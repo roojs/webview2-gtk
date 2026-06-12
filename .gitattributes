@@ -1,0 +1,13 @@
+# MSYS2 makepkg and bash scripts break on CRLF (GitHub Actions runs on Windows).
+* text=auto eol=lf
+
+*.sh text eol=lf
+PKGBUILD text eol=lf
+packaging/** text eol=lf
+
+# Vala / Meson / headers — keep LF
+*.vala text eol=lf
+*.build text eol=lf
+*.vapi text eol=lf
+meson.build text eol=lf
+meson_options.txt text eol=lf

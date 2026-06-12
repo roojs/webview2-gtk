@@ -21,5 +21,11 @@ if ! command -v "${MAKEPKG}" >/dev/null 2>&1; then
 fi
 
 cd "${PKG_DIR}"
+
+# Windows checkouts may introduce CRLF; makepkg refuses to source PKGBUILD with \r.
+if grep -q $'\r' PKGBUILD 2>/dev/null; then
+	sed -i 's/\r$//' PKGBUILD
+fi
+
 "${MAKEPKG}" -C -f --noconfirm --skipchecksums "$@"
 echo "build-pacman-package: ${PKG_DIR}/mingw-w64-ucrt-x86_64-webview2gtk-"*.pkg.tar.zst
