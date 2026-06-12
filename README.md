@@ -2,6 +2,8 @@
 
 **GTK 4** widget embedding **Microsoft Edge WebView2** on Windows — a practical substitute for WebKitGTK when you already use GTK and need a modern HTML engine.
 
+![webview2-gtk browser demo](https://github.com/user-attachments/assets/6cbc26f0-a172-4615-ac48-70d2cc9bef53)
+
 The widget takes the native HWND from `gdk_win32_surface_get_handle()` on the window’s `GdkSurface` and parents WebView2 there.
 
 Build this library on **Windows**. Anything that links against it must be built on Windows too — there is no Linux cross-compile path.
