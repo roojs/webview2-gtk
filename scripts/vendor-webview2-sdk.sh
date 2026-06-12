@@ -46,7 +46,7 @@ extract_nupkg() {
 	if tar -xf "${NUPKG}" -C "${EXTRACT}" 2>/dev/null; then
 		return 0
 	fi
-	echo "error: need unzip to extract .nupkg (Windows: rerun setup-msys2-toolchain.sh or pacman -S unzip)" >&2
+	echo "error: need unzip or tar to extract .nupkg (vendor-webview2-sdk.sh)" >&2
 	exit 1
 }
 

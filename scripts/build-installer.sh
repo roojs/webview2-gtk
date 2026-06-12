@@ -19,7 +19,7 @@ if [[ ! -f "${STAGE}/lib/libwebview2gtk-1.a" ]]; then
 fi
 
 if ! command -v makensis >/dev/null 2>&1; then
-	echo "build-installer: install NSIS: pacman -S nsis" >&2
+	echo "build-installer: install NSIS: pacman -S mingw-w64-ucrt-x86_64-nsis" >&2
 	exit 1
 fi
 

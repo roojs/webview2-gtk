@@ -71,7 +71,7 @@ PKGBUILD: [`packaging/msys2/PKGBUILD`](packaging/msys2/PKGBUILD)
 Run once:
 
 ```text
-C:\msys64\ucrt64.exe -c "pacman -Syu --noconfirm && pacman -S --needed --noconfirm mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-vala mingw-w64-ucrt-x86_64-meson mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-pkg-config mingw-w64-ucrt-x86_64-gtk4 mingw-w64-ucrt-x86_64-cantarell-fonts mingw-w64-ucrt-x86_64-curl mingw-w64-ucrt-x86_64-unzip"
+C:\msys64\ucrt64.exe -c "pacman -Syu --noconfirm && pacman -S --needed --noconfirm mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-vala mingw-w64-ucrt-x86_64-meson mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-pkg-config mingw-w64-ucrt-x86_64-gtk4 mingw-w64-ucrt-x86_64-cantarell-fonts mingw-w64-ucrt-x86_64-curl mingw-w64-ucrt-x86_64-nsis"
 ```
 
 ## Build this library
@@ -145,7 +145,7 @@ dist\webview2gtk\
 
 ### Build the Windows installer (.exe)
 
-After the install step above (also needs NSIS once: add `nsis` to the pacman line in setup, or `pacman -S nsis` via the same one-liner pattern):
+After the install step above (also needs NSIS once: `pacman -S mingw-w64-ucrt-x86_64-nsis` in UCRT64):
 
 ```text
 C:\msys64\ucrt64.exe -c "cd /c/path/to/webview2-gtk && ./scripts/build-installer.sh dist/webview2gtk"
