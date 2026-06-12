@@ -38,15 +38,25 @@ fi
 
 extract_nupkg() {
 	mkdir -p "${EXTRACT}"
-	# .nupkg is zip. Extract to /tmp (not X:); copy only headers/DLLs into build/vendor/.
+	# .nupkg is zip. UCRT64 has no unzip on PATH unless msys/unzip is installed.
 	if command -v unzip >/dev/null 2>&1; then
 		unzip -q -o "${NUPKG}" -d "${EXTRACT}"
 		return 0
 	fi
-	if tar -xf "${NUPKG}" -C "${EXTRACT}" 2>/dev/null; then
+	if [[ -x /usr/bin/unzip ]]; then
+		/usr/bin/unzip -q -o "${NUPKG}" -d "${EXTRACT}"
 		return 0
 	fi
-	echo "error: need unzip or tar to extract .nupkg (vendor-webview2-sdk.sh)" >&2
+	if command -v bsdtar >/dev/null 2>&1; then
+		bsdtar -xf "${NUPKG}" -C "${EXTRACT}"
+		return 0
+	fi
+	if command -v python3 >/dev/null 2>&1; then
+		python3 -c 'import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])' \
+			"${NUPKG}" "${EXTRACT}"
+		return 0
+	fi
+	echo "error: need unzip to extract .nupkg (pacman -S unzip in MSYS2)" >&2
 	exit 1
 }
 

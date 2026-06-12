@@ -25,6 +25,7 @@ makedepends=(
   'mingw-w64-ucrt-x86_64-ninja'
   'mingw-w64-ucrt-x86_64-pkg-config'
   'mingw-w64-ucrt-x86_64-curl'
+  'unzip'
 )
 options=('!strip' '!emptydirs')
 source=()
