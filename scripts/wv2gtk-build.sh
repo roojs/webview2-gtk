@@ -38,9 +38,7 @@ HOST_VALA_ARGS=(
 	--profile=posix
 	--pkg win32-ui-webview2
 	--pkg win32-ui-windowsandmessaging
-	--pkg win32-system-stub
 	--pkg win32-foundation-stub
-	--pkg win32-graphics-gdi
 )
 
 GTK_VALA_ARGS=(

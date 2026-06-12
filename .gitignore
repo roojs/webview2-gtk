@@ -6,3 +6,4 @@
 *.pkg.tar.zst
 packaging/msys2/src/
 .specstory/
+.cursorindexingignore
