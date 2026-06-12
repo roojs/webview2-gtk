@@ -52,9 +52,10 @@ jobs:
             cd "${WEBVIEW2GTK_DIR}"
           fi
           ./scripts/vendor-webview2-sdk.sh
-          meson setup build --prefix=/webview2gtk
+          mkdir -p dist
+          meson setup build --prefix="$(pwd)/dist/webview2gtk"
           meson compile -C build
-          meson install -C build --destdir="$PWD/dist"
+          meson install -C build
           echo "PKG_CONFIG_PATH=${{ github.workspace }}/${WEBVIEW2GTK_DIR}/dist/webview2gtk/lib/pkgconfig" >> "${GITHUB_ENV}"
 
       - name: Build app

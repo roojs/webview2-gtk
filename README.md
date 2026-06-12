@@ -87,7 +87,7 @@ C:\msys64\ucrt64.exe -c "cd /c/path/to/webview2-gtk && ./scripts/vendor-webview2
 | Step | Demo location | `bin\` folder? |
 |------|----------------|----------------|
 | `meson compile` only | `build\webview2gtk-hello.exe` (next to `build\`, not in a subfolder) | **No** |
-| `meson install --destdir=dist` | `dist\webview2gtk\bin\*.exe` | Yes |
+| `meson install` (with `--prefix=$(pwd)/dist/webview2gtk`) | `dist\webview2gtk\bin\*.exe` | Yes |
 | `webview2gtk-setup.exe` | `C:\Program Files\webview2gtk\bin\` | Yes |
 | pacman package | `C:\msys64\ucrt64\bin\` | Yes (ucrt64 bin, not in the repo) |
 
@@ -131,7 +131,7 @@ Override the SSH host: `AGENT_WIN_HOST=my-win-pc ./scripts/agent-remote-build.sh
 Install to a prefix (for other Meson projects):
 
 ```text
-C:\msys64\ucrt64.exe -c "cd /c/path/to/webview2-gtk && meson setup build --prefix=/webview2gtk && meson compile -C build && meson install -C build --destdir=dist"
+C:\msys64\ucrt64.exe -c "cd /c/path/to/webview2-gtk && mkdir -p dist && meson setup build --prefix=\$(pwd)/dist/webview2gtk && meson compile -C build && meson install -C build"
 ```
 
 That produces `dist\webview2gtk\`:

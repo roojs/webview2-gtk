@@ -14,7 +14,7 @@ VERSION="$(grep -E "^[[:space:]]*version:" "${ROOT}/meson.build" | head -1 | sed
 
 if [[ ! -f "${STAGE}/lib/libwebview2gtk-1.a" ]]; then
 	echo "build-installer: missing ${STAGE}/lib/libwebview2gtk-1.a" >&2
-	echo "Run: meson install -C build --destdir=dist --prefix=/webview2gtk" >&2
+	echo "Run: meson setup build --prefix=\"\$(pwd)/dist/webview2gtk\" && meson install -C build" >&2
 	exit 1
 fi
 
@@ -24,6 +24,11 @@ if ! command -v makensis >/dev/null 2>&1; then
 fi
 
 WIN_SRC="$(cygpath -aw "${STAGE}")"
+OUT_EXE="$(cygpath -aw "${ROOT}/webview2gtk-setup.exe")"
 cd "${ROOT}"
-makensis -DINST_SRC="${WIN_SRC}" -DPRODUCT_VERSION="${VERSION}" packaging/webview2gtk.nsi
+makensis \
+	-DINST_SRC="${WIN_SRC}" \
+	-DPRODUCT_VERSION="${VERSION}" \
+	-DOUTFILE="${OUT_EXE}" \
+	packaging/webview2gtk.nsi
 echo "build-installer: ${ROOT}/webview2gtk-setup.exe"

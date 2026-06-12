@@ -9,7 +9,10 @@
 !include "MUI2.nsh"
 
 Name "webview2-gtk"
-OutFile "webview2gtk-setup.exe"
+!ifndef OUTFILE
+  !define OUTFILE "webview2gtk-setup.exe"
+!endif
+OutFile "${OUTFILE}"
 InstallDir "$PROGRAMFILES64\webview2gtk"
 InstallDirRegKey HKLM "Software\webview2-gtk" "InstallDir"
 RequestExecutionLevel admin

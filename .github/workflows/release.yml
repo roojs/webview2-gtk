@@ -45,9 +45,10 @@ jobs:
       - name: Build NSIS installer
         run: |
           ./scripts/vendor-webview2-sdk.sh
-          meson setup build --prefix=/webview2gtk
+          mkdir -p dist
+          meson setup build --prefix="$(pwd)/dist/webview2gtk"
           meson compile -C build
-          meson install -C build --destdir="$PWD/dist"
+          meson install -C build
           ./scripts/build-installer.sh dist/webview2gtk
 
       - name: Collect artifacts
