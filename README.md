@@ -247,7 +247,7 @@ That copies your exe, `WebView2Loader.dll`, and missing GTK/GLib DLLs from the t
 
 Add webview2-gtk as a **submodule** at `webview2-gtk/` to skip the clone step, or point `WEBVIEW2GTK_REPO` at your fork.
 
-(This library’s own releases use [`.github/workflows/windows-build.yml`](.github/workflows/windows-build.yml) to publish **`webview2gtk-setup.exe`** and **`mingw-w64-ucrt-x86_64-webview2gtk-*.pkg.tar.zst`**.)
+(This library’s own releases use [`.github/workflows/release.yml`](.github/workflows/release.yml): push a tag like `v0.1.0` to build and publish **`webview2gtk-setup.exe`** and **`mingw-w64-ucrt-x86_64-webview2gtk-*.pkg.tar.zst`**. Manual run: Actions → Release → Run workflow.)
 
 ## API (WebKitGTK 6–aligned)
 
@@ -285,7 +285,7 @@ packaging/          NSIS installer + packaging/msys2/PKGBUILD (pacman)
 scripts/            vendor SDK, build, sample-build.sh, sample-package-windows.sh,
                     sample-github-build-windows.yml, agent-remote-build.sh,
                     build-pacman-package.sh
-.github/workflows/  Windows CI (this library’s webview2gtk-setup.exe)
+.github/workflows/  Release CI (tag `v*` → setup.exe + pacman package)
 ```
 
 ## Manual build (without top-level Meson)
