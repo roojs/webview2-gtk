@@ -28,7 +28,7 @@ jobs:
         shell: msys2 {0}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: msys2/setup-msys2@v2
         with:
@@ -69,7 +69,7 @@ jobs:
           WEBVIEW2_LOADER_SRC="${WEBVIEW2GTK_DIR}/dist/webview2gtk/bin/WebView2Loader.dll" \
           ./scripts/package-windows.sh
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: windows-app
           path: dist/
