@@ -38,7 +38,7 @@ fi
 
 extract_nupkg() {
 	mkdir -p "${EXTRACT}"
-	# .nupkg is zip. UCRT64 has no unzip on PATH unless msys/unzip is installed.
+	# .nupkg is zip. There is no mingw-w64-*-unzip; use msys/unzip or other zip readers.
 	if command -v unzip >/dev/null 2>&1; then
 		unzip -q -o "${NUPKG}" -d "${EXTRACT}"
 		return 0
@@ -48,15 +48,17 @@ extract_nupkg() {
 		return 0
 	fi
 	if command -v bsdtar >/dev/null 2>&1; then
-		bsdtar -xf "${NUPKG}" -C "${EXTRACT}"
-		return 0
+		bsdtar -xf "${NUPKG}" -C "${EXTRACT}" && return 0
+	fi
+	if [[ -x /usr/bin/bsdtar ]]; then
+		/usr/bin/bsdtar -xf "${NUPKG}" -C "${EXTRACT}" && return 0
 	fi
 	if command -v python3 >/dev/null 2>&1; then
 		python3 -c 'import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])' \
 			"${NUPKG}" "${EXTRACT}"
 		return 0
 	fi
-	echo "error: need unzip to extract .nupkg (pacman -S unzip in MSYS2)" >&2
+	echo "error: need unzip, bsdtar, or python3 to extract .nupkg (pacman -S unzip)" >&2
 	exit 1
 }
 

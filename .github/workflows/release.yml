@@ -28,6 +28,7 @@ jobs:
           update: true
           install: >-
             base-devel
+            unzip
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-vala
             mingw-w64-ucrt-x86_64-meson
@@ -36,7 +37,6 @@ jobs:
             mingw-w64-ucrt-x86_64-gtk4
             mingw-w64-ucrt-x86_64-curl
             mingw-w64-ucrt-x86_64-nsis
-          pacboy: unzip:p
 
       - name: Build pacman package
         run: ./scripts/build-pacman-package.sh
