@@ -40,19 +40,16 @@ prepare() {
   rm -rf "$srcdir/webview2-gtk"
   mkdir -p "$srcdir/webview2-gtk"
 
-  # srcdir is packaging/msys2/src — never cp -a the whole repo (copies into itself).
-  if [[ -d "$root/.git" ]]; then
-    git -C "$root" archive --format=tar HEAD | tar -xf - -C "$srcdir/webview2-gtk"
-  else
-    (cd "$root" && tar -cf - \
-      --exclude='./packaging/msys2/src' \
-      --exclude='./build' \
-      --exclude='./build-remote' \
-      --exclude='./dist' \
-      --exclude='./.git' \
-      --exclude='./packaging/msys2/*.pkg.tar.zst' \
-      .) | (cd "$srcdir/webview2-gtk" && tar -xf -)
-  fi
+  # srcdir is packaging/msys2/src — exclude it so we never copy the tree into itself.
+  # Use tar only (no git): UCRT64 makepkg does not have /usr/bin/git on PATH.
+  (cd "$root" && tar -cf - \
+    --exclude='./packaging/msys2/src' \
+    --exclude='./build' \
+    --exclude='./build-remote' \
+    --exclude='./dist' \
+    --exclude='./.git' \
+    --exclude='./packaging/msys2/*.pkg.tar.zst' \
+    .) | (cd "$srcdir/webview2-gtk" && tar -xf -)
 }
 
 build() {
