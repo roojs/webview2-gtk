@@ -1,0 +1,10 @@
+prefix=@prefix@
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: webview2gtk-1
+Description: GTK 4 WebView2 widget for Windows (Edge Chromium)
+Version: 0.1.0
+Requires: gtk4
+Libs: -L${libdir} -lwebview2gtk-1 -lole32 -luuid -lshell32 -ladvapi32
+Cflags: -I${includedir}/webview2gtk-1

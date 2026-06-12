@@ -1,0 +1,62 @@
+# Build webview2-gtk on Windows; release = setup.exe + MSYS2 pacman package.
+name: Windows build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            base-devel
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-vala
+            mingw-w64-ucrt-x86_64-meson
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkg-config
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-curl
+            mingw-w64-ucrt-x86_64-unzip
+            nsis
+
+      - name: Build pacman package
+        run: ./scripts/build-pacman-package.sh
+
+      - name: Build NSIS installer
+        run: |
+          ./scripts/vendor-webview2-sdk.sh
+          meson setup build --prefix=/webview2gtk
+          meson compile -C build
+          meson install -C build --destdir="$PWD/dist"
+          ./scripts/build-installer.sh dist/webview2gtk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: webview2gtk-windows-x64
+          path: |
+            webview2gtk-setup.exe
+            packaging/msys2/mingw-w64-ucrt-x86_64-webview2gtk-*.pkg.tar.zst
+
+      - name: Upload release assets
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            webview2gtk-setup.exe
+            packaging/msys2/mingw-w64-ucrt-x86_64-webview2gtk-*.pkg.tar.zst

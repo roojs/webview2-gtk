@@ -1,0 +1,36 @@
+# Sample Meson snippet for a cross-platform GTK 4 + Vala app that uses
+# WebKitGTK on Linux and webview2gtk on Windows.
+#
+# Copy the relevant parts into your project's meson.build.
+
+project('my-browser-app', ['c', 'vala'], version: '1.0.0')
+
+gtk4 = dependency('gtk4')
+win = host_machine.system() == 'windows'
+
+if win
+  # Option A: prebuilt release unpacked to C:/webview2gtk (see README)
+examples/consumer-meson.build
+  if not meson.is_cross_build()
+    meson.add_env('PKG_CONFIG_PATH', webview2gtk_pc, method: 'prepend')
+  endif
+  webview_dep = dependency('webview2gtk-1', required: true)
+  vala_args = ['-D', 'WINDOWS']
+else
+  webview_dep = dependency('webkitgtk-6.0', version: '>= 6.0')
+  vala_args = []
+endif
+
+sources = files('src/main.vala')
+
+executable(
+  'my-browser-app',
+  sources,
+  dependencies: [gtk4, webview_dep],
+  vala_args: vala_args,
+  install: true,
+)
+
+# After install on Windows, ship next to my-browser-app.exe:
+#   WebView2Loader.dll
+#   GTK 4 DLLs from MSYS2 UCRT64 (if users run outside the UCRT64 shell)

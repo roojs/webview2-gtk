@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+# Build webview2-gtk library and examples (MSYS2 UCRT64 / native Windows).
+#
+# Usage:
+#   wv2gtk-build.sh lib      <builddir> <prefix>
+#   wv2gtk-build.sh hello    <builddir> <out.exe>
+#   wv2gtk-build.sh browser  <builddir> <out.exe>
+set -euo pipefail
+
+MODE="${1:?mode: lib|hello|browser}"
+BUILD_DIR="${2:?build directory}"
+OUT="${3:?output (prefix for lib, exe for examples)}"
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+VAPI="${ROOT}/vapi"
+GEN="${ROOT}/generated"
+HOST="${ROOT}/lib/host"
+WIDGET_INC="${ROOT}/lib/webview2gtk"
+GDK_WIN32_C="${WIDGET_INC}/webview2gtk-gdk-win32.c"
+WEBVIEW2_INC="${ROOT}/build/vendor/webview2/include"
+
+if [[ ! -f "${WEBVIEW2_INC}/WebView2.h" ]]; then
+	echo "wv2gtk-build: run ./scripts/vendor-webview2-sdk.sh first" >&2
+	exit 1
+fi
+
+HOST_VALA=(
+	"${HOST}/win32-ui-webview2-host.vala"
+	"${HOST}/webview2gtk-host-listeners.vala"
+	"${GEN}/win32-ui-webview2-host-glue.vala"
+	"${GEN}/win32-ui-webview2-com-sync.vala"
+	"${GEN}/win32-wide-strings.vala"
+	"${GEN}/win32-ui-webview2-events-bridge.vala"
+)
+
+HOST_VALA_ARGS=(
+	--vapidir "${VAPI}"
+	--profile=posix
+	--pkg win32-ui-webview2
+	--pkg win32-ui-windowsandmessaging
+	--pkg win32-system-stub
+	--pkg win32-foundation-stub
+	--pkg win32-graphics-gdi
+)
+
+GTK_VALA_ARGS=(
+	--vapidir "${VAPI}"
+	--profile=gobject
+	--pkg gtk4
+)
+
+CC_QUIET=(
+	-Wno-discarded-qualifiers
+	-Wno-incompatible-pointer-types
+	-Wno-implicit-function-declaration
+)
+
+WEBVIEW2_LINK=( -lole32 -luuid -lshell32 -ladvapi32 )
+GTK_CFLAGS="$(pkg-config --cflags gtk4)"
+GTK_LIBS="$(pkg-config --libs gtk4)"
+
+compile_host_c() {
+	local host_dir="$1"
+	mkdir -p "${host_dir}"
+	valac "${HOST_VALA_ARGS[@]}" -C -d "${host_dir}" "${HOST_VALA[@]}"
+}
+
+host_c_files() {
+	local host_dir="$1"
+	echo \
+		"${host_dir}/win32-ui-webview2-host.c" \
+		"${host_dir}/webview2gtk-host-listeners.c" \
+		"${host_dir}/win32-ui-webview2-host-glue.c" \
+		"${host_dir}/win32-ui-webview2-com-sync.c" \
+		"${host_dir}/win32-wide-strings.c" \
+		"${host_dir}/win32-ui-webview2-events-bridge.c" \
+		"${GEN}/win32-ui-webview2-com-sync.c" \
+		"${GEN}/win32-ui-webview2-events.c" \
+		"${HOST}/win32-ui-webview2-loader.c" \
+		"${HOST}/win32-ui-webview2-com-glue.c"
+}
+
+inc_flags() {
+	local host_dir="$1"
+	local extra_dir="${2:-}"
+	local -a flags=(
+		-mwindows
+		-I"${host_dir}"
+		-I"${GEN}"
+		-I"${WEBVIEW2_INC}"
+		-I"${HOST}"
+		-I"${WIDGET_INC}"
+	)
+	if [[ -n "${extra_dir}" ]]; then
+		flags+=(-I"${extra_dir}")
+	fi
+	# shellcheck disable=SC2086
+	echo "${flags[@]}" ${GTK_CFLAGS}
+}
+
+compile_host_objects() {
+	local host_dir="$1"
+	local obj_dir="$2"
+	mkdir -p "${obj_dir}"
+	# shellcheck disable=SC2046,SC2086
+	for src in $(host_c_files "${host_dir}"); do
+		local base
+		base="$(basename "${src}" .c)"
+		cc -c "${CC_QUIET[@]}" $(inc_flags "${host_dir}") \
+			-o "${obj_dir}/${base}.o" "${src}"
+	done
+}
+
+case "${MODE}" in
+	lib)
+		PREFIX="${OUT}"
+		HOST_DIR="${BUILD_DIR}/host"
+		GTK_DIR="${BUILD_DIR}/gtk-lib"
+		OBJ_DIR="${BUILD_DIR}/obj"
+		mkdir -p "${PREFIX}/lib" "${PREFIX}/include/webview2gtk-1" "${PREFIX}/lib/pkgconfig"
+		compile_host_c "${HOST_DIR}"
+		(
+			cd "${ROOT}"
+			valac "${GTK_VALA_ARGS[@]}" --vapidir "${VAPI}" -C -d "${GTK_DIR}" \
+				lib/webview2gtk/webview.vala
+		)
+		compile_host_objects "${HOST_DIR}" "${OBJ_DIR}"
+		cc -c "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
+			-o "${OBJ_DIR}/webview2gtk-gdk-win32.o" "${GDK_WIN32_C}"
+		cc -c "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
+			-o "${OBJ_DIR}/webview.o" "${GTK_DIR}/lib/webview2gtk/webview.c"
+		ar rcs "${PREFIX}/lib/libwebview2gtk-1.a" "${OBJ_DIR}"/*.o
+		cp -f "${VAPI}/webview2gtk-1.vapi" "${PREFIX}/lib/webview2gtk-1.vapi"
+		cp -f "${WIDGET_INC}/webview2gtk.h" "${PREFIX}/include/webview2gtk-1/webview2gtk.h"
+		cp -f "${HOST}/webview2gtk-host-api.h" "${PREFIX}/include/webview2gtk-1/"
+		sed "s|@prefix@|${PREFIX}|g" "${ROOT}/webview2gtk-1.pc.in" > "${PREFIX}/lib/pkgconfig/webview2gtk-1.pc"
+		cp -f "${ROOT}/build/vendor/webview2/x64/WebView2Loader.dll" "${PREFIX}/lib/" 2>/dev/null || true
+		;;
+	hello|browser)
+		;;
+	*)
+		echo "unknown mode: ${MODE}" >&2
+		exit 1
+		;;
+esac
+
+if [[ "${MODE}" != lib ]]; then
+	HOST_DIR="${BUILD_DIR}/host"
+	GTK_DIR="${BUILD_DIR}/gtk-${MODE}"
+	compile_host_c "${HOST_DIR}"
+	(
+		cd "${ROOT}"
+		valac "${GTK_VALA_ARGS[@]}" --vapidir "${VAPI}" -C -d "${GTK_DIR}" \
+			lib/webview2gtk/webview.vala \
+			"examples/${MODE}/main.vala"
+	)
+	MAIN_C="${GTK_DIR}/examples/${MODE}/main.c"
+	WIDGET_C="${GTK_DIR}/lib/webview2gtk/webview.c"
+	# shellcheck disable=SC2046,SC2086
+	cc "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
+		-o "${OUT}" \
+		"${MAIN_C}" \
+		"${WIDGET_C}" \
+		"${GDK_WIN32_C}" \
+		$(host_c_files "${HOST_DIR}") \
+		"${WEBVIEW2_LINK[@]}" \
+		${GTK_LIBS}
+	cp -f "${ROOT}/build/vendor/webview2/x64/WebView2Loader.dll" "$(dirname "${OUT}")/" 2>/dev/null || true
+fi
+
+echo "wv2gtk-build: ${MODE} -> ${OUT}"

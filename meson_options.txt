@@ -1,0 +1,1 @@
+option('examples', type: 'boolean', value: true, description: 'Build hello and browser demos')

@@ -1,0 +1,87 @@
+# Sample GitHub Actions workflow — build your app on Windows with webview2gtk.
+#
+# 1. Copy to your repo:  .github/workflows/build-windows.yml
+# 2. Copy also:          scripts/sample-package-windows.sh  →  scripts/package-windows.sh
+# 3. Edit the env block and the "Build app" step below.
+# 4. Push — uploads dist/ as an artifact; on Release attaches my-app-windows.zip.
+#
+name: Build Windows app
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+  release:
+    types: [published]
+
+env:
+  WEBVIEW2GTK_DIR: webview2-gtk
+  WEBVIEW2GTK_REPO: https://github.com/YOUR_ORG/webview2-gtk.git
+  APP_BUILD_DIR: build
+  APP_EXE_NAME: my-browser-app.exe
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-vala
+            mingw-w64-ucrt-x86_64-meson
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkg-config
+            mingw-w64-ucrt-x86_64-gtk4
+
+      - name: Build webview2gtk
+        run: |
+          if [[ -d "${WEBVIEW2GTK_DIR}/meson.build" ]]; then
+            cd "${WEBVIEW2GTK_DIR}"
+          else
+            git clone --depth 1 "${WEBVIEW2GTK_REPO}" "${WEBVIEW2GTK_DIR}"
+            cd "${WEBVIEW2GTK_DIR}"
+          fi
+          ./scripts/vendor-webview2-sdk.sh
+          meson setup build --prefix=/webview2gtk
+          meson compile -C build
+          meson install -C build --destdir="$PWD/dist"
+          echo "PKG_CONFIG_PATH=${{ github.workspace }}/${WEBVIEW2GTK_DIR}/dist/webview2gtk/lib/pkgconfig" >> "${GITHUB_ENV}"
+
+      - name: Build app
+        run: |
+          # --- edit for your project ---
+          meson setup "${APP_BUILD_DIR}"
+          meson compile -C "${APP_BUILD_DIR}"
+
+      - name: Package for release
+        run: |
+          EXE_PATH="${APP_BUILD_DIR}/${APP_EXE_NAME}" \
+          OUT_DIR=dist \
+          WEBVIEW2_LOADER_SRC="${WEBVIEW2GTK_DIR}/dist/webview2gtk/bin/WebView2Loader.dll" \
+          ./scripts/package-windows.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-app
+          path: dist/
+
+      - name: Upload release zip
+        if: github.event_name == 'release'
+        run: |
+          cd dist
+          zip -r ../my-app-windows.zip .
+
+      - name: Attach to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: my-app-windows.zip

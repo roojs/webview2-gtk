@@ -1,0 +1,8 @@
+/build/
+/.meson-private/
+*.exe
+*.o
+*.a
+*.pkg.tar.zst
+packaging/msys2/src/
+.specstory/

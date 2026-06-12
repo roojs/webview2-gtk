@@ -1,0 +1,71 @@
+# Maintainer: webview2-gtk contributors
+# Build (MSYS2 UCRT64):
+#   cd packaging/msys2
+#   makepkg-mingw -C -f --noconfirm
+# Install:
+#   pacman -U mingw-w64-ucrt-x86_64-webview2gtk-*.pkg.tar.zst
+#
+# Or from repo root:
+#   ./scripts/build-pacman-package.sh
+
+pkgname=mingw-w64-ucrt-x86_64-webview2gtk
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="GTK 4 WebView2 widget for Windows (Edge Chromium)"
+arch=('any')
+url="https://github.com/YOUR_ORG/webview2-gtk"
+license=('LGPL-2.1-or-later')
+depends=(
+  'mingw-w64-ucrt-x86_64-gtk4'
+)
+makedepends=(
+  'mingw-w64-ucrt-x86_64-gcc'
+  'mingw-w64-ucrt-x86_64-vala'
+  'mingw-w64-ucrt-x86_64-meson'
+  'mingw-w64-ucrt-x86_64-ninja'
+  'mingw-w64-ucrt-x86_64-pkg-config'
+  'mingw-w64-ucrt-x86_64-curl'
+  'mingw-w64-ucrt-x86_64-unzip'
+)
+options=('!strip' '!emptydirs')
+source=()
+sha256sums=()
+
+_repo_root() {
+  cd "$(dirname "${BASH_SOURCE[0]}")/../.."
+  pwd
+}
+
+prepare() {
+  local root="$(_repo_root)"
+  rm -rf "$srcdir/webview2-gtk"
+  cp -a "$root" "$srcdir/webview2-gtk"
+  rm -rf \
+    "$srcdir/webview2-gtk/build" \
+    "$srcdir/webview2-gtk/dist" \
+    "$srcdir/webview2-gtk/.git" \
+    "$srcdir/webview2-gtk/packaging/msys2/src"
+  rm -f "$srcdir/webview2-gtk/packaging/msys2"/*.pkg.tar.zst
+}
+
+build() {
+  cd "$srcdir/webview2-gtk"
+  ./scripts/vendor-webview2-sdk.sh
+  meson setup build --prefix="$MINGW_PREFIX" -Dexamples=true
+  meson compile -C build
+}
+
+package() {
+  cd "$srcdir/webview2-gtk"
+  meson install -C build --destdir="$pkgdir"
+
+  # pkg-config prefix must be the mingw root, not the staging path
+  local pc="$pkgdir${MINGW_PREFIX}/lib/pkgconfig/webview2gtk-1.pc"
+  if [[ -f "$pc" ]]; then
+    sed -i "s|^prefix=.*|prefix=${MINGW_PREFIX}|" "$pc"
+  fi
+
+  if [[ -f LICENSE ]]; then
+    install -Dm644 LICENSE "$pkgdir${MINGW_PREFIX}/share/licenses/${pkgname}/LICENSE"
+  fi
+}
