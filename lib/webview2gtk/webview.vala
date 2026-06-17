@@ -93,7 +93,7 @@ public class WebView : Gtk.Box {
 	private bool _is_loading = false;
 	private double _estimated_load_progress = 0.0;
 	private double _zoom_level = 1.0;
-	private Settings _capture_settings = new Settings ();
+	private WebViewSettings _capture_settings = new WebViewSettings ();
 	private NetworkSession _network_session = new NetworkSession ();
 
 	public bool is_loading {
@@ -228,7 +228,7 @@ public class WebView : Gtk.Box {
 		}
 	}
 
-	public new Settings get_settings () {
+	public new WebViewSettings get_settings () {
 		return _capture_settings;
 	}
 

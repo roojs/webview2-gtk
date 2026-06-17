@@ -131,28 +131,34 @@ case "${MODE}" in
 		OBJ_DIR="${BUILD_DIR}/obj"
 		mkdir -p "${PREFIX}/lib" "${PREFIX}/include/webview2gtk-1" "${PREFIX}/lib/pkgconfig"
 		compile_host_c "${HOST_DIR}"
+		mkdir -p "${GTK_DIR}/lib/webview2gtk"
 		(
 			cd "${ROOT}"
-			valac "${GTK_VALA_ARGS[@]}" --vapidir "${VAPI}" -C -d "${GTK_DIR}" \
+			valac "${GTK_VALA_ARGS[@]}" --vapidir "${VAPI}" \
+				-C -H "${GTK_DIR}/lib/webview2gtk/webview2gtk.h" \
+				--library=webview2gtk-1 \
+				-d "${GTK_DIR}" \
 				lib/webview2gtk/webview.vala \
 				"${CAPTURE_VALA[@]}"
 		)
+		GTK_HEADER="${GTK_DIR}/lib/webview2gtk/webview2gtk.h"
+		if [[ ! -f "${GTK_HEADER}" ]]; then
+			echo "wv2gtk-build: ${GTK_HEADER} not generated" >&2
+			exit 1
+		fi
 		compile_host_objects "${HOST_DIR}" "${OBJ_DIR}"
 		cc -c "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
 			-o "${OBJ_DIR}/webview2gtk-gdk-win32.o" "${GDK_WIN32_C}"
-		cc -c "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
-			-o "${OBJ_DIR}/webview.o" "${GTK_DIR}/lib/webview2gtk/webview.c"
 		for src in "${GTK_DIR}/lib/webview2gtk"/*.c; do
 			base="$(basename "${src}" .c)"
-			if [[ "${base}" == "webview" ]]; then
-				continue
-			fi
 			cc -c "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
+				-include "${GTK_HEADER}" \
 				-o "${OBJ_DIR}/${base}.o" "${src}"
 		done
 		ar rcs "${PREFIX}/lib/libwebview2gtk-1.a" "${OBJ_DIR}"/*.o
 		cp -f "${VAPI}/webview2gtk-1.vapi" "${PREFIX}/lib/webview2gtk-1.vapi"
-		cp -f "${WIDGET_INC}/webview2gtk.h" "${PREFIX}/include/webview2gtk-1/webview2gtk.h"
+		cp -f "${GTK_HEADER}" "${PREFIX}/include/webview2gtk-1/webview2gtk.h"
+		cp -f "${GTK_HEADER}" "${WIDGET_INC}/webview2gtk.h"
 		cp -f "${HOST}/webview2gtk-host-api.h" "${PREFIX}/include/webview2gtk-1/"
 		sed "s|@prefix@|${PREFIX}|g" "${ROOT}/webview2gtk-1.pc.in" > "${PREFIX}/lib/pkgconfig/webview2gtk-1.pc"
 		cp -f "${ROOT}/build/vendor/webview2/x64/WebView2Loader.dll" "${PREFIX}/lib/" 2>/dev/null || true
@@ -177,12 +183,15 @@ if [[ "${MODE}" != lib ]]; then
 			"examples/${MODE}/main.vala"
 	)
 	MAIN_C="${GTK_DIR}/examples/${MODE}/main.c"
-	WIDGET_C="${GTK_DIR}/lib/webview2gtk/webview.c"
+	GTK_C=()
+	for src in "${GTK_DIR}/lib/webview2gtk"/*.c; do
+		GTK_C+=("${src}")
+	done
 	# shellcheck disable=SC2046,SC2086
 	cc "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
 		-o "${OUT}" \
 		"${MAIN_C}" \
-		"${WIDGET_C}" \
+		"${GTK_C[@]}" \
 		"${GDK_WIN32_C}" \
 		$(host_c_files "${HOST_DIR}") \
 		"${WEBVIEW2_LINK[@]}" \

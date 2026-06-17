@@ -60,7 +60,7 @@ namespace WebView2Gtk {
 		public void set_tls_errors_policy (TLSErrorsPolicy policy);
 	}
 
-	public class Settings : GLib.Object {
+	public class WebViewSettings : GLib.Object {
 		public string user_agent { get; set; }
 		public HardwareAccelerationPolicy hardware_acceleration_policy { get; set; }
 		public bool enable_javascript { get; set; }
@@ -102,7 +102,7 @@ namespace WebView2Gtk {
 		public bool is_loading { get; }
 		public double estimated_load_progress { get; }
 		public bool ready { get; }
-		public new Settings get_settings ();
+		public new WebViewSettings get_settings ();
 		public NetworkSession get_network_session ();
 		public async Gdk.Texture get_snapshot (
 			SnapshotRegion region,
