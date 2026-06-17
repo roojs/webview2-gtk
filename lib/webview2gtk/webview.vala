@@ -93,6 +93,8 @@ public class WebView : Gtk.Box {
 	private bool _is_loading = false;
 	private double _estimated_load_progress = 0.0;
 	private double _zoom_level = 1.0;
+	private Settings _capture_settings = new Settings ();
+	private NetworkSession _network_session = new NetworkSession ();
 
 	public bool is_loading {
 		get { return _is_loading; }
@@ -224,6 +226,85 @@ public class WebView : Gtk.Box {
 		if (_attached && wv2_host_is_ready ()) {
 			wv2_host_put_zoom_factor (zoom_level);
 		}
+	}
+
+	public new Settings get_settings () {
+		return _capture_settings;
+	}
+
+	public NetworkSession get_network_session () {
+		return _network_session;
+	}
+
+	public async Gdk.Texture get_snapshot (
+		SnapshotRegion region,
+		SnapshotOptions options,
+		GLib.Cancellable? cancellable = null
+	) throws GLib.Error {
+		var full_document = region == SnapshotRegion.FULL_DOCUMENT;
+		uint8[]? png_bytes = null;
+		var capture_ok = false;
+		new Thread<void> ("wv2-snapshot", () => {
+			string? devtools_json = null;
+			capture_ok = wv2_capture_screenshot_sync (full_document, out devtools_json);
+			if (capture_ok && devtools_json != null) {
+				try {
+					const string marker = "\"data\":\"";
+					var start = devtools_json.index_of (marker);
+					if (start < 0) {
+						capture_ok = false;
+					} else {
+						start += marker.length;
+						var end = devtools_json.index_of_char ('"', start);
+						if (end < 0) {
+							capture_ok = false;
+						} else {
+							png_bytes = Base64.decode (
+								devtools_json.substring (start, end - start)
+							);
+						}
+					}
+				} catch (GLib.Error e) {
+					capture_ok = false;
+				}
+			}
+			Idle.add (() => {
+				get_snapshot.callback ();
+				return false;
+			});
+		});
+		yield;
+		if (!capture_ok || png_bytes == null) {
+			throw new GLib.IOError.FAILED ("Screenshot capture failed");
+		}
+		return Gdk.Texture.from_bytes (new Bytes.take ((owned) png_bytes));
+	}
+
+	public async JavaScriptResult evaluate_javascript (
+		string script,
+		ssize_t length = -1,
+		string? world_name = null,
+		string? source_uri = null,
+		GLib.Cancellable? cancellable = null
+	) throws GLib.Error {
+		string? result_json = null;
+		var script_ok = false;
+		new Thread<void> ("wv2-script", () => {
+			string? raw = null;
+			script_ok = wv2_execute_script_sync (script, out raw);
+			if (script_ok && raw != null) {
+				result_json = raw;
+			}
+			Idle.add (() => {
+				evaluate_javascript.callback ();
+				return false;
+			});
+		});
+		yield;
+		if (!script_ok) {
+			throw new GLib.IOError.FAILED ("execute_script failed");
+		}
+		return new JavaScriptResult (result_json ?? "null");
 	}
 
 	private Gtk.Window? toplevel_window () {

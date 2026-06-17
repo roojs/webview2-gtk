@@ -47,6 +47,17 @@ GTK_VALA_ARGS=(
 	--pkg gtk4
 )
 
+CAPTURE_VALA=(
+	lib/webview2gtk/CaptureBindings.vala
+	lib/webview2gtk/Enums.vala
+	lib/webview2gtk/NetworkProxySettings.vala
+	lib/webview2gtk/CookieManager.vala
+	lib/webview2gtk/NetworkSession.vala
+	lib/webview2gtk/Settings.vala
+	lib/webview2gtk/JavaScriptResult.vala
+	lib/webview2gtk/PrintOperation.vala
+)
+
 CC_QUIET=(
 	-Wno-discarded-qualifiers
 	-Wno-incompatible-pointer-types
@@ -75,7 +86,10 @@ host_c_files() {
 		"${GEN}/win32-ui-webview2-com-sync.c" \
 		"${GEN}/win32-ui-webview2-events.c" \
 		"${HOST}/win32-ui-webview2-loader.c" \
-		"${HOST}/win32-ui-webview2-com-glue.c"
+		"${HOST}/win32-ui-webview2-com-glue.c" \
+		"${HOST}/win32-ui-webview2-script.c" \
+		"${HOST}/win32-ui-webview2-capture.c" \
+		"${HOST}/win32-ui-webview2-print.c"
 }
 
 inc_flags() {
@@ -120,13 +134,22 @@ case "${MODE}" in
 		(
 			cd "${ROOT}"
 			valac "${GTK_VALA_ARGS[@]}" --vapidir "${VAPI}" -C -d "${GTK_DIR}" \
-				lib/webview2gtk/webview.vala
+				lib/webview2gtk/webview.vala \
+				"${CAPTURE_VALA[@]}"
 		)
 		compile_host_objects "${HOST_DIR}" "${OBJ_DIR}"
 		cc -c "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
 			-o "${OBJ_DIR}/webview2gtk-gdk-win32.o" "${GDK_WIN32_C}"
 		cc -c "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
 			-o "${OBJ_DIR}/webview.o" "${GTK_DIR}/lib/webview2gtk/webview.c"
+		for src in "${GTK_DIR}/lib/webview2gtk"/*.c; do
+			base="$(basename "${src}" .c)"
+			if [[ "${base}" == "webview" ]]; then
+				continue
+			fi
+			cc -c "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
+				-o "${OBJ_DIR}/${base}.o" "${src}"
+		done
 		ar rcs "${PREFIX}/lib/libwebview2gtk-1.a" "${OBJ_DIR}"/*.o
 		cp -f "${VAPI}/webview2gtk-1.vapi" "${PREFIX}/lib/webview2gtk-1.vapi"
 		cp -f "${WIDGET_INC}/webview2gtk.h" "${PREFIX}/include/webview2gtk-1/webview2gtk.h"
@@ -150,6 +173,7 @@ if [[ "${MODE}" != lib ]]; then
 		cd "${ROOT}"
 		valac "${GTK_VALA_ARGS[@]}" --vapidir "${VAPI}" -C -d "${GTK_DIR}" \
 			lib/webview2gtk/webview.vala \
+			"${CAPTURE_VALA[@]}" \
 			"examples/${MODE}/main.vala"
 	)
 	MAIN_C="${GTK_DIR}/examples/${MODE}/main.c"

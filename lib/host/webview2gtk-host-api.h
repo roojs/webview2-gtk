@@ -40,6 +40,10 @@ void vala_webview2_host_set_event_handlers (
 	void *user_data
 );
 
+bool vala_webview2_host_execute_script_sync (const char *script_utf8, char **result_json_out);
+bool vala_webview2_host_capture_screenshot_sync (bool full_document, char **devtools_json_out);
+bool vala_webview2_host_print_to_pdf_sync (const char *output_path_utf8);
+
 #ifdef __cplusplus
 }
 #endif

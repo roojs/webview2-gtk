@@ -274,6 +274,31 @@ BOOL vala_webview2_com_begin_host (HWND parent, LPCWSTR url, const RECT *bounds)
 	return TRUE;
 }
 
+ICoreWebView2 *
+vala_webview2_com_get_webview (void)
+{
+	return g_glue.webview;
+}
+
+void
+vala_webview2_com_pump_messages (void)
+{
+	MSG msg;
+	while (PeekMessageW (&msg, NULL, 0, 0, PM_REMOVE)) {
+		TranslateMessage (&msg);
+		DispatchMessageW (&msg);
+	}
+}
+
+void
+vala_webview2_com_sync_await (volatile LONG *done)
+{
+	while (InterlockedCompareExchange (done, 0, 0) == 0) {
+		vala_webview2_com_pump_messages ();
+		Sleep (10);
+	}
+}
+
 void vala_webview2_com_release_host (void)
 {
 	if (g_glue.webview != NULL) {
