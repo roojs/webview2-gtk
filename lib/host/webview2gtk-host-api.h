@@ -29,6 +29,7 @@ const char *vala_webview2_host_get_source (void);
 const char *vala_webview2_host_get_document_title (void);
 double vala_webview2_host_get_zoom_factor (void);
 bool vala_webview2_host_put_zoom_factor (double zoom);
+bool vala_webview2_host_put_is_visible (bool visible);
 
 typedef void (*WebView2GtkEventCb) (void *user_data);
 typedef void (*WebView2GtkNavCompletedCb) (void *user_data, bool success);

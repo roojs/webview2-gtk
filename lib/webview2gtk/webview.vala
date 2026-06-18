@@ -52,6 +52,8 @@ extern string wv2_host_get_document_title ();
 extern double wv2_host_get_zoom_factor ();
 [CCode (cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_put_zoom_factor")]
 extern bool wv2_host_put_zoom_factor (double zoom);
+[CCode (cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_put_is_visible")]
+extern bool wv2_host_put_is_visible (bool visible);
 
 [CCode (cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_event_handlers")]
 extern void wv2_host_set_event_handlers (
@@ -118,6 +120,13 @@ public class WebView : Gtk.Box {
 
 		_host.map.connect (on_host_map);
 		_host.add_tick_callback (on_frame_tick);
+
+		this.notify["opacity"].connect (() => {
+			this.sync_host_visible ();
+		});
+		this.notify["visible"].connect (() => {
+			this.sync_host_visible ();
+		});
 	}
 
 	public signal void load_changed (LoadEvent load_event);
@@ -241,40 +250,21 @@ public class WebView : Gtk.Box {
 		SnapshotOptions options,
 		GLib.Cancellable? cancellable = null
 	) throws GLib.Error {
+		/* WebView2 COM + message pump must run on the GTK/UI thread. */
 		var full_document = region == SnapshotRegion.FULL_DOCUMENT;
-		uint8[]? png_bytes = null;
-		var capture_ok = false;
-		new Thread<void> ("wv2-snapshot", () => {
-			string? devtools_json = null;
-			capture_ok = wv2_capture_screenshot_sync (full_document, out devtools_json);
-			if (capture_ok && devtools_json != null) {
-				try {
-					const string marker = "\"data\":\"";
-					var start = devtools_json.index_of (marker);
-					if (start < 0) {
-						capture_ok = false;
-					} else {
-						start += marker.length;
-						var end = devtools_json.index_of_char ('"', start);
-						if (end < 0) {
-							capture_ok = false;
-						} else {
-							png_bytes = Base64.decode (
-								devtools_json.substring (start, end - start)
-							);
-						}
-					}
-				} catch (GLib.Error e) {
-					capture_ok = false;
-				}
-			}
-			Idle.add (() => {
-				get_snapshot.callback ();
-				return false;
-			});
-		});
-		yield;
+		string? devtools_json = null;
+		var capture_ok = wv2_capture_screenshot_sync (full_document, out devtools_json);
+		var png_bytes = devtools_json_to_png_bytes (devtools_json);
 		if (!capture_ok || png_bytes == null) {
+			if (devtools_json != null) {
+				GLib.warning (
+					"get_snapshot: DevTools response (truncated): %s",
+					devtools_json.substring (
+						0,
+						int.min (devtools_json.length, 200)
+					)
+				);
+			}
 			throw new GLib.IOError.FAILED ("Screenshot capture failed");
 		}
 		return Gdk.Texture.from_bytes (new Bytes.take ((owned) png_bytes));
@@ -287,24 +277,38 @@ public class WebView : Gtk.Box {
 		string? source_uri = null,
 		GLib.Cancellable? cancellable = null
 	) throws GLib.Error {
-		string? result_json = null;
-		var script_ok = false;
-		new Thread<void> ("wv2-script", () => {
-			string? raw = null;
-			script_ok = wv2_execute_script_sync (script, out raw);
-			if (script_ok && raw != null) {
-				result_json = raw;
-			}
-			Idle.add (() => {
-				evaluate_javascript.callback ();
-				return false;
-			});
-		});
-		yield;
+		/* Same thread rule as get_snapshot — ExecuteScript is COM on the UI thread. */
+		string? raw = null;
+		var script_ok = wv2_execute_script_sync (script, out raw);
 		if (!script_ok) {
 			throw new GLib.IOError.FAILED ("execute_script failed");
 		}
-		return new JavaScriptResult (result_json ?? "null");
+		return new JavaScriptResult (raw ?? "null");
+	}
+
+	private static uint8[]? devtools_json_to_png_bytes (string? devtools_json)
+	{
+		if (devtools_json == null) {
+			return null;
+		}
+		try {
+			string[] markers = { "\"data\":\"", "\"data\": \"" };
+			foreach (var marker in markers) {
+				var start = devtools_json.index_of (marker);
+				if (start < 0) {
+					continue;
+				}
+				start += marker.length;
+				var end = devtools_json.index_of_char ('"', start);
+				if (end < 0) {
+					continue;
+				}
+				return Base64.decode (devtools_json.substring (start, end - start));
+			}
+		} catch (GLib.Error e) {
+			return null;
+		}
+		return null;
 	}
 
 	private Gtk.Window? toplevel_window () {
@@ -339,6 +343,14 @@ public class WebView : Gtk.Box {
 			return;
 		}
 		wv2_host_set_bounds_xywh (x, y, width, height);
+	}
+
+	private void sync_host_visible () {
+		if (!_attached) {
+			return;
+		}
+		var show = this.get_visible () && this.get_opacity () > 0.001;
+		wv2_host_put_is_visible (show);
 	}
 
 	private void try_navigate () {
@@ -382,6 +394,7 @@ public class WebView : Gtk.Box {
 			(void*) on_document_title_changed_cb,
 			this
 		);
+		this.sync_host_visible ();
 		try_navigate ();
 	}
 

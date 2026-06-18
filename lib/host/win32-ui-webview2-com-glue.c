@@ -51,8 +51,9 @@ raise_webview_child_proc (HWND hwnd, LPARAM lparam)
 		return TRUE;
 	}
 	if (wcsstr (cls, L"Chrome") != NULL || wcsstr (cls, L"WebView") != NULL) {
+		/* Z-order only — visibility is ICoreWebView2Controller::put_IsVisible. */
 		SetWindowPos (hwnd, HWND_TOP, 0, 0, 0, 0,
-		              SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+		              SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 	}
 	return TRUE;
 }

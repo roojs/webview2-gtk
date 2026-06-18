@@ -37,6 +37,7 @@ private struct HostState {
 	public void* webview;
 	public WideString? pending_url;
 	public bool ready;
+	public bool host_visible;
 }
 
 private HostState? g_host;
@@ -82,6 +83,13 @@ internal unowned ICoreWebView2 host_webview_com() {
 	return (ICoreWebView2) g_host.webview;
 }
 
+internal void set_host_visible_flag(bool visible) {
+	if (g_host == null) {
+		return;
+	}
+	g_host.host_visible = visible;
+}
+
 private string take_com_string(uint16* com_str) {
 	if (com_str == null) {
 		return "";
@@ -114,7 +122,7 @@ private void apply_bounds() {
 	if (!com_ok(hr)) {
 		stderr.printf("WebView2 put_bounds failed: 0x%08x\n", (uint) hr);
 	}
-	if (g_host.parent != null) {
+	if (g_host.parent != null && g_host.host_visible) {
 		com_present_webview(g_host.parent);
 	}
 }
@@ -144,7 +152,10 @@ public void finish_setup(
 	g_host.parent = parent;
 	g_host.ready = true;
 	apply_bounds();
-	var vis = com_controller_put_is_visible(host_controller_com(), 1);
+	var vis = com_controller_put_is_visible(
+		host_controller_com(),
+		g_host.host_visible ? 1 : 0
+	);
 	if (!com_ok(vis)) {
 		stderr.printf("WebView2 put_is_visible failed: 0x%08x\n", (uint) vis);
 	}
@@ -176,6 +187,7 @@ public bool create_with_bounds(
 	var st = HostState();
 	st.parent = parent_hwnd;
 	st.bounds = bounds;
+	st.host_visible = true;
 	g_host = st;
 	return com_begin_host(parent_hwnd, url, &g_host.bounds);
 }

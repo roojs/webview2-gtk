@@ -4,6 +4,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "webview2gtk-host-api.h"
@@ -88,12 +89,16 @@ vala_webview2_host_capture_screenshot_sync (bool full_document, char **devtools_
 	hr = ICoreWebView2_CallDevToolsProtocolMethod (
 		webview, L"Page.captureScreenshot", params, &dh.handler);
 	if (FAILED (hr)) {
+		fprintf (stderr,
+			"Page.captureScreenshot failed HRESULT=0x%08lx\n",
+			(unsigned long) hr);
 		return false;
 	}
 
 	vala_webview2_com_sync_await (&dh.done);
 
 	if (dh.json == NULL) {
+		fprintf (stderr, "Page.captureScreenshot: empty DevTools response\n");
 		return false;
 	}
 	if (devtools_json_out != NULL) {

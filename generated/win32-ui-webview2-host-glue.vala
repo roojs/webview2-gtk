@@ -145,8 +145,9 @@ public bool post_web_message_as_string(string text) {
 
 [CCode(cname = "vala_webview2_host_put_is_visible")]
 public bool put_is_visible(bool visible) {
+	set_host_visible_flag(visible);
 	if (!controller_ready()) {
-		return false;
+		return true;
 	}
 	return com_ok(com_controller_put_is_visible (host_controller_com(), visible ? 1 : 0));
 }
