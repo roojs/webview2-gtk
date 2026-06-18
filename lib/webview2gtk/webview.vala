@@ -88,6 +88,7 @@ public class WebView : Gtk.Box {
 	private Gtk.Widget _host;
 	private void* _parent_hwnd = null;
 	private bool _attached = false;
+	private bool _host_shown_on_screen = true;
 	private string? _pending_uri = null;
 
 	private string _uri = "about:blank";
@@ -342,6 +343,11 @@ public class WebView : Gtk.Box {
 		if (!host_bounds (out x, out y, out width, out height)) {
 			return;
 		}
+		if (!_host_shown_on_screen) {
+			/* Off-screen while GTK opacity is 0 — DevTools capture still needs IsVisible. */
+			x = -30000;
+			y = -30000;
+		}
 		wv2_host_set_bounds_xywh (x, y, width, height);
 	}
 
@@ -349,8 +355,9 @@ public class WebView : Gtk.Box {
 		if (!_attached) {
 			return;
 		}
-		var show = this.get_visible () && this.get_opacity () > 0.001;
-		wv2_host_put_is_visible (show);
+		_host_shown_on_screen = this.get_visible () && this.get_opacity () > 0.001;
+		wv2_host_put_is_visible (true);
+		push_bounds ();
 	}
 
 	private void try_navigate () {

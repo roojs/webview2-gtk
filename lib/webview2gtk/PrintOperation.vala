@@ -17,28 +17,39 @@ public class PrintOperation : Object {
 	}
 
 	public void print () {
-		var uri = _print_settings?.get (Gtk.PRINT_SETTINGS_OUTPUT_URI) ?? "";
-		string path = uri;
-		try {
-			if (path.has_prefix ("file://")) {
-				path = Filename.from_uri (path);
-			}
-		} catch (GLib.Error e) {
-			failed (e);
+		var output_path = this.output_path_from_settings ();
+		if (output_path == "") {
+			failed (new GLib.IOError.FAILED ("Missing PDF output path"));
 			return;
 		}
-		var output_path = path;
-		new Thread<void> ("wv2-print-pdf", () => {
+		/* PrintToPdf COM on GTK/UI thread; defer signals so async capture does not resume inside sync_await. */
+		GLib.Idle.add (() => {
 			var ok = wv2_print_to_pdf_sync (output_path);
-			Idle.add (() => {
+			GLib.Idle.add (() => {
 				if (ok) {
 					finished ();
 				} else {
 					failed (new GLib.IOError.FAILED ("PrintToPdf failed"));
 				}
-				return false;
+				return Source.REMOVE;
 			});
+			return Source.REMOVE;
 		});
+	}
+
+	private string output_path_from_settings () {
+		var uri = _print_settings?.get (Gtk.PRINT_SETTINGS_OUTPUT_URI) ?? "";
+		if (uri == "") {
+			return "";
+		}
+		if (uri.has_prefix ("file://")) {
+			try {
+				return Filename.from_uri (uri);
+			} catch (GLib.Error e) {
+				return "";
+			}
+		}
+		return uri;
 	}
 }
 
