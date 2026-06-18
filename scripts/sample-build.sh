@@ -4,8 +4,8 @@
 # Copy into your project, edit the settings block, then from MSYS2 UCRT64:
 #   ./scripts/sample-build.sh
 #
-# Or from cmd/PowerShell (one-liner wrapper only):
-#   C:\msys64\ucrt64.exe -c "cd /c/path/to/my-app && ./scripts/sample-build.sh"
+# Or from PowerShell (one line):
+#   C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'cd /c/path/to/my-app && ./scripts/sample-build.sh'
 set -euo pipefail
 
 # --- edit these ---

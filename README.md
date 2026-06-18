@@ -10,7 +10,44 @@ Build this library on **Windows**. Anything that links against it must be built 
 
 You can still share Vala source with a Linux build that uses WebKitGTK instead (`#if WINDOWS` — see below).
 
-All Windows build/run commands use **`C:\msys64\ucrt64.exe -c '…'`** one-liners (bash inside MSYS2 UCRT64). You can paste them into cmd or PowerShell — there are **no `.ps1` scripts** in this repo. Install [MSYS2](https://www.msys2.org/) once if you do not have it; change `C:\msys64` if yours differs.
+**Windows commands:** open PowerShell, paste one line per step, run bash scripts in `scripts/` (see [How to run bash scripts from PowerShell](#how-to-run-msys2-from-powershell)). Same idea as [vala.win32 `docs/windows-build.md`](../vala.win32/docs/windows-build.md).
+
+| | |
+|--|--|
+| Linux git host | e.g. `/home/alan/gitlive/webview2-gtk` |
+| Windows SSH | `ssh snappr-win` (your Windows box) |
+| Windows repo (agent rsync) | **`C:\msys64\tmp\webview2-gtk\`** |
+| Portable demos (run at desktop) | **`C:\msys64\tmp\webview2-gtk\dist-demos\`** (or your clone’s `dist-demos\`) |
+| Raw compile output | `build\` (needs toolchain on `PATH` — do not double-click) |
+
+## How to run MSYS2 from PowerShell
+
+Do **not** open the MSYS2 / UCRT64 terminal to paste blocks. That paste path is unreliable on this setup.
+
+**Do not** use repo `.ps1` scripts — Windows PowerShell 5.1 misparses long embedded bash.
+
+**Do** use **bash scripts in `scripts/`** and launch each with **one PowerShell line**:
+
+```powershell
+C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'cd /c/msys64/tmp/webview2-gtk && ./scripts/SOME-SCRIPT.sh'
+```
+
+PowerShell only starts MSYS2; **bash** runs the logic.
+
+Repo path inside MSYS2: **`/c/msys64/tmp/webview2-gtk`** (or `/c/path/to/webview2-gtk` for a local clone).
+
+| Script | One PowerShell line |
+|--------|---------------------|
+| Toolchain (first time) | `... -c 'pacman -Syu --noconfirm && pacman -S --needed --noconfirm mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-vala mingw-w64-ucrt-x86_64-meson mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-pkg-config mingw-w64-ucrt-x86_64-gtk4 mingw-w64-ucrt-x86_64-cantarell-fonts mingw-w64-ucrt-x86_64-curl mingw-w64-ucrt-x86_64-nsis'` |
+| Vendor WebView2 SDK | `... -c 'cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh'` |
+| Configure + compile | `... -c 'cd /c/msys64/tmp/webview2-gtk && meson setup build && meson compile -C build'` |
+| Package portable demos | `... -c 'cd /c/msys64/tmp/webview2-gtk && ./scripts/package-demos.sh'` |
+| Build pacman package | `... -c 'cd /c/msys64/tmp/webview2-gtk && ./scripts/build-pacman-package.sh'` |
+| Build NSIS installer | `... -c 'cd /c/msys64/tmp/webview2-gtk && ./scripts/build-installer.sh dist/webview2gtk'` |
+
+(`...` = `C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64`)
+
+Optional (once per PowerShell session): `function msys { & C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c $args[0] }` then `msys 'cd /c/msys64/tmp/webview2-gtk && ./scripts/package-demos.sh'`.
 
 ## Download (Windows)
 
@@ -22,15 +59,14 @@ Download **`webview2gtk-setup.exe`** from [GitHub Releases](https://github.com/Y
 
 Check the install:
 
-```text
-C:\msys64\ucrt64.exe -c "export PKG_CONFIG_PATH='/c/Program Files/webview2gtk/lib/pkgconfig:$PKG_CONFIG_PATH'; pkg-config --modversion webview2gtk-1"
+```powershell
+C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'export PKG_CONFIG_PATH="/c/Program Files/webview2gtk/lib/pkgconfig:$PKG_CONFIG_PATH"; pkg-config --modversion webview2gtk-1'
 ```
 
-Demos:
+Demos (after install — double-click or from PowerShell):
 
-```cmd
-"C:\Program Files\webview2gtk\bin\webview2gtk-hello.exe"
-"C:\Program Files\webview2gtk\bin\webview2gtk-browser.exe"
+```powershell
+& 'C:\Program Files\webview2gtk\bin\webview2gtk-hello.exe'
 ```
 
 Uninstall via Windows Settings → Apps.
@@ -41,24 +77,24 @@ Installs into `C:\msys64\ucrt64\` — `pkg-config --libs webview2gtk-1` works wi
 
 **From a release** (edit URL to match the release):
 
-```text
-C:\msys64\ucrt64.exe -c "pacman -U --noconfirm https://github.com/YOUR_ORG/webview2-gtk/releases/download/v0.1.0/mingw-w64-ucrt-x86_64-webview2gtk-0.1.0-1-any.pkg.tar.zst"
+```powershell
+C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'pacman -U --noconfirm https://github.com/YOUR_ORG/webview2-gtk/releases/download/v0.1.0/mingw-w64-ucrt-x86_64-webview2gtk-0.1.0-1-any.pkg.tar.zst'
 ```
 
 Verify:
 
-```text
-C:\msys64\ucrt64.exe -c "pkg-config --modversion webview2gtk-1"
+```powershell
+C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'pkg-config --modversion webview2gtk-1'
 ```
 
-Demos: `C:\msys64\ucrt64\bin\webview2gtk-hello.exe`
+Demos (inside UCRT64 — GTK on `PATH`): `C:\msys64\ucrt64\bin\webview2gtk-hello.exe`
 
 Uninstall: `pacman -R mingw-w64-ucrt-x86_64-webview2gtk`
 
 **Build the package yourself** (from a clone):
 
-```text
-C:\msys64\ucrt64.exe -c "cd /c/path/to/webview2-gtk && ./scripts/build-pacman-package.sh && pacman -U --noconfirm packaging/msys2/mingw-w64-ucrt-x86_64-webview2gtk-*.pkg.tar.zst"
+```powershell
+C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'cd /c/path/to/webview2-gtk && ./scripts/build-pacman-package.sh && pacman -U --noconfirm packaging/msys2/mingw-w64-ucrt-x86_64-webview2gtk-*.pkg.tar.zst'
 ```
 
 PKGBUILD: [`packaging/msys2/PKGBUILD`](packaging/msys2/PKGBUILD)
@@ -66,47 +102,61 @@ PKGBUILD: [`packaging/msys2/PKGBUILD`](packaging/msys2/PKGBUILD)
 ## Requirements
 
 - **Windows 10/11** with [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (Evergreen; usually preinstalled)
-- **MSYS2** at `C:\msys64` ([installer](https://www.msys2.org/)) — used only via the one-liners below, not an extra terminal
-
-## First-time toolchain setup
-
-Run once:
-
-```text
-C:\msys64\ucrt64.exe -c "pacman -Syu --noconfirm && pacman -S --needed --noconfirm mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-vala mingw-w64-ucrt-x86_64-meson mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-pkg-config mingw-w64-ucrt-x86_64-gtk4 mingw-w64-ucrt-x86_64-cantarell-fonts mingw-w64-ucrt-x86_64-curl mingw-w64-ucrt-x86_64-nsis"
-```
+- **MSYS2** at `C:\msys64` ([installer](https://www.msys2.org/)) — see [How to run bash scripts from PowerShell](#how-to-run-msys2-from-powershell)
 
 ## Build this library
 
-Replace `C:\path\to\webview2-gtk` with your clone path (the `/c/path/to/webview2-gtk` inside the command is the same path in toolchain form):
+**One PowerShell line** (vendor SDK, configure, compile, package demos):
 
-```text
-C:\msys64\ucrt64.exe -c "cd /c/path/to/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup build && meson compile -C build"
+```powershell
+C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup build && meson compile -C build'
 ```
 
-**Where the demos land**
+`meson compile` runs **`package-demos`** when examples are enabled (see below).
 
-| Step | Demo location | `bin\` folder? |
-|------|----------------|----------------|
-| `meson compile` only | `build\webview2gtk-hello.exe` (next to `build\`, not in a subfolder) | **No** |
-| `meson install` (with `--prefix=$(pwd)/dist/webview2gtk`) | `dist\webview2gtk\bin\*.exe` | Yes |
-| `webview2gtk-setup.exe` | `C:\Program Files\webview2gtk\bin\` | Yes |
-| pacman package | `C:\msys64\ucrt64\bin\` | Yes (ucrt64 bin, not in the repo) |
+### Portable demos (`dist-demos\`) — run from Explorer / PowerShell
 
-If you only compiled and do not see `bin\`, run the exes from **`build\`** directly.
+GTK apps built with MSYS2 need **toolchain DLLs** (`libgtk-4-1.dll`, `libglib-2.0-0.dll`, …) beside the `.exe`. Raw `build\webview2gtk-hello.exe` only has `WebView2Loader.dll` — double-clicking it shows **“cannot proceed because lib…dll was not found”**.
 
-**Run the demos** — always via UCRT64 so GTK DLLs are on `PATH`:
+**Fix:** use **`dist-demos\`** (created automatically by `meson compile`, or manually via `./scripts/package-demos.sh`). That folder contains:
 
-```text
-C:\msys64\ucrt64.exe -c "cd /c/path/to/webview2-gtk/build && ./webview2gtk-hello.exe"
-C:\msys64\ucrt64.exe -c "cd /c/path/to/webview2-gtk/build && ./webview2gtk-browser.exe https://example.com/"
+- `webview2gtk-hello.exe`, `webview2gtk-browser.exe`
+- `WebView2Loader.dll` + GTK/GLib DLLs from `/ucrt64/bin` (via `ldd`)
+- `etc/fonts`, `share/fonts` (fontconfig for runs outside UCRT64)
+- `run-hello.bat`, `run-browser.bat` (optional — set font paths for Explorer double-click)
+
+**Run the demos** (portable `dist-demos\` — DLLs bundled):
+
+```powershell
+& 'C:\msys64\tmp\webview2-gtk\dist-demos\webview2gtk-hello.exe'
+& 'C:\msys64\tmp\webview2-gtk\dist-demos\webview2gtk-browser.exe' 'https://example.com/'
 ```
 
-Or open the **UCRT64** terminal from the MSYS2 start menu, `cd` to `build/`, and run `./webview2gtk-hello.exe` directly.
+Re-package only (after a compile):
 
-You should see a GTK window with **Edge WebView2** content inside (this library is **not** WebKitGTK — it mimics the WebKit API on Windows only). If the window opens but the web area stays blank, rebuild after pulling the latest sources (embedding fixes), confirm [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) is installed, and ensure `WebView2Loader.dll` sits beside the exe in `build\`.
+```powershell
+C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'cd /c/msys64/tmp/webview2-gtk && ./scripts/package-demos.sh'
+```
 
-Copy `build\vendor\webview2\x64\WebView2Loader.dll` beside those exes if the loader is not found at runtime.
+**Where outputs land**
+
+| Step | Demo location | GTK DLLs bundled? |
+|------|----------------|-------------------|
+| `build\` only | `build\webview2gtk-hello.exe` | **No** — dev compile artifact |
+| `meson compile` (examples on) | `dist-demos\` | **Yes** — **use this to run** |
+| `meson install` + `bundle-bin-runtime.sh` | `dist\webview2gtk\bin\` | **Yes** (CI / installer staging) |
+| `webview2gtk-setup.exe` | `C:\Program Files\webview2gtk\bin\` | **Yes** (release installer) |
+| pacman package | `C:\msys64\ucrt64\bin\` | Via UCRT64 `PATH` only |
+
+You should see a GTK window with **Edge WebView2** content inside. [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) must be installed on the PC.
+
+### Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `valac` not found | Run via PowerShell (`C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c '…'`), not bare cmd |
+| `cannot proceed because lib…dll was not found` | Run from **`dist-demos\`**, not raw `build\` |
+| Web area blank | Rebuild; confirm WebView2 Runtime is installed |
 
 ### Remote build from Linux (rsync + SSH)
 
@@ -114,7 +164,7 @@ If you develop on Linux but have a Windows box with MSYS2 (same rsync/SSH patter
 
 1. **SSH** — `~/.ssh/config` entry (e.g. `Host snappr-win` → your Windows host).
 2. **Rsync on Windows** — `pacman -S rsync` in MSYS2 UCRT64.
-3. **GTK4 on Windows** — `pacman -S mingw-w64-ucrt-x86_64-gtk4` (and the rest of the toolchain from [First-time toolchain setup](#first-time-toolchain-setup)).
+3. **GTK4 on Windows** — run the toolchain line in [How to run bash scripts from PowerShell](#how-to-run-msys2-from-powershell) (first table row).
 
 From the Linux clone:
 
@@ -126,14 +176,14 @@ From the Linux clone:
 ./scripts/agent-remote-build.sh run      # 3s smoke run of hello on Windows
 ```
 
-Sources mirror to `C:\msys64\tmp\webview2-gtk\` on the Windows host. Built exes and logs land in **`build-remote/`** on Linux (`webview2gtk-hello.exe`, `webview2gtk-browser.exe`, `last-build.log`).
+Sources mirror to `C:\msys64\tmp\webview2-gtk\` on the Windows host. Portable demos land in **`dist-demos\`** on Windows (and `build-remote/portable/` when pulled to Linux).
 
 Override the SSH host: `AGENT_WIN_HOST=my-win-pc ./scripts/agent-remote-build.sh build`
 
 Install to a prefix (for other Meson projects):
 
-```text
-C:\msys64\ucrt64.exe -c "cd /c/path/to/webview2-gtk && mkdir -p dist && meson setup build --prefix=\$(pwd)/dist/webview2gtk && meson compile -C build && meson install -C build"
+```powershell
+C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'cd /c/path/to/webview2-gtk && mkdir -p dist && meson setup build --prefix=$(pwd)/dist/webview2gtk && meson compile -C build && meson install -C build && ./scripts/bundle-bin-runtime.sh dist/webview2gtk/bin'
 ```
 
 That produces `dist\webview2gtk\`:
@@ -149,8 +199,8 @@ dist\webview2gtk\
 
 After the install step above (also needs NSIS once: `pacman -S mingw-w64-ucrt-x86_64-nsis` in UCRT64):
 
-```text
-C:\msys64\ucrt64.exe -c "cd /c/path/to/webview2-gtk && ./scripts/build-installer.sh dist/webview2gtk"
+```powershell
+C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'cd /c/path/to/webview2-gtk && ./scripts/build-installer.sh dist/webview2gtk'
 ```
 
 Output: `C:\path\to\webview2-gtk\webview2gtk-setup.exe`
@@ -187,8 +237,8 @@ On Windows, pass `-D WINDOWS` to `valac` (or use Meson — see sample below).
 
 **Build locally:** copy [`scripts/sample-build.sh`](scripts/sample-build.sh) into your project, edit the settings at the top, then:
 
-```text
-C:\msys64\ucrt64.exe -c "cd /c/path/to/my-app && ./scripts/sample-build.sh"
+```powershell
+C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'cd /c/path/to/my-app && ./scripts/sample-build.sh'
 ```
 
 ### Sample `meson.build` (consumer project)
@@ -228,14 +278,35 @@ Build your app on each platform locally (Linux → WebKitGTK, Windows → webvie
 
 Ship a folder containing your `.exe` plus runtime DLLs. End users also need the [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) on the PC.
 
+### Runtime bundling (for your own app)
+
+GTK/GLib DLLs live in `C:\msys64\ucrt64\bin\` at **build** time. They are **not** linked statically. To run from Explorer or plain PowerShell, copy toolchain DLLs beside your exe (same approach as **vala.win32** `copy_ldd_runtime_dlls` in `scripts/build-win.sh`).
+
+**Reuse from this repo:**
+
+| Script | Purpose |
+|--------|---------|
+| [`scripts/copy-exe-runtime-dlls.sh`](scripts/copy-exe-runtime-dlls.sh) | Core: `ldd` an exe → copy `/ucrt64/bin` deps into an output dir |
+| [`scripts/sample-package-windows.sh`](scripts/sample-package-windows.sh) | Template for consumer apps: exe + `WebView2Loader.dll` + GTK DLLs → `dist/` |
+| [`scripts/package-demos.sh`](scripts/package-demos.sh) | This repo’s hello + browser → `dist-demos/` |
+| [`scripts/bundle-bin-runtime.sh`](scripts/bundle-bin-runtime.sh) | All exes in a `bin/` dir (meson install / GitHub release staging) |
+
+**Minimal integration** — copy `copy-exe-runtime-dlls.sh` + `sample-package-windows.sh` into your project, build, then:
+
+```powershell
+C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'cd /c/path/to/my-app && EXE_PATH=build/my-browser-app.exe ./scripts/package-windows.sh'
+```
+
+That writes `dist\my-browser-app.exe`, `WebView2Loader.dll`, and GTK DLLs. Zip `dist\` for download.
+
+**Wrapping in your own tooling:** one PowerShell line per step — `C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c '…./scripts/….sh'`. For CI (GitHub Actions) use `shell: msys2 {0}` and call the same bash scripts directly.
+
 ### Local packaging
 
-1. Copy [`scripts/sample-package-windows.sh`](scripts/sample-package-windows.sh) → `scripts/package-windows.sh` in your project.
-2. Edit defaults at the top (or pass `EXE_PATH`, `OUT_DIR` env vars).
-3. After building:
+Same as **Minimal integration** above — copy scripts into your project:
 
-```text
-C:\msys64\ucrt64.exe -c "cd /c/path/to/my-app && EXE_PATH=build/my-browser-app.exe ./scripts/package-windows.sh"
+```powershell
+C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'cd /c/path/to/my-app && EXE_PATH=build/my-browser-app.exe ./scripts/package-windows.sh'
 ```
 
 That copies your exe, `WebView2Loader.dll`, and missing GTK/GLib DLLs from the toolchain into `dist\`. Zip `dist\` for download.
@@ -243,7 +314,7 @@ That copies your exe, `WebView2Loader.dll`, and missing GTK/GLib DLLs from the t
 ### GitHub Actions
 
 1. Copy [`scripts/sample-github-build-windows.yml`](scripts/sample-github-build-windows.yml) → `.github/workflows/build-windows.yml` in **your** repo.
-2. Copy `scripts/sample-package-windows.sh` → `scripts/package-windows.sh`.
+2. Copy `scripts/copy-exe-runtime-dlls.sh` and `scripts/sample-package-windows.sh` → `scripts/package-windows.sh`.
 3. Edit the `env` block (`APP_EXE_NAME`, `WEBVIEW2GTK_REPO`, …) and the **Build app** step for your Meson project.
 4. Push — the workflow builds webview2gtk, builds your app, runs `package-windows.sh`, and uploads `dist/` as an artifact. On a GitHub **Release**, it also attaches `my-app-windows.zip`.
 
@@ -284,16 +355,17 @@ examples/hello/     Hello HTML demo
 examples/browser/   Minimal browser chrome
 examples/consumer-meson.build   Sample Meson for your app
 packaging/          NSIS installer + packaging/msys2/PKGBUILD (pacman)
-scripts/            vendor SDK, build, sample-build.sh, sample-package-windows.sh,
+scripts/            vendor SDK, build, package-demos.sh, copy-exe-runtime-dlls.sh,
+                    sample-build.sh, sample-package-windows.sh,
                     sample-github-build-windows.yml, agent-remote-build.sh,
-                    build-pacman-package.sh
+                    build-pacman-package.sh, bundle-bin-runtime.sh
 .github/workflows/  Release CI (tag `v*` → setup.exe + pacman package)
 ```
 
 ## Manual build (without top-level Meson)
 
-```text
-C:\msys64\ucrt64.exe -c "cd /c/path/to/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && ./scripts/wv2gtk-build.sh lib build build/install-staging && ./scripts/wv2gtk-build.sh hello build build/webview2gtk-hello.exe && ./scripts/wv2gtk-build.sh browser build build/webview2gtk-browser.exe"
+```powershell
+C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'cd /c/path/to/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && ./scripts/wv2gtk-build.sh lib build build/install-staging && ./scripts/wv2gtk-build.sh hello build build/webview2gtk-hello.exe && ./scripts/wv2gtk-build.sh browser build build/webview2gtk-browser.exe && ./scripts/package-demos.sh'
 ```
 
 ## Origin

@@ -62,6 +62,15 @@ browser_exe = custom_target(
   install_dir: get_option('bindir'),
 )
 
+package_demos_sh = files('scripts/package-demos.sh')
+custom_target(
+  'package-demos',
+  output: 'package-demos.stamp',
+  command: [_build_bash, package_demos_sh],
+  depends: [hello_exe, browser_exe],
+  build_by_default: get_option('examples'),
+)
+
 webview2_loader = webview2_sdk / 'x64' / 'WebView2Loader.dll'
 have_webview2_loader = run_command('test', '-f', webview2_loader, check: false).returncode() == 0
 if get_option('examples') and have_webview2_loader

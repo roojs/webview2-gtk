@@ -1,7 +1,8 @@
 # Sample GitHub Actions workflow — build your app on Windows with webview2gtk.
 #
 # 1. Copy to your repo:  .github/workflows/build-windows.yml
-# 2. Copy also:          scripts/sample-package-windows.sh  →  scripts/package-windows.sh
+# 2. Copy also:          scripts/copy-exe-runtime-dlls.sh
+#                         scripts/sample-package-windows.sh  →  scripts/package-windows.sh
 # 3. Edit the env block and the "Build app" step below.
 # 4. Push — uploads dist/ as an artifact; on Release attaches my-app-windows.zip.
 #

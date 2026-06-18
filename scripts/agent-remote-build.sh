@@ -21,6 +21,7 @@ RSYNC_EXCLUDES=(
 	--exclude 'build/'
 	--exclude 'build-remote/'
 	--exclude 'dist/'
+	--exclude 'dist-demos/'
 	--exclude '.git/'
 	--exclude '.specstory/'
 	--exclude 'build/gen/'
@@ -39,13 +40,13 @@ sync_to_windows() {
 run_remote_build() {
 	echo "[agent-remote-build] build on ${REMOTE_HOST} (C: mirror)"
 	ssh -o BatchMode=yes "${REMOTE_HOST}" \
-		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && (test -d build/meson-private || meson setup build) && meson compile -C build 2>&1 | tee build/last-build.log\""
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && (test -d build/meson-private || meson setup build) && meson compile -C build 2>&1 | tee build/last-build.log && ./scripts/package-demos.sh\""
 }
 
 run_remote_smoke() {
-	echo "[agent-remote-build] smoke run gtk hello (3s) on ${REMOTE_HOST}"
+	echo "[agent-remote-build] smoke run portable hello (3s) on ${REMOTE_HOST}"
 	ssh -o BatchMode=yes "${REMOTE_HOST}" \
-		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk/build && cp -f ../build/vendor/webview2/x64/WebView2Loader.dll . 2>/dev/null || cp -f vendor/webview2/x64/WebView2Loader.dll . && timeout 3 ./webview2gtk-hello.exe 2>&1 | tee smoke-run.log || true\""
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk/dist-demos && timeout 3 ./webview2gtk-hello.exe 2>&1 | tee smoke-run.log || true\""
 }
 
 pull_artifacts() {
@@ -56,12 +57,20 @@ pull_artifacts() {
 		"${RSYNC_PATH[@]}" \
 		"${REMOTE_HOST}:${REMOTE_BUILD}/" \
 		"${ROOT}/build-remote/"
+	mkdir -p "${ROOT}/build-remote/portable"
+	echo "[agent-remote-build] pull dist-demos/ <- ${REMOTE_HOST}"
+	rsync -avz \
+		-e "${RSYNC_SSH[*]}" \
+		"${RSYNC_PATH[@]}" \
+		"${REMOTE_HOST}:${REMOTE_ROOT}/dist-demos/" \
+		"${ROOT}/build-remote/portable/"
 }
 
 print_hint() {
 	echo ""
 	echo "Linux copy: ${ROOT}/build-remote/"
-	echo "  webview2gtk-hello.exe   webview2gtk-browser.exe   last-build.log"
+	echo "  portable/               double-click-ready demos + GTK DLLs"
+	echo "  webview2gtk-hello.exe   raw meson build (needs UCRT64 PATH)"
 	if [[ -f "${ROOT}/build-remote/last-build.log" ]]; then
 		echo "--- tail last-build.log ---"
 		tail -20 "${ROOT}/build-remote/last-build.log"

@@ -1,4 +1,6 @@
 /build/
+/build-remote/
+/dist-demos/
 /.meson-private/
 *.exe
 *.o

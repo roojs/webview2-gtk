@@ -62,5 +62,6 @@ public static int main (string[] args) {
 		window.set_child (root);
 		window.present ();
 	});
-	return app.run (args);
+	/* GApplication rejects unknown positional args — strip URL before run. */
+	return app.run (new string[] { args[0] });
 }
