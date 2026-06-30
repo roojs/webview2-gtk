@@ -16,16 +16,12 @@ public class JavaScriptResult : Object {
 		if (_json == null || _json == "" || _json == "null") {
 			return "";
 		}
-		if (_json.has_prefix ("\"") && _json.has_suffix ("\"")) {
-			try {
-				var parser = new Json.Parser ();
-				parser.load_from_data (_json, -1);
-				var root = parser.get_root ();
-				if (root.get_value_type () == Type.STRING) {
-					return root.get_string ();
-				}
-			} catch (GLib.Error e) {
-			}
+		if (_json.length >= 2
+			&& _json.has_prefix ("\"")
+			&& _json.has_suffix ("\"")) {
+			return _json.substring (1, _json.length - 2)
+				.replace ("\\\"", "\"")
+				.replace ("\\\\", "\\");
 		}
 		return _json;
 	}
