@@ -340,7 +340,7 @@ Add webview2-gtk as a **submodule** at `webview2-gtk/` to skip the clone step, o
 
 WebView2Gtk-only: `ready` — host COM object attached.
 
-Not implemented yet: `load_failed`, settings, inspector, policy callbacks, JS bridge, etc.
+Not implemented yet: settings, inspector, policy callbacks, JS bridge, etc. (`load_failed` and `JavaScriptResult.to_string` are implemented.)
 
 **Limitation:** one WebView2 host per process today (shared COM singleton).
 

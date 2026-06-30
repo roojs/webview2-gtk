@@ -94,6 +94,7 @@ public class WebView : Gtk.Box {
 	private string _uri = "about:blank";
 	private string _title = "";
 	private bool _is_loading = false;
+	private bool _load_cancelled = false;
 	private double _estimated_load_progress = 0.0;
 	private double _zoom_level = 1.0;
 	private WebViewSettings _capture_settings = new WebViewSettings ();
@@ -131,6 +132,13 @@ public class WebView : Gtk.Box {
 	}
 
 	public signal void load_changed (LoadEvent load_event);
+
+	/** WebKitGTK-shaped — emitted when navigation fails or is cancelled. */
+	public signal bool load_failed (
+		LoadEvent load_event,
+		string failing_uri,
+		GLib.Error error
+	);
 
 	protected override void size_allocate (int width, int height, int baseline) {
 		base.size_allocate (width, height, baseline);
@@ -212,6 +220,7 @@ public class WebView : Gtk.Box {
 	}
 
 	public void stop_loading () {
+		_load_cancelled = true;
 		wv2_host_stop ();
 		set_loading (false, 0.0);
 	}
@@ -447,11 +456,26 @@ public class WebView : Gtk.Box {
 	}
 
 	private void on_navigation_completed (bool success) {
-		if (success) {
-			refresh_uri ();
-			refresh_title ();
+		if (!success) {
+			var uri = _pending_uri;
+			if (uri == null || uri.length == 0) {
+				uri = _uri;
+			}
+			GLib.Error err;
+			if (_load_cancelled) {
+				_load_cancelled = false;
+				err = new NetworkError.CANCELLED ("Load cancelled");
+			} else {
+				err = new NetworkError.FAILED ("Navigation failed");
+			}
+			load_failed (LoadEvent.STARTED, uri, err);
+			set_loading (false, 0.0);
+			return;
 		}
-		set_loading (false, success ? 1.0 : 0.0);
+		_load_cancelled = false;
+		refresh_uri ();
+		refresh_title ();
+		set_loading (false, 1.0);
 		load_changed (LoadEvent.FINISHED);
 	}
 

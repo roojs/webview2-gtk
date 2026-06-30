@@ -37,4 +37,13 @@ public enum CookiePersistentStorage {
 	SQLITE
 }
 
+/** WebKitGTK-shaped subset — used by {@link WebView.load_failed}. */
+public errordomain NetworkError {
+	FAILED,
+	TRANSPORT,
+	UNKNOWN_PROTOCOL,
+	CANCELLED,
+	FILE_DOES_NOT_EXIST;
+}
+
 }

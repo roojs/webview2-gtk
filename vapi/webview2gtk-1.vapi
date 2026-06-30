@@ -45,6 +45,14 @@ namespace WebView2Gtk {
 		SQLITE
 	}
 
+	public errordomain NetworkError {
+		FAILED,
+		TRANSPORT,
+		UNKNOWN_PROTOCOL,
+		CANCELLED,
+		FILE_DOES_NOT_EXIST;
+	}
+
 	public class NetworkProxySettings : GLib.Object {
 		public NetworkProxySettings (string default_proxy_uri, string? http_proxy_uri = null);
 	}
@@ -68,6 +76,7 @@ namespace WebView2Gtk {
 
 	public class JavaScriptResult : GLib.Object {
 		public string to_json (int indent = 0);
+		public string to_string ();
 		public int32 to_int32 ();
 	}
 
@@ -84,6 +93,7 @@ namespace WebView2Gtk {
 	public class WebView : Gtk.Box {
 		public WebView ();
 		public signal void load_changed (LoadEvent load_event);
+		public signal bool load_failed (LoadEvent load_event, string failing_uri, GLib.Error error);
 		public bool can_go_back ();
 		public bool can_go_forward ();
 		public unowned string get_uri ();
