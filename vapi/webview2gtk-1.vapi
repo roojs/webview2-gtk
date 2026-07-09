@@ -60,6 +60,10 @@ namespace WebView2Gtk {
 	public class CookieManager : GLib.Object {
 		public void set_accept_policy (CookieAcceptPolicy policy);
 		public void set_persistent_storage (string filename, CookiePersistentStorage storage);
+		public async GLib.List<Soup.Cookie> get_cookies (
+			string uri,
+			GLib.Cancellable? cancellable = null
+		) throws GLib.Error;
 	}
 
 	public class NetworkSession : GLib.Object {

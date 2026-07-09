@@ -45,6 +45,7 @@ GTK_VALA_ARGS=(
 	--vapidir "${VAPI}"
 	--profile=gobject
 	--pkg gtk4
+	--pkg libsoup-3.0
 )
 
 CAPTURE_VALA=(
@@ -65,8 +66,8 @@ CC_QUIET=(
 )
 
 WEBVIEW2_LINK=( -lole32 -luuid -lshell32 -ladvapi32 )
-GTK_CFLAGS="$(pkg-config --cflags gtk4)"
-GTK_LIBS="$(pkg-config --libs gtk4)"
+GTK_CFLAGS="$(pkg-config --cflags gtk4 libsoup-3.0)"
+GTK_LIBS="$(pkg-config --libs gtk4 libsoup-3.0)"
 
 compile_host_c() {
 	local host_dir="$1"
@@ -89,7 +90,8 @@ host_c_files() {
 		"${HOST}/win32-ui-webview2-com-glue.c" \
 		"${HOST}/win32-ui-webview2-script.c" \
 		"${HOST}/win32-ui-webview2-capture.c" \
-		"${HOST}/win32-ui-webview2-print.c"
+		"${HOST}/win32-ui-webview2-print.c" \
+		"${HOST}/win32-ui-webview2-cookies.c"
 }
 
 inc_flags() {
