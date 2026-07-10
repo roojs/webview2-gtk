@@ -186,11 +186,108 @@ static HRESULT STDMETHODCALLTYPE cookies_invoke (
 	return S_OK;
 }
 
-bool
-vala_webview2_host_get_cookies_sync (const char *uri_utf8, char **cookies_text_out)
+static ICoreWebView2CookieManager *
+cookie_manager_from_webview (void)
 {
 	ICoreWebView2 *webview;
 	ICoreWebView2_2 *webview2 = NULL;
+	ICoreWebView2CookieManager *manager = NULL;
+	HRESULT hr;
+
+	webview = vala_webview2_com_get_webview ();
+	if (webview == NULL) {
+		return NULL;
+	}
+	hr = ICoreWebView2_QueryInterface (webview, &IID_ICoreWebView2_2,
+	                                   (void **) &webview2);
+	if (FAILED (hr) || webview2 == NULL) {
+		return NULL;
+	}
+	hr = ICoreWebView2_2_get_CookieManager (webview2, &manager);
+	ICoreWebView2_2_Release (webview2);
+	if (FAILED (hr)) {
+		return NULL;
+	}
+	return manager;
+}
+
+bool
+vala_webview2_host_add_cookie_sync (
+	const char *name_utf8,
+	const char *value_utf8,
+	const char *domain_utf8,
+	const char *path_utf8,
+	bool http_only,
+	bool secure)
+{
+	ICoreWebView2CookieManager *manager;
+	uint16_t *name_wide = NULL;
+	uint16_t *value_wide = NULL;
+	uint16_t *domain_wide = NULL;
+	uint16_t *path_wide = NULL;
+	ICoreWebView2Cookie *cookie = NULL;
+	HRESULT hr;
+	bool ok = false;
+	const char *domain = domain_utf8;
+	const char *path = path_utf8;
+
+	if (name_utf8 == NULL || name_utf8[0] == '\0'
+	    || value_utf8 == NULL) {
+		return false;
+	}
+	if (domain == NULL || domain[0] == '\0') {
+		domain = "";
+	}
+	if (path == NULL || path[0] == '\0') {
+		path = "/";
+	}
+
+	manager = cookie_manager_from_webview ();
+	if (manager == NULL) {
+		return false;
+	}
+
+	name_wide = win32_ui_utf8_to_utf16 (name_utf8, NULL);
+	value_wide = win32_ui_utf8_to_utf16 (value_utf8, NULL);
+	domain_wide = win32_ui_utf8_to_utf16 (domain, NULL);
+	path_wide = win32_ui_utf8_to_utf16 (path, NULL);
+	if (name_wide == NULL || value_wide == NULL
+	    || domain_wide == NULL || path_wide == NULL) {
+		goto out;
+	}
+
+	hr = ICoreWebView2CookieManager_CreateCookie (
+		manager,
+		(LPCWSTR) name_wide,
+		(LPCWSTR) value_wide,
+		(LPCWSTR) domain_wide,
+		(LPCWSTR) path_wide,
+		&cookie);
+	if (FAILED (hr) || cookie == NULL) {
+		goto out;
+	}
+	ICoreWebView2Cookie_put_IsHttpOnly (cookie, http_only ? TRUE : FALSE);
+	ICoreWebView2Cookie_put_IsSecure (cookie, secure ? TRUE : FALSE);
+	hr = ICoreWebView2CookieManager_AddOrUpdateCookie (manager, cookie);
+	ok = SUCCEEDED (hr);
+
+out:
+	if (cookie != NULL) {
+		ICoreWebView2Cookie_Release (cookie);
+	}
+	free (name_wide);
+	free (value_wide);
+	free (domain_wide);
+	free (path_wide);
+	if (manager != NULL) {
+		ICoreWebView2CookieManager_Release (manager);
+	}
+	return ok;
+}
+
+bool
+vala_webview2_host_get_cookies_sync (const char *uri_utf8, char **cookies_text_out)
+{
 	ICoreWebView2CookieManager *manager = NULL;
 	uint16_t *uri_wide = NULL;
 	CookiesHandler ch;
@@ -200,17 +297,11 @@ vala_webview2_host_get_cookies_sync (const char *uri_utf8, char **cookies_text_o
 	if (cookies_text_out != NULL) {
 		*cookies_text_out = NULL;
 	}
-	webview = vala_webview2_com_get_webview ();
-	if (webview == NULL || uri_utf8 == NULL || uri_utf8[0] == '\0') {
+	if (uri_utf8 == NULL || uri_utf8[0] == '\0') {
 		return false;
 	}
-	hr = ICoreWebView2_QueryInterface (webview, &IID_ICoreWebView2_2, (void **) &webview2);
-	if (FAILED (hr) || webview2 == NULL) {
-		return false;
-	}
-	hr = ICoreWebView2_2_get_CookieManager (webview2, &manager);
-	ICoreWebView2_2_Release (webview2);
-	if (FAILED (hr) || manager == NULL) {
+	manager = cookie_manager_from_webview ();
+	if (manager == NULL) {
 		return false;
 	}
 

@@ -64,6 +64,10 @@ namespace WebView2Gtk {
 			string uri,
 			GLib.Cancellable? cancellable = null
 		) throws GLib.Error;
+		public async bool add_cookie (
+			Soup.Cookie cookie,
+			GLib.Cancellable? cancellable = null
+		) throws GLib.Error;
 	}
 
 	public class NetworkSession : GLib.Object {
