@@ -91,7 +91,8 @@ host_c_files() {
 		"${HOST}/win32-ui-webview2-script.c" \
 		"${HOST}/win32-ui-webview2-capture.c" \
 		"${HOST}/win32-ui-webview2-print.c" \
-		"${HOST}/win32-ui-webview2-cookies.c"
+		"${HOST}/win32-ui-webview2-cookies.c" \
+		"${HOST}/win32-ui-webview2-document-response.c"
 }
 
 inc_flags() {

@@ -33,6 +33,13 @@ bool vala_webview2_host_put_is_visible (bool visible);
 
 typedef void (*WebView2GtkEventCb) (void *user_data);
 typedef void (*WebView2GtkNavCompletedCb) (void *user_data, bool success);
+typedef void (*WebView2GtkDocumentResponseCb) (
+	void *user_data,
+	int status,
+	const char * const *header_names,
+	const char * const *header_values,
+	size_t header_count
+);
 
 void vala_webview2_host_set_event_handlers (
 	WebView2GtkEventCb navigation_starting,
@@ -40,6 +47,14 @@ void vala_webview2_host_set_event_handlers (
 	WebView2GtkEventCb document_title_changed,
 	void *user_data
 );
+
+void vala_webview2_host_set_document_response_handler (
+	WebView2GtkDocumentResponseCb handler,
+	void *user_data
+);
+
+void vala_webview2_document_response_register (struct ICoreWebView2 *webview);
+void vala_webview2_document_response_unregister (struct ICoreWebView2 *webview);
 
 bool vala_webview2_host_execute_script_sync (const char *script_utf8, char **result_json_out);
 bool vala_webview2_host_capture_screenshot_sync (bool full_document, char **devtools_json_out);

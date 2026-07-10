@@ -97,6 +97,10 @@ namespace WebView2Gtk {
 	public class WebView : Gtk.Box {
 		public WebView ();
 		public signal void load_changed (LoadEvent load_event);
+		public signal void main_document_response (
+			uint status,
+			Soup.MessageHeaders headers
+		);
 		public signal bool load_failed (LoadEvent load_event, string failing_uri, GLib.Error error);
 		public bool can_go_back ();
 		public bool can_go_forward ();

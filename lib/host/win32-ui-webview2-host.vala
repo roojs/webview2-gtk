@@ -164,6 +164,7 @@ public void finish_setup(
 	}
 	flush_pending_navigate();
 	events_register(host_webview_com());
+	document_response_register(host_webview_com());
 }
 
 [CCode(cname = "vala_webview2_host_create_with_xywh")]
@@ -240,6 +241,7 @@ public void on_size(void* parent_hwnd) {
 [CCode(cname = "vala_webview2_host_destroy")]
 public void destroy() {
 	if (webview_ready()) {
+		document_response_unregister(host_webview_com());
 		events_unregister(host_webview_com());
 	}
 	com_release_host();
@@ -251,6 +253,12 @@ extern void events_register(ICoreWebView2 webview);
 
 [CCode(cheader_filename = "win32-ui-webview2-events.h", cname = "vala_webview2_events_unregister")]
 extern void events_unregister(ICoreWebView2 webview);
+
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_document_response_register")]
+extern void document_response_register(ICoreWebView2 webview);
+
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_document_response_unregister")]
+extern void document_response_unregister(ICoreWebView2 webview);
 
 [CCode(cname = "vala_webview2_host_is_ready")]
 public bool is_ready() {
