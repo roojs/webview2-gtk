@@ -9,3 +9,4 @@
 packaging/msys2/src/
 .specstory/
 .cursorindexingignore
+.vscode
