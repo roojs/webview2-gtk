@@ -3,11 +3,13 @@
 #define COBJMACROS
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
 
 #include "webview2gtk-host-api.h"
+#include "win32-ui-webview2-document-response.h"
 #include "win32-ui-webview2-com-glue.h"
 #include "win32-ui-webview2-sdk.h"
 

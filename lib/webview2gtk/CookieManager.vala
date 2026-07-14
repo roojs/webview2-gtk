@@ -37,6 +37,23 @@ public class CookieManager : Object {
 		}
 		return list;
 	}
+
+	public async bool add_cookie (
+		Soup.Cookie cookie,
+		GLib.Cancellable? cancellable = null
+	) throws GLib.Error {
+		if (!wv2_add_cookie_sync (
+			cookie.get_name (),
+			cookie.get_value (),
+			cookie.get_domain (),
+			cookie.get_path (),
+			cookie.get_http_only (),
+			cookie.get_secure ()
+		)) {
+			throw new NetworkError.FAILED ("add_cookie failed");
+		}
+		return true;
+	}
 }
 
 }

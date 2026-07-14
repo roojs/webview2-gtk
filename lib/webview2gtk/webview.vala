@@ -508,12 +508,12 @@ public class WebView : Gtk.Box {
 	private static void on_document_response_cb (
 		void* user_data,
 		int status,
-		char** header_names,
-		char** header_values,
+		[CCode (array_length = false)] unowned string[] header_names,
+		[CCode (array_length = false)] unowned string[] header_values,
 		size_t header_count
 	) {
 		var headers = new Soup.MessageHeaders (Soup.MessageHeadersType.RESPONSE);
-		for (var i = 0; i < header_count; i++) {
+		for (var i = 0; i < (int) header_count; i++) {
 			headers.append (header_names[i], header_values[i]);
 		}
 		((WebView) user_data).on_document_response ((uint) status, headers);

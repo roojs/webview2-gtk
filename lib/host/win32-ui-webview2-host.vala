@@ -254,10 +254,10 @@ extern void events_register(ICoreWebView2 webview);
 [CCode(cheader_filename = "win32-ui-webview2-events.h", cname = "vala_webview2_events_unregister")]
 extern void events_unregister(ICoreWebView2 webview);
 
-[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_document_response_register")]
+[CCode(cheader_filename = "win32-ui-webview2-document-response.h", cname = "vala_webview2_document_response_register")]
 extern void document_response_register(ICoreWebView2 webview);
 
-[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_document_response_unregister")]
+[CCode(cheader_filename = "win32-ui-webview2-document-response.h", cname = "vala_webview2_document_response_unregister")]
 extern void document_response_unregister(ICoreWebView2 webview);
 
 [CCode(cname = "vala_webview2_host_is_ready")]

@@ -53,9 +53,6 @@ void vala_webview2_host_set_document_response_handler (
 	void *user_data
 );
 
-void vala_webview2_document_response_register (struct ICoreWebView2 *webview);
-void vala_webview2_document_response_unregister (struct ICoreWebView2 *webview);
-
 bool vala_webview2_host_execute_script_sync (const char *script_utf8, char **result_json_out);
 bool vala_webview2_host_capture_screenshot_sync (bool full_document, char **devtools_json_out);
 bool vala_webview2_host_print_to_pdf_sync (const char *output_path_utf8);
