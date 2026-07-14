@@ -167,20 +167,23 @@ static HRESULT STDMETHODCALLTYPE cookies_invoke (
 		InterlockedExchange (&ch->done, 1);
 		return S_OK;
 	}
-	for (i = 0; i < count; i++) {
-		ICoreWebView2Cookie *cookie = NULL;
+	{
 		size_t len = 0;
 		size_t cap = 0;
 
-		if (FAILED (ICoreWebView2CookieList_GetValueAtIndex (cookie_list, i, &cookie))
-		    || cookie == NULL) {
-			continue;
-		}
-		if (!append_cookie_line (&ch->result, &len, &cap, cookie)) {
+		for (i = 0; i < count; i++) {
+			ICoreWebView2Cookie *cookie = NULL;
+
+			if (FAILED (ICoreWebView2CookieList_GetValueAtIndex (cookie_list, i, &cookie))
+			    || cookie == NULL) {
+				continue;
+			}
+			if (!append_cookie_line (&ch->result, &len, &cap, cookie)) {
+				ICoreWebView2Cookie_Release (cookie);
+				break;
+			}
 			ICoreWebView2Cookie_Release (cookie);
-			break;
 		}
-		ICoreWebView2Cookie_Release (cookie);
 	}
 	InterlockedExchange (&ch->done, 1);
 	return S_OK;

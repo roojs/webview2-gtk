@@ -135,6 +135,12 @@ public class WebView : Gtk.Box {
 		this.notify["visible"].connect (() => {
 			this.sync_host_visible ();
 		});
+		this.map.connect (() => {
+			this.sync_host_visible ();
+		});
+		this.unmap.connect (() => {
+			this.sync_host_visible ();
+		});
 	}
 
 	public signal void load_changed (LoadEvent load_event);
@@ -377,8 +383,15 @@ public class WebView : Gtk.Box {
 		if (!_attached) {
 			return;
 		}
-		_host_shown_on_screen = this.get_visible () && this.get_opacity () > 0.001;
+		_host_shown_on_screen = this.get_mapped ()
+			&& this.get_visible ()
+			&& this.get_opacity () > 0.001;
+		/* Keep IsVisible for DevTools capture; park off-screen when not shown. */
 		wv2_host_put_is_visible (true);
+		if (!_host_shown_on_screen) {
+			wv2_host_set_bounds_xywh (-30000, -30000, 1, 1);
+			return;
+		}
 		push_bounds ();
 	}
 
