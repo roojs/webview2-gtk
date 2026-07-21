@@ -89,14 +89,31 @@ compile_host_c() {
 
 host_c_files() {
 	local host_dir="$1"
-	# valac -d "${host_dir}" keeps source-relative subdirs (lib/host/, generated/).
+	local -a valac_c=()
+	# valac -d layout differs by version / cwd:
+	# nested: host_dir/lib/host/*.c + host_dir/generated/*.c
+	# flat:   host_dir/*.c  (MSYS2 / GitHub Actions)
+	if [[ -f "${host_dir}/lib/host/win32-ui-webview2-host.c" ]]; then
+		valac_c=(
+			"${host_dir}/lib/host/win32-ui-webview2-host.c"
+			"${host_dir}/lib/host/webview2gtk-host-listeners.c"
+			"${host_dir}/generated/win32-ui-webview2-host-glue.c"
+			"${host_dir}/generated/win32-ui-webview2-com-sync.c"
+			"${host_dir}/generated/win32-wide-strings.c"
+			"${host_dir}/generated/win32-ui-webview2-events-bridge.c"
+		)
+	else
+		valac_c=(
+			"${host_dir}/win32-ui-webview2-host.c"
+			"${host_dir}/webview2gtk-host-listeners.c"
+			"${host_dir}/win32-ui-webview2-host-glue.c"
+			"${host_dir}/win32-ui-webview2-com-sync.c"
+			"${host_dir}/win32-wide-strings.c"
+			"${host_dir}/win32-ui-webview2-events-bridge.c"
+		)
+	fi
 	echo \
-		"${host_dir}/lib/host/win32-ui-webview2-host.c" \
-		"${host_dir}/lib/host/webview2gtk-host-listeners.c" \
-		"${host_dir}/generated/win32-ui-webview2-host-glue.c" \
-		"${host_dir}/generated/win32-ui-webview2-com-sync.c" \
-		"${host_dir}/generated/win32-wide-strings.c" \
-		"${host_dir}/generated/win32-ui-webview2-events-bridge.c" \
+		"${valac_c[@]}" \
 		"${GEN}/win32-ui-webview2-com-sync.c" \
 		"${GEN}/win32-ui-webview2-events.c" \
 		"${HOST}/win32-ui-webview2-loader.c" \
@@ -116,14 +133,17 @@ inc_flags() {
 	local -a flags=(
 		-mwindows
 		-I"${host_dir}"
+	)
+	# Prefer valac-generated headers over any stale copy under lib/webview2gtk/.
+	if [[ -n "${extra_dir}" ]]; then
+		flags+=(-I"${extra_dir}/lib/webview2gtk" -I"${extra_dir}")
+	fi
+	flags+=(
 		-I"${GEN}"
 		-I"${WEBVIEW2_INC}"
 		-I"${HOST}"
 		-I"${WIDGET_INC}"
 	)
-	if [[ -n "${extra_dir}" ]]; then
-		flags+=(-I"${extra_dir}")
-	fi
 	# shellcheck disable=SC2086
 	echo "${flags[@]}" ${GTK_CFLAGS}
 }
