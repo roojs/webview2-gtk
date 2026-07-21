@@ -3,6 +3,7 @@ name: Deploy Documentation to GitHub Pages
 on:
   push:
     branches:
+      - master
       - main
     paths:
       - 'lib/webview2gtk/**/*.vala'
@@ -23,7 +24,6 @@ permissions:
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -59,7 +59,6 @@ jobs:
           path: build/valadoc
 
   deploy:
-    if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:
