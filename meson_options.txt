@@ -1,1 +1,2 @@
 option('examples', type: 'boolean', value: true, description: 'Build hello and browser demos')
+option('docs', type: 'boolean', value: false, description: 'Build Valadoc API docs (works on Linux; required to configure off Windows)')

@@ -1,4 +1,5 @@
 /build/
+/build-docs/
 /build-remote/
 /dist-demos/
 /.meson-private/

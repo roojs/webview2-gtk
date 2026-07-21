@@ -7,11 +7,11 @@
 #   ./scripts/agent-remote-build.sh pull     # pull build/ back to Linux
 #   ./scripts/agent-remote-build.sh run      # run hello demo on Windows (3s smoke)
 #
-# Requires: ssh snappr-win, MSYS2 rsync on Windows (see vala.win32 docs/windows-build.md § Rsync).
+# Requires: AGENT_WIN_HOST (SSH Host), MSYS2 rsync on Windows (see vala.win32 docs/windows-build.md § Rsync).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-REMOTE_HOST="${AGENT_WIN_HOST:-snappr-win}"
+REMOTE_HOST="${AGENT_WIN_HOST:?set AGENT_WIN_HOST to your Windows SSH Host alias}"
 REMOTE_ROOT="/c/msys64/tmp/webview2-gtk"
 REMOTE_BUILD="${REMOTE_ROOT}/build"
 RSYNC_SSH=(ssh -o BatchMode=yes)

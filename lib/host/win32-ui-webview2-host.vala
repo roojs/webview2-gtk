@@ -165,6 +165,12 @@ public void finish_setup(
 	flush_pending_navigate();
 	events_register(host_webview_com());
 	document_response_register(host_webview_com());
+	/* A11y Invoke diagnostics — off in general builds.
+	 * To enable: set WEBVIEW2GTK_A11Y_DIAG_COMPILE to 1 in
+	 * win32-ui-webview2-a11y-diag.h, uncomment the next line, rebuild,
+	 * run with WEBVIEW2GTK_A11Y_DIAG=1.
+	a11y_diag_register(host_webview_com());
+	*/
 }
 
 [CCode(cname = "vala_webview2_host_create_with_xywh")]
@@ -256,6 +262,9 @@ extern void events_unregister(ICoreWebView2 webview);
 
 [CCode(cheader_filename = "win32-ui-webview2-document-response.h", cname = "vala_webview2_document_response_register")]
 extern void document_response_register(ICoreWebView2 webview);
+
+[CCode(cheader_filename = "win32-ui-webview2-a11y-diag.h", cname = "vala_webview2_a11y_diag_register")]
+extern void a11y_diag_register(ICoreWebView2 webview);
 
 [CCode(cheader_filename = "win32-ui-webview2-document-response.h", cname = "vala_webview2_document_response_unregister")]
 extern void document_response_unregister(ICoreWebView2 webview);

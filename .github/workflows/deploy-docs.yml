@@ -1,0 +1,71 @@
+name: Deploy Documentation to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lib/webview2gtk/**/*.vala'
+      - 'docs/meson.build'
+      - 'docs/valadoc-wiki/**'
+      - 'docs/run-valadoc.sh'
+      - 'docs/fix-valadoc-index-links.sh'
+      - 'docs/code-documentation.md'
+      - 'meson.build'
+      - 'meson_options.txt'
+      - '.github/workflows/deploy-docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            meson \
+            ninja-build \
+            valac \
+            valadoc \
+            libgee-0.8-dev \
+            libglib2.0-dev \
+            libgtk-4-dev \
+            libsoup-3.0-dev \
+            build-essential \
+            pkg-config
+
+      - name: Setup meson (docs only)
+        run: meson setup build -Ddocs=true -Dexamples=false
+
+      - name: Build documentation
+        run: ninja -C build docs/valadoc
+
+      - name: Create .nojekyll file
+        run: touch build/valadoc/.nojekyll
+
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/valadoc
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

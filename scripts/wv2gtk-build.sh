@@ -46,10 +46,15 @@ GTK_VALA_ARGS=(
 	--profile=gobject
 	--pkg gtk4
 	--pkg libsoup-3.0
+	--pkg gee-0.8
+	--pkg posix
 )
 
 CAPTURE_VALA=(
 	lib/webview2gtk/CaptureBindings.vala
+	lib/webview2gtk/A11yBindings.vala
+	lib/webview2gtk/win32atspi/Win32Atspi.vala
+	lib/webview2gtk/win32atspi/Win32AtspiWin.vala
 	lib/webview2gtk/Enums.vala
 	lib/webview2gtk/NetworkProxySettings.vala
 	lib/webview2gtk/CookieManager.vala
@@ -65,25 +70,33 @@ CC_QUIET=(
 	-Wno-implicit-function-declaration
 )
 
-WEBVIEW2_LINK=( -lole32 -luuid -lshell32 -ladvapi32 )
-GTK_CFLAGS="$(pkg-config --cflags gtk4 libsoup-3.0)"
-GTK_LIBS="$(pkg-config --libs gtk4 libsoup-3.0)"
+WEBVIEW2_LINK=( -lole32 -luuid -lshell32 -ladvapi32 -loleaut32 -luiautomationcore )
+GTK_CFLAGS="$(pkg-config --cflags gtk4 libsoup-3.0 gee-0.8)"
+GTK_LIBS="$(pkg-config --libs gtk4 libsoup-3.0 gee-0.8)"
 
 compile_host_c() {
 	local host_dir="$1"
 	mkdir -p "${host_dir}"
 	valac "${HOST_VALA_ARGS[@]}" -C -d "${host_dir}" "${HOST_VALA[@]}"
+	local f
+	for f in $(host_c_files "${host_dir}"); do
+		if [[ ! -f "${f}" ]]; then
+			echo "wv2gtk-build: missing generated host C: ${f}" >&2
+			exit 1
+		fi
+	done
 }
 
 host_c_files() {
 	local host_dir="$1"
+	# valac -d "${host_dir}" keeps source-relative subdirs (lib/host/, generated/).
 	echo \
-		"${host_dir}/win32-ui-webview2-host.c" \
-		"${host_dir}/webview2gtk-host-listeners.c" \
-		"${host_dir}/win32-ui-webview2-host-glue.c" \
-		"${host_dir}/win32-ui-webview2-com-sync.c" \
-		"${host_dir}/win32-wide-strings.c" \
-		"${host_dir}/win32-ui-webview2-events-bridge.c" \
+		"${host_dir}/lib/host/win32-ui-webview2-host.c" \
+		"${host_dir}/lib/host/webview2gtk-host-listeners.c" \
+		"${host_dir}/generated/win32-ui-webview2-host-glue.c" \
+		"${host_dir}/generated/win32-ui-webview2-com-sync.c" \
+		"${host_dir}/generated/win32-wide-strings.c" \
+		"${host_dir}/generated/win32-ui-webview2-events-bridge.c" \
 		"${GEN}/win32-ui-webview2-com-sync.c" \
 		"${GEN}/win32-ui-webview2-events.c" \
 		"${HOST}/win32-ui-webview2-loader.c" \
@@ -92,7 +105,9 @@ host_c_files() {
 		"${HOST}/win32-ui-webview2-capture.c" \
 		"${HOST}/win32-ui-webview2-print.c" \
 		"${HOST}/win32-ui-webview2-cookies.c" \
-		"${HOST}/win32-ui-webview2-document-response.c"
+		"${HOST}/win32-ui-webview2-document-response.c" \
+		"${HOST}/win32-ui-webview2-a11y.c" \
+		"${HOST}/win32-ui-webview2-a11y-diag.c"
 }
 
 inc_flags() {
@@ -152,12 +167,15 @@ case "${MODE}" in
 		compile_host_objects "${HOST_DIR}" "${OBJ_DIR}"
 		cc -c "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
 			-o "${OBJ_DIR}/webview2gtk-gdk-win32.o" "${GDK_WIN32_C}"
-		for src in "${GTK_DIR}/lib/webview2gtk"/*.c; do
+		shopt -s nullglob
+		for src in "${GTK_DIR}/lib/webview2gtk"/*.c \
+			"${GTK_DIR}/lib/webview2gtk"/win32atspi/*.c; do
 			base="$(basename "${src}" .c)"
 			cc -c "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
 				-include "${GTK_HEADER}" \
 				-o "${OBJ_DIR}/${base}.o" "${src}"
 		done
+		shopt -u nullglob
 		ar rcs "${PREFIX}/lib/libwebview2gtk-1.a" "${OBJ_DIR}"/*.o
 		cp -f "${VAPI}/webview2gtk-1.vapi" "${PREFIX}/lib/webview2gtk-1.vapi"
 		cp -f "${GTK_HEADER}" "${PREFIX}/include/webview2gtk-1/webview2gtk.h"
@@ -187,9 +205,12 @@ if [[ "${MODE}" != lib ]]; then
 	)
 	MAIN_C="${GTK_DIR}/examples/${MODE}/main.c"
 	GTK_C=()
-	for src in "${GTK_DIR}/lib/webview2gtk"/*.c; do
+	shopt -s nullglob
+	for src in "${GTK_DIR}/lib/webview2gtk"/*.c \
+		"${GTK_DIR}/lib/webview2gtk"/win32atspi/*.c; do
 		GTK_C+=("${src}")
 	done
+	shopt -u nullglob
 	# shellcheck disable=SC2046,SC2086
 	cc "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
 		-o "${OUT}" \

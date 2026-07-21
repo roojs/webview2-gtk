@@ -15,7 +15,7 @@ You can still share Vala source with a Linux build that uses WebKitGTK instead (
 | | |
 |--|--|
 | Linux git host | e.g. `/home/alan/gitlive/webview2-gtk` |
-| Windows SSH | `ssh snappr-win` (your Windows box) |
+| Windows SSH | your Windows build host (`ssh …`) |
 | Windows repo (agent rsync) | **`C:\msys64\tmp\webview2-gtk\`** |
 | Portable demos (run at desktop) | **`C:\msys64\tmp\webview2-gtk\dist-demos\`** (or your clone’s `dist-demos\`) |
 | Raw compile output | `build\` (needs toolchain on `PATH` — do not double-click) |
@@ -162,7 +162,7 @@ You should see a GTK window with **Edge WebView2** content inside. [WebView2 Run
 
 If you develop on Linux but have a Windows box with MSYS2 (same rsync/SSH pattern as **vala.win32** `scripts/agent-remote-build.sh`):
 
-1. **SSH** — `~/.ssh/config` entry (e.g. `Host snappr-win` → your Windows host).
+1. **SSH** — `~/.ssh/config` `Host` for the Windows box; set `AGENT_WIN_HOST` to that name.
 2. **Rsync on Windows** — `pacman -S rsync` in MSYS2 UCRT64.
 3. **GTK4 on Windows** — run the toolchain line in [How to run bash scripts from PowerShell](#how-to-run-msys2-from-powershell) (first table row).
 
@@ -338,7 +338,7 @@ Add webview2-gtk as a **submodule** at `webview2-gtk/` to skip the clone step, o
 | `zoom_level` / `get_zoom_level()` / `set_zoom_level()` | same |
 | `load_changed(LoadEvent)` | same enum names |
 
-WebView2Gtk-only: `ready` — host COM object attached.
+WebView2Gtk-only: `ready`; **Win32Atspi** (AT-SPI-shaped API over UIA — see [docs/a11y.md](docs/a11y.md)).
 
 Not implemented yet: settings, inspector, policy callbacks, JS bridge, etc. (`load_failed` and `JavaScriptResult.to_string` are implemented.)
 
@@ -349,18 +349,32 @@ Not implemented yet: settings, inspector, policy callbacks, JS bridge, etc. (`lo
 ```
 lib/host/           WebView2 COM host (from vala.win32)
 lib/webview2gtk/    Public GTK 4 widget (Vala)
+docs/a11y.md        UIA / Win32Atspi notes
+docs/               Valadoc (`-Ddocs=true`) + deploy-docs.yml → GitHub Pages
 generated/          Host glue
 vapi/               Win32/WebView2 bindings for the host
 examples/hello/     Hello HTML demo
-examples/browser/   Minimal browser chrome
+examples/browser/   Minimal browser chrome (+ Win32Atspi Invoke / Fill)
 examples/consumer-meson.build   Sample Meson for your app
 packaging/          NSIS installer + packaging/msys2/PKGBUILD (pacman)
 scripts/            vendor SDK, build, package-demos.sh, copy-exe-runtime-dlls.sh,
                     sample-build.sh, sample-package-windows.sh,
                     sample-github-build-windows.yml, agent-remote-build.sh,
                     build-pacman-package.sh, bundle-bin-runtime.sh
-.github/workflows/  Release CI (tag `v*` → setup.exe + pacman package)
+.github/workflows/  Release CI (tag `v*`) + deploy-docs.yml (Valadoc → Pages)
 ```
+
+## API documentation (Valadoc)
+
+Same pattern as OLLMchat: Valadoc from public `.vala`, published on GitHub Pages.
+
+```bash
+meson setup build-docs -Ddocs=true
+ninja -C build-docs docs/valadoc
+# build-docs/valadoc/webview2gtk/index.htm
+```
+
+Markup rules: [docs/code-documentation.md](docs/code-documentation.md). Keep `docs/meson.build` inputs in sync when adding public sources.
 
 ## Manual build (without top-level Meson)
 

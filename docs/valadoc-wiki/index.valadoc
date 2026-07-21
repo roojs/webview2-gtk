@@ -1,0 +1,20 @@
+== webview2-gtk API - Package Overview ==
+
+GTK 4 widget embedding Microsoft Edge WebView2 on Windows, plus
+{{{Win32Atspi}}} (AT-SPI-shaped accessibility over UI Automation).
+
+Public namespaces:
+
+ * {{{WebView2Gtk}}} — {{{WebView}}} and related types (WebKitGTK-shaped API)
+ * {{{Win32Atspi}}} — accessibility tree / actions / keyboard synth
+
+Hand-written notes: [[https://github.com/roojs/webview2-gtk/blob/main/docs/a11y.md|docs/a11y.md]].
+
+== WebView ==
+
+ * [[https://roojs.github.io/webview2-gtk/webview2gtk/WebView2Gtk.WebView.html|WebView2Gtk.WebView]]
+
+== Accessibility ==
+
+ * [[https://roojs.github.io/webview2-gtk/webview2gtk/Win32Atspi.html|Win32Atspi]]
+ * [[https://roojs.github.io/webview2-gtk/webview2gtk/Win32Atspi.Accessible.html|Win32Atspi.Accessible]]

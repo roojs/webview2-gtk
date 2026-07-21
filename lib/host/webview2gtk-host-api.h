@@ -66,6 +66,56 @@ bool vala_webview2_host_add_cookie_sync (
 	bool secure
 );
 
+/* Structured ControlView walk from page Document.
+ * Coordinates are screen pixels. Call from the GTK/UI thread.
+ * Node ids are valid until the next a11y_walk (element cache is replaced).
+ */
+typedef struct webview2gtk_a11y_node {
+	int id;
+	int parent_id;
+	int x;
+	int y;
+	int w;
+	int h;
+	char *name;
+	char *role;
+	char *value;
+	char *uri; /* http(s) when ValuePattern exposes a URL; else empty */
+	bool can_invoke;
+	bool can_set_value;
+} webview2gtk_a11y_node;
+
+bool vala_webview2_host_a11y_walk (webview2gtk_a11y_node **nodes_out, size_t *count_out);
+void vala_webview2_host_a11y_nodes_free (webview2gtk_a11y_node *nodes, size_t count);
+
+typedef void (*WebView2GtkA11yForeachCb) (
+	int id,
+	int parent_id,
+	int x,
+	int y,
+	int w,
+	int h,
+	const char *name,
+	const char *role,
+	const char *value,
+	const char *uri,
+	bool can_invoke,
+	bool can_set_value,
+	void *user_data
+);
+
+/* Vala-friendly: walk Document, invoke cb per node, free staging (keeps invoke cache). */
+bool vala_webview2_host_a11y_walk_foreach (WebView2GtkA11yForeachCb cb, void *user_data);
+
+bool vala_webview2_host_a11y_invoke (int id);
+bool vala_webview2_host_a11y_set_value (int id, const char *utf8);
+/* SetFocus only — for AT-SPI grab_focus without activating. */
+bool vala_webview2_host_a11y_focus (int id);
+/* Type UTF-8 via SendInput (AT-SPI generate_keyboard_event STRING). */
+bool vala_webview2_host_a11y_type_text (const char *utf8);
+/* Virtual-key press+release (e.g. VK_BACK = 0x08). */
+bool vala_webview2_host_a11y_key_vk (unsigned short vk);
+
 #ifdef __cplusplus
 }
 #endif

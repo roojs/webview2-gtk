@@ -6,8 +6,20 @@ project(
   default_options: ['buildtype=debugoptimized', 'c_std=c11'],
 )
 
-if host_machine.system() != 'windows'
-  error('webview2-gtk is Windows-only (GTK 4 + WebView2 via gdk_win32_surface_get_handle)')
+is_windows = host_machine.system() == 'windows'
+want_docs = get_option('docs')
+
+if not is_windows and not want_docs
+  error('webview2-gtk is Windows-only (GTK 4 + WebView2). Use -Ddocs=true to configure Valadoc on Linux.')
+endif
+
+if want_docs
+  subdir('docs')
+endif
+
+if not is_windows
+  # Docs-only configure (CI / local Valadoc). Library and demos need Windows.
+  subdir_done()
 endif
 
 project_root = meson.project_source_root()

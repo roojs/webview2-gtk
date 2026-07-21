@@ -430,6 +430,7 @@ public class WebView : Gtk.Box {
 			return;
 		}
 		_attached = true;
+		Win32Atspi.register_webview (this);
 		wv2_host_set_document_response_handler (
 			(void*) on_document_response_cb,
 			this

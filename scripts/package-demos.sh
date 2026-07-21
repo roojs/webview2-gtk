@@ -15,7 +15,7 @@ COPY_DLLS="${ROOT}/scripts/copy-exe-runtime-dlls.sh"
 
 case "$(uname -s 2>/dev/null)" in
 MINGW*|MSYS*)
-	for image in webview2gtk-hello.exe webview2gtk-browser.exe snappr.exe; do
+	for image in webview2gtk-hello.exe webview2gtk-browser.exe; do
 		taskkill //F //IM "${image}" >/dev/null 2>&1 || true
 	done
 	sleep 1

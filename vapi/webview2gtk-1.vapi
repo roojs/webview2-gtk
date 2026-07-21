@@ -140,3 +140,52 @@ namespace WebView2Gtk {
 		) throws GLib.Error;
 	}
 }
+
+/* Win32 AT-SPI facade — see docs/a11y.md */
+namespace Win32Atspi {
+	public enum CoordType { SCREEN, WINDOW, PARENT }
+	public enum ScrollType { TOP_EDGE, BOTTOM_EDGE, LEFT_EDGE, RIGHT_EDGE, ANYWHERE }
+	public enum KeySynthType { PRESS, RELEASE, PRESSRELEASE, STRING }
+
+	public class ComponentExtents : GLib.Object {
+		public int x { get; set; }
+		public int y { get; set; }
+		public int width { get; set; }
+		public int height { get; set; }
+	}
+
+	public class Text : GLib.Object {
+		public int get_character_count ();
+		public string get_text (int start_offset, int end_offset);
+	}
+
+	public class Hyperlink : GLib.Object {
+		public int get_n_anchors ();
+		public string get_uri (int i);
+	}
+
+	public class Accessible : GLib.Object {
+		public string get_name ();
+		public string get_role_name ();
+		public string get_description ();
+		public uint get_process_id ();
+		public int get_child_count ();
+		public Accessible get_child_at_index (int index);
+		public GLib.HashTable<string, string> get_attributes ();
+		public GLib.GenericArray<string> get_interfaces ();
+		public int get_n_actions ();
+		public string get_action_name (int index);
+		public bool do_action (int index);
+		public bool grab_focus ();
+		public bool set_text_contents (string text);
+		public ComponentExtents get_extents (CoordType coord_type);
+		public void scroll_to (ScrollType type) throws GLib.Error;
+		public Text get_text_iface ();
+		public Hyperlink? get_hyperlink ();
+	}
+
+	public static void init ();
+	public static Accessible get_desktop (int index);
+	public static void register_webview (WebView2Gtk.WebView web);
+	public static void generate_keyboard_event (long keyval, string? keystring, KeySynthType synth);
+}

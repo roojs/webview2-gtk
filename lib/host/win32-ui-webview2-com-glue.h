@@ -6,6 +6,7 @@
 
 struct ICoreWebView2;
 struct ICoreWebView2Controller;
+struct ICoreWebView2Environment;
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,6 +19,8 @@ void vala_webview2_com_present_webview (HWND parent);
 void vala_webview2_com_release_host (void);
 
 struct ICoreWebView2 *vala_webview2_com_get_webview (void);
+HWND vala_webview2_com_get_parent_hwnd (void);
+struct ICoreWebView2Environment *vala_webview2_com_get_environment (void);
 
 void vala_webview2_com_pump_messages (void);
 void vala_webview2_com_sync_await (volatile LONG *done);

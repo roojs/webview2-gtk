@@ -281,6 +281,18 @@ vala_webview2_com_get_webview (void)
 	return g_glue.webview;
 }
 
+HWND
+vala_webview2_com_get_parent_hwnd (void)
+{
+	return g_glue.parent;
+}
+
+ICoreWebView2Environment *
+vala_webview2_com_get_environment (void)
+{
+	return g_glue.environment;
+}
+
 void
 vala_webview2_com_pump_messages (void)
 {
