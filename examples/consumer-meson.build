@@ -2,6 +2,7 @@
 # WebKitGTK on Linux and webview2gtk on Windows.
 #
 # Copy the relevant parts into your project's meson.build.
+# See docs/using-in-your-app.md.
 
 project('my-browser-app', ['c', 'vala'], version: '1.0.0')
 
@@ -9,8 +10,9 @@ gtk4 = dependency('gtk4')
 win = host_machine.system() == 'windows'
 
 if win
-  # Option A: prebuilt release unpacked to C:/webview2gtk (see README)
-examples/consumer-meson.build
+  # setup.exe → 'C:/Program Files/webview2gtk/lib/pkgconfig'
+  # pacman   → already on PKG_CONFIG_PATH under /ucrt64
+  webview2gtk_pc = 'C:/Program Files/webview2gtk/lib/pkgconfig'
   if not meson.is_cross_build()
     meson.add_env('PKG_CONFIG_PATH', webview2gtk_pc, method: 'prepend')
   endif
@@ -34,3 +36,4 @@ executable(
 # After install on Windows, ship next to my-browser-app.exe:
 #   WebView2Loader.dll
 #   GTK 4 DLLs from MSYS2 UCRT64 (if users run outside the UCRT64 shell)
+# See docs/deploying-windows.md
