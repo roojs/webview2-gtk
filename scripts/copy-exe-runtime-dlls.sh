@@ -15,10 +15,17 @@ if [[ ! -f "${EXE_PATH}" ]]; then
 fi
 
 mkdir -p "${OUT_DIR}"
-cp -f "${EXE_PATH}" "${OUT_DIR}/"
+# In-place bundling (CI: exe already in OUT_DIR) — skip same-file cp.
+exe_base="$(basename "${EXE_PATH}")"
+if [[ "$(cd "$(dirname "${EXE_PATH}")" && pwd -P)/${exe_base}" != "$(cd "${OUT_DIR}" && pwd -P)/${exe_base}" ]]; then
+	cp -f "${EXE_PATH}" "${OUT_DIR}/"
+fi
 
 if [[ -n "${WEBVIEW2_LOADER}" && -f "${WEBVIEW2_LOADER}" ]]; then
-	cp -f "${WEBVIEW2_LOADER}" "${OUT_DIR}/"
+	loader_base="$(basename "${WEBVIEW2_LOADER}")"
+	if [[ "$(cd "$(dirname "${WEBVIEW2_LOADER}")" && pwd -P)/${loader_base}" != "$(cd "${OUT_DIR}" && pwd -P)/${loader_base}" ]]; then
+		cp -f "${WEBVIEW2_LOADER}" "${OUT_DIR}/"
+	fi
 fi
 
 trim() {

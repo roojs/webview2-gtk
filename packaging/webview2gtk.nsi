@@ -44,7 +44,7 @@ Section "webview2-gtk" SecMain
   SetOutPath "$INSTDIR\bin"
   File "${INST_SRC}\bin\webview2gtk-hello.exe"
   File "${INST_SRC}\bin\webview2gtk-browser.exe"
-  File "${INST_SRC}\bin\WebView2Loader.dll"
+  File "${INST_SRC}\bin\*.dll"
 
   SetOutPath "$INSTDIR\lib"
   File "${INST_SRC}\lib\libwebview2gtk-1.a"
