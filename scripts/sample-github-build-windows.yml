@@ -43,6 +43,8 @@ jobs:
             mingw-w64-ucrt-x86_64-ninja
             mingw-w64-ucrt-x86_64-pkg-config
             mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-libgee
+            mingw-w64-ucrt-x86_64-libsoup3
 
       - name: Build webview2gtk
         run: |

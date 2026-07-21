@@ -9,14 +9,16 @@
 #   ./scripts/build-pacman-package.sh
 
 pkgname=mingw-w64-ucrt-x86_64-webview2gtk
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
 pkgdesc="GTK 4 WebView2 widget for Windows (Edge Chromium)"
 arch=('any')
-url="https://github.com/YOUR_ORG/webview2-gtk"
+url="https://github.com/roojs/webview2-gtk"
 license=('LGPL-2.1-or-later')
 depends=(
   'mingw-w64-ucrt-x86_64-gtk4'
+  'mingw-w64-ucrt-x86_64-libgee'
+  'mingw-w64-ucrt-x86_64-libsoup3'
 )
 makedepends=(
   'mingw-w64-ucrt-x86_64-gcc'

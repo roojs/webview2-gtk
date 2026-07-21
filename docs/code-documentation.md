@@ -69,10 +69,12 @@ Same rules as OLLMchat:
 ''[[https://roojs.github.io/webview2-gtk/webview2gtk/WebView2Gtk.WebView.html|WebView2Gtk.WebView]]''
 ```
 
-3. Valadoc emits those as external links (`target="_blank"`). After valadoc runs,
-   **`docs/fix-valadoc-index-links.sh`** (invoked by `docs/run-valadoc.sh`)
-   rewrites matching `https://roojs.github.io/webview2-gtk/webview2gtk/…`
-   hrefs in `index.htm` to same-directory relative paths (no new tab).
+3. Valadoc emits those as external links (`target="_blank"`) on **both**
+   `valadoc/index.html` (Pages root) and `valadoc/webview2gtk/index.htm`.
+   **`docs/fix-valadoc-index-links.sh`** (via `docs/run-valadoc.sh`) rewrites
+   matching Pages hrefs to relative paths and drops `target="_blank"`:
+   - package index → `Foo.html`
+   - site root → `webview2gtk/Foo.html`
 4. Keep wiki links aligned with symbols that exist in `docs/meson.build`.
 
 Do **not** hand-write relative `href`s in the wiki — the post-process expects the

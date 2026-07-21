@@ -2,7 +2,7 @@
 ;
 ; Build from MSYS2 UCRT64 after meson install:
 ;   WIN_SRC=$(cygpath -aw "$PWD/dist/webview2gtk")
-;   makensis -DINST_SRC="$WIN_SRC" -DPRODUCT_VERSION=0.1.0 packaging/webview2gtk.nsi
+;   makensis -DINST_SRC="$WIN_SRC" -DPRODUCT_VERSION=0.2.0 packaging/webview2gtk.nsi
 ;
 ; Or: ./scripts/build-installer.sh dist/webview2gtk
 
@@ -19,7 +19,7 @@ RequestExecutionLevel admin
 Unicode true
 
 !ifndef PRODUCT_VERSION
-  !define PRODUCT_VERSION "0.1.0"
+  !define PRODUCT_VERSION "0.2.0"
 !endif
 !ifndef INST_SRC
   !define INST_SRC "dist\webview2gtk"

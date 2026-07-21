@@ -1,7 +1,7 @@
 name: Release
 
 # Builds webview2gtk-setup.exe + MSYS2 pacman package on Windows and publishes
-# release assets for tags like `v0.1.0` (same trigger pattern as OLLMchat).
+# release assets for tags like `v0.2.0` (same trigger pattern as OLLMchat).
 
 on:
   push:
@@ -36,6 +36,8 @@ jobs:
             mingw-w64-ucrt-x86_64-ninja
             mingw-w64-ucrt-x86_64-pkg-config
             mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-libgee
+            mingw-w64-ucrt-x86_64-libsoup3
             mingw-w64-ucrt-x86_64-curl
             mingw-w64-ucrt-x86_64-nsis
 
