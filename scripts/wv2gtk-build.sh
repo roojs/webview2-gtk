@@ -57,6 +57,8 @@ CAPTURE_VALA=(
 	lib/webview2gtk/win32atspi/Win32AtspiWin.vala
 	lib/webview2gtk/Enums.vala
 	lib/webview2gtk/NetworkProxySettings.vala
+	lib/webview2gtk/URIRequest.vala
+	lib/webview2gtk/Download.vala
 	lib/webview2gtk/CookieManager.vala
 	lib/webview2gtk/NetworkSession.vala
 	lib/webview2gtk/Settings.vala
@@ -70,7 +72,7 @@ CC_QUIET=(
 	-Wno-implicit-function-declaration
 )
 
-WEBVIEW2_LINK=( -lole32 -luuid -lshell32 -ladvapi32 -loleaut32 -luiautomationcore )
+WEBVIEW2_LINK=( -lole32 -luuid -lshell32 -ladvapi32 -loleaut32 -luiautomationcore -lwinhttp )
 GTK_CFLAGS="$(pkg-config --cflags gtk4 libsoup-3.0 gee-0.8)"
 GTK_LIBS="$(pkg-config --libs gtk4 libsoup-3.0 gee-0.8)"
 
@@ -123,6 +125,7 @@ host_c_files() {
 		"${HOST}/win32-ui-webview2-print.c" \
 		"${HOST}/win32-ui-webview2-cookies.c" \
 		"${HOST}/win32-ui-webview2-document-response.c" \
+		"${HOST}/win32-ui-webview2-downloads.c" \
 		"${HOST}/win32-ui-webview2-a11y.c" \
 		"${HOST}/win32-ui-webview2-a11y-diag.c"
 }

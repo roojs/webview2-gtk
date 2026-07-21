@@ -66,6 +66,31 @@ bool vala_webview2_host_add_cookie_sync (
 	bool secure
 );
 
+/* ---- Downloads (DownloadStarting + WinHTTP; WebKit-shaped Vala) ---- */
+typedef void (*WebView2GtkDownloadStartedCb) (
+	int id,
+	const char *uri,
+	const char *suggested_filename,
+	const char *mime_type,
+	int64_t content_length,
+	void *user_data
+);
+typedef void (*WebView2GtkDownloadProgressCb) (int id, uint64_t received, void *user_data);
+typedef void (*WebView2GtkDownloadFinishedCb) (int id, void *user_data);
+typedef void (*WebView2GtkDownloadFailedCb) (int id, const char *message, void *user_data);
+
+void vala_webview2_host_set_download_handlers (
+	WebView2GtkDownloadStartedCb started,
+	WebView2GtkDownloadProgressCb progress,
+	WebView2GtkDownloadFinishedCb finished,
+	WebView2GtkDownloadFailedCb failed,
+	void *user_data
+);
+
+int vala_webview2_host_download_create (const char *uri);
+bool vala_webview2_host_download_start (int id, const char *dest_path, bool overwrite);
+void vala_webview2_host_download_cancel (int id);
+
 /* Structured ControlView walk from page Document.
  * Coordinates are screen pixels. Call from the GTK/UI thread.
  * Node ids are valid until the next a11y_walk (element cache is replaced).

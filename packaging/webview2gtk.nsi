@@ -96,7 +96,7 @@ Function FixPkgConfig
   FileWrite $0 "Description: GTK 4 WebView2 widget for Windows (Edge Chromium)$\r$\n"
   FileWrite $0 "Version: ${PRODUCT_VERSION}$\r$\n"
   FileWrite $0 "Requires: gtk4$\r$\n"
-  FileWrite $0 "Libs: -L$${libdir} -lwebview2gtk-1 -lole32 -luuid -lshell32 -ladvapi32$\r$\n"
+  FileWrite $0 "Libs: -L$${libdir} -lwebview2gtk-1 -lole32 -luuid -lshell32 -ladvapi32 -loleaut32 -luiautomationcore -lwinhttp$\r$\n"
   FileWrite $0 "Cflags: -I$${includedir}/webview2gtk-1$\r$\n"
   FileClose $0
 FunctionEnd

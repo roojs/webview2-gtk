@@ -274,6 +274,31 @@ public class WebView : Gtk.Box {
 		return _network_session;
 	}
 
+	/**
+	 * Start a download of ''uri'' using the WebView cookie jar.
+	 * Emits {@link NetworkSession.download_started} then {@link Download.decide_destination}.
+	 */
+	public Download download_uri (string uri) {
+		var trimmed = uri.strip ();
+		var id = wv2_host_download_create (trimmed);
+		var suggested = "download";
+		try {
+			var parsed = GLib.Uri.parse (trimmed, GLib.UriFlags.NONE);
+			var path = parsed.get_path ();
+			if (path != null && path != "" && path != "/") {
+				var leaf = GLib.Path.get_basename (path);
+				if (leaf != "" && leaf != "/" && leaf != ".") {
+					suggested = leaf;
+				}
+			}
+		} catch (GLib.Error e) {
+		}
+		var dl = new Download (this._network_session, id, trimmed, suggested, "", -1);
+		this._network_session.register_download (dl, id);
+		this._network_session.emit_download_started (dl);
+		return dl;
+	}
+
 	public async Gdk.Texture get_snapshot (
 		SnapshotRegion region,
 		SnapshotOptions options,
