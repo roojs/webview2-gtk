@@ -38,8 +38,9 @@ _repo_root() {
   pwd
 }
 
-# CI sets WV2GTK_PREBUILT_DESTDIR to a meson --destdir tree (already under
-# $MINGW_PREFIX/…) so Release builds once and only packages here.
+# CI sets WV2GTK_PREBUILT_DESTDIR to a meson --destdir tree normalized to
+# …/ucrt64/… (see scripts/msys2-normalize-destdir.sh). Must not be packaging/msys2/pkg
+# — that collides with makepkg's $pkgdir.
 prepare() {
   if [[ -n "${WV2GTK_PREBUILT_DESTDIR:-}" ]]; then
     return 0
@@ -53,6 +54,7 @@ prepare() {
   (cd "$root" && tar -cf - \
     --exclude='./packaging/msys2/src' \
     --exclude='./packaging/msys2/pkg' \
+    --exclude='./packaging/msys2/prebuilt' \
     --exclude='./build' \
     --exclude='./build-remote' \
     --exclude='./dist' \
@@ -79,6 +81,18 @@ package() {
       echo "PKGBUILD: WV2GTK_PREBUILT_DESTDIR missing: ${WV2GTK_PREBUILT_DESTDIR}" >&2
       return 1
     fi
+    case "${pkgdir}" in
+      "${WV2GTK_PREBUILT_DESTDIR}"|"${WV2GTK_PREBUILT_DESTDIR}"/*)
+        echo "PKGBUILD: WV2GTK_PREBUILT_DESTDIR must not be under makepkg \$pkgdir (${pkgdir})" >&2
+        return 1
+        ;;
+    esac
+    case "${WV2GTK_PREBUILT_DESTDIR}" in
+      "${pkgdir}"|"${pkgdir}"/*)
+        echo "PKGBUILD: WV2GTK_PREBUILT_DESTDIR (${WV2GTK_PREBUILT_DESTDIR}) collides with \$pkgdir" >&2
+        return 1
+        ;;
+    esac
     mkdir -p "$pkgdir"
     cp -a "${WV2GTK_PREBUILT_DESTDIR}/." "$pkgdir/"
     return 0

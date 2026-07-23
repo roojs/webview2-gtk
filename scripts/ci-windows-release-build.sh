@@ -46,7 +46,7 @@ meson setup build --prefix="${PKG_PREFIX}" -Dexamples=true --reconfigure 2>/dev/
 	|| meson setup build --prefix="${PKG_PREFIX}" -Dexamples=true
 meson compile -C build
 
-DEST="${ROOT}/packaging/msys2/pkg"
+DEST="${ROOT}/packaging/msys2/prebuilt"
 rm -rf "${DEST}"
 meson install -C build --destdir="${DEST}"
 ./scripts/msys2-normalize-destdir.sh "${DEST}"

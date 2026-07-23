@@ -10,6 +10,7 @@
 *.pkg.tar.zst.sig
 packaging/msys2/src/
 packaging/msys2/pkg/
+packaging/msys2/prebuilt/
 .specstory/
 .tools/
 .cursorindexingignore
