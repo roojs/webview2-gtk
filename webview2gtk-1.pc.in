@@ -6,5 +6,5 @@ Name: webview2gtk-1
 Description: GTK 4 WebView2 widget for Windows (Edge Chromium)
 Version: 0.2.0
 Requires: gtk4
-Libs: -L${libdir} -lwebview2gtk-1 -lole32 -luuid -lshell32 -ladvapi32
+Libs: -L${libdir} -lwebview2gtk-1 -lole32 -luuid -lshell32 -ladvapi32 -loleaut32 -luiautomationcore -lwinhttp -lshlwapi
 Cflags: -I${includedir}/webview2gtk-1
