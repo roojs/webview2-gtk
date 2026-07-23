@@ -7,8 +7,13 @@
 *.o
 *.a
 *.pkg.tar.zst
+*.pkg.tar.zst.sig
 packaging/msys2/src/
 .specstory/
 .tools/
 .cursorindexingignore
 .vscode
+
+# Release signing key material (never commit)
+.gnupg-release-signing/
+.webview2gtk-gpg-private.asc

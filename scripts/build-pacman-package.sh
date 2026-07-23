@@ -3,9 +3,12 @@
 #
 # Usage:
 #   ./scripts/build-pacman-package.sh
+#   ./scripts/build-pacman-package.sh --sign          # needs GPGKEY / imported secret key
+#   PKGVER=0.2.7 ./scripts/build-pacman-package.sh    # override PKGBUILD pkgver (releases)
 #
 # Output:
 #   packaging/msys2/mingw-w64-ucrt-x86_64-webview2gtk-*.pkg.tar.zst
+#   packaging/msys2/mingw-w64-ucrt-x86_64-webview2gtk-*.pkg.tar.zst.sig  (with --sign)
 #
 # Install:
 #   pacman -U packaging/msys2/mingw-w64-ucrt-x86_64-webview2gtk-*.pkg.tar.zst
@@ -27,5 +30,22 @@ if grep -q $'\r' PKGBUILD 2>/dev/null; then
 	sed -i 's/\r$//' PKGBUILD
 fi
 
+if [[ -n "${PKGVER:-}" ]]; then
+	sed -i "s/^pkgver=.*/pkgver=${PKGVER}/" PKGBUILD
+	echo "build-pacman-package: pkgver=${PKGVER}"
+fi
+
 "${MAKEPKG}" -C -f --noconfirm --skipchecksums "$@"
-echo "build-pacman-package: ${PKG_DIR}/mingw-w64-ucrt-x86_64-webview2gtk-"*.pkg.tar.zst
+
+shopt -s nullglob
+pkgs=(mingw-w64-ucrt-x86_64-webview2gtk-*.pkg.tar.zst)
+if ((${#pkgs[@]} == 0)); then
+	echo "build-pacman-package: no package produced" >&2
+	exit 1
+fi
+for pkg in "${pkgs[@]}"; do
+	echo "build-pacman-package: ${PKG_DIR}/${pkg}"
+	if [[ -f "${pkg}.sig" ]]; then
+		echo "build-pacman-package: ${PKG_DIR}/${pkg}.sig"
+	fi
+done

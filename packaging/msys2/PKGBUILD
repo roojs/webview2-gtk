@@ -2,11 +2,12 @@
 # Build (MSYS2 UCRT64):
 #   cd packaging/msys2
 #   makepkg-mingw -C -f --noconfirm
-# Install:
-#   pacman -U mingw-w64-ucrt-x86_64-webview2gtk-*.pkg.tar.zst
+# Install (signed releases): trust packaging/msys2/webview2gtk-packager.gpg, then
+#   pacman -U https://github.com/roojs/webview2-gtk/releases/download/vX.Y.Z/mingw-w64-ucrt-x86_64-webview2gtk-X.Y.Z-1-any.pkg.tar.zst
 #
 # Or from repo root:
 #   ./scripts/build-pacman-package.sh
+#   PKGVER=X.Y.Z ./scripts/build-pacman-package.sh --sign
 
 pkgname=mingw-w64-ucrt-x86_64-webview2gtk
 pkgver=0.2.0

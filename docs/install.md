@@ -29,11 +29,19 @@ Uninstall via Windows Settings → Apps.
 
 Installs into `C:\msys64\ucrt64\` — `pkg-config --libs webview2gtk-1` works without extra `PKG_CONFIG_PATH`.
 
-**From a release** (edit the URL to match the asset on [Releases](https://github.com/roojs/webview2-gtk/releases)):
+Releases publish the package **and** a detached `.sig`. Trust the packager key once (UCRT64), then `pacman -U` the release URL:
 
 ```powershell
-C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'pacman -U --noconfirm https://github.com/roojs/webview2-gtk/releases/download/vX.Y.Z/mingw-w64-ucrt-x86_64-webview2gtk-X.Y.Z-1-any.pkg.tar.zst'
+# One-time: import + locally sign the packager key
+C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'curl -fsSLO https://raw.githubusercontent.com/roojs/webview2-gtk/master/packaging/msys2/webview2gtk-packager.gpg && pacman-key --add webview2gtk-packager.gpg && pacman-key --lsign-key 3205B6B562FE42F650A4901C611DB50F71CAB8F6'
 ```
+
+```powershell
+# Install from the latest matching release asset (example: v0.2.7)
+C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'pacman -U --noconfirm https://github.com/roojs/webview2-gtk/releases/download/v0.2.7/mingw-w64-ucrt-x86_64-webview2gtk-0.2.7-1-any.pkg.tar.zst'
+```
+
+Use the tag and asset name from the [Releases](https://github.com/roojs/webview2-gtk/releases) page. From the next signed release onward, `pkgver` matches the git tag (`v0.2.7` → `…-0.2.7-1-…`).
 
 Verify:
 
@@ -51,4 +59,4 @@ Uninstall: `pacman -R mingw-w64-ucrt-x86_64-webview2gtk`
 C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'cd /c/path/to/webview2-gtk && ./scripts/build-pacman-package.sh && pacman -U --noconfirm packaging/msys2/mingw-w64-ucrt-x86_64-webview2gtk-*.pkg.tar.zst'
 ```
 
-PKGBUILD: [`packaging/msys2/PKGBUILD`](../packaging/msys2/PKGBUILD)
+PKGBUILD: [`packaging/msys2/PKGBUILD`](../packaging/msys2/PKGBUILD). Signing details: [0.3-pacman-package-signatures.md](plans/0.3-pacman-package-signatures.md).
