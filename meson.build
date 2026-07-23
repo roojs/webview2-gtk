@@ -49,15 +49,15 @@ lib_stage = build_root / 'install-staging'
 lib_target = custom_target(
   'webview2gtk-lib',
   output: 'libwebview2gtk-1.stamp',
-  command: [_build_bash, wv2gtk_build_sh, 'lib', build_root, lib_stage],
+  command: [_build_bash, wv2gtk_build_sh, 'lib', build_root, lib_stage, '@OUTPUT@'],
   build_by_default: true,
 )
 
-# Examples
+# Examples link the staged static lib (do not re-valac the whole widget tree).
 hello_exe = custom_target(
   'webview2gtk-hello',
   output: 'webview2gtk-hello.exe',
-  command: [_build_bash, wv2gtk_build_sh, 'hello', build_root / 'hello', '@OUTPUT@'],
+  command: [_build_bash, wv2gtk_build_sh, 'hello', build_root / 'hello', '@OUTPUT@', lib_stage],
   depends: lib_target,
   build_by_default: get_option('examples'),
   install: get_option('examples'),
@@ -67,7 +67,7 @@ hello_exe = custom_target(
 browser_exe = custom_target(
   'webview2gtk-browser',
   output: 'webview2gtk-browser.exe',
-  command: [_build_bash, wv2gtk_build_sh, 'browser', build_root / 'browser', '@OUTPUT@'],
+  command: [_build_bash, wv2gtk_build_sh, 'browser', build_root / 'browser', '@OUTPUT@', lib_stage],
   depends: lib_target,
   build_by_default: get_option('examples'),
   install: get_option('examples'),
@@ -78,7 +78,7 @@ package_demos_sh = files('scripts/package-demos.sh')
 custom_target(
   'package-demos',
   output: 'package-demos.stamp',
-  command: [_build_bash, package_demos_sh],
+  command: [_build_bash, package_demos_sh, '@OUTPUT@'],
   depends: [hello_exe, browser_exe],
   build_by_default: get_option('examples'),
 )

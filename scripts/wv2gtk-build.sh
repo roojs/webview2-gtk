@@ -2,9 +2,12 @@
 # Build webview2-gtk library and examples (MSYS2 UCRT64 / native Windows).
 #
 # Usage:
-#   wv2gtk-build.sh lib      <builddir> <prefix>
-#   wv2gtk-build.sh hello    <builddir> <out.exe>
-#   wv2gtk-build.sh browser  <builddir> <out.exe>
+#   wv2gtk-build.sh lib      <builddir> <prefix> <stamp>
+#   wv2gtk-build.sh hello    <builddir> <out.exe> <lib-stage>
+#   wv2gtk-build.sh browser  <builddir> <out.exe> <lib-stage>
+#
+# Examples link the staged static library from `lib` — they do not recompile
+# the widget/host tree (that was tripling CI compile time).
 set -euo pipefail
 
 MODE="${1:?mode: lib|hello|browser}"
@@ -22,6 +25,13 @@ WEBVIEW2_INC="${ROOT}/build/vendor/webview2/include"
 if [[ ! -f "${WEBVIEW2_INC}/WebView2.h" ]]; then
 	echo "wv2gtk-build: run ./scripts/vendor-webview2-sdk.sh first" >&2
 	exit 1
+fi
+
+# Prefer ccache when present (CI caches ~/.ccache).
+if command -v ccache >/dev/null 2>&1; then
+	CC="${CC:-ccache cc}"
+else
+	CC="${CC:-cc}"
 fi
 
 # Skip generated/win32-ui-webview2-events-bridge.vala: Vala target delegates warn
@@ -162,7 +172,9 @@ compile_host_objects() {
 	for src in $(host_c_files "${host_dir}"); do
 		local base
 		base="$(basename "${src}" .c)"
-		cc -c "${CC_QUIET[@]}" $(inc_flags "${host_dir}") \
+		# CC may be "ccache cc"
+		# shellcheck disable=SC2086
+		${CC} -c "${CC_QUIET[@]}" $(inc_flags "${host_dir}") \
 			-o "${obj_dir}/${base}.o" "${src}"
 	done
 }
@@ -170,6 +182,7 @@ compile_host_objects() {
 case "${MODE}" in
 	lib)
 		PREFIX="${OUT}"
+		STAMP="${4:?meson stamp output}"
 		HOST_DIR="${BUILD_DIR}/host"
 		GTK_DIR="${BUILD_DIR}/gtk-lib"
 		OBJ_DIR="${BUILD_DIR}/obj"
@@ -191,62 +204,84 @@ case "${MODE}" in
 			exit 1
 		fi
 		compile_host_objects "${HOST_DIR}" "${OBJ_DIR}"
-		cc -c "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
+		# shellcheck disable=SC2086
+		${CC} -c "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
 			-o "${OBJ_DIR}/webview2gtk-gdk-win32.o" "${GDK_WIN32_C}"
 		shopt -s nullglob
 		for src in "${GTK_DIR}/lib/webview2gtk"/*.c \
 			"${GTK_DIR}/lib/webview2gtk"/win32atspi/*.c; do
 			base="$(basename "${src}" .c)"
-			cc -c "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
+			# shellcheck disable=SC2086
+			${CC} -c "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
 				-include "${GTK_HEADER}" \
 				-o "${OBJ_DIR}/${base}.o" "${src}"
 		done
 		shopt -u nullglob
 		ar rcs "${PREFIX}/lib/libwebview2gtk-1.a" "${OBJ_DIR}"/*.o
 		cp -f "${VAPI}/webview2gtk-1.vapi" "${PREFIX}/lib/webview2gtk-1.vapi"
+		printf '%s\n' 'gtk4' 'libsoup-3.0' 'gee-0.8' > "${PREFIX}/lib/webview2gtk-1.deps"
 		cp -f "${GTK_HEADER}" "${PREFIX}/include/webview2gtk-1/webview2gtk.h"
 		cp -f "${GTK_HEADER}" "${WIDGET_INC}/webview2gtk.h"
 		cp -f "${HOST}/webview2gtk-host-api.h" "${PREFIX}/include/webview2gtk-1/"
 		sed "s|@prefix@|${PREFIX}|g" "${ROOT}/webview2gtk-1.pc.in" > "${PREFIX}/lib/pkgconfig/webview2gtk-1.pc"
 		cp -f "${ROOT}/build/vendor/webview2/x64/WebView2Loader.dll" "${PREFIX}/lib/" 2>/dev/null || true
+		# Meson custom_target output — without this, `meson install` rebuilds lib every time.
+		mkdir -p "$(dirname "${STAMP}")"
+		touch "${STAMP}"
 		;;
 	hello|browser)
+		LIB_STAGE="${4:?lib-stage from meson (install-staging)}"
+		STAGED_A="${LIB_STAGE}/lib/libwebview2gtk-1.a"
+		STAGED_INC="${LIB_STAGE}/include/webview2gtk-1"
+		STAGED_VAPI_DIR="${LIB_STAGE}/lib"
+		if [[ ! -f "${STAGED_A}" ]]; then
+			echo "wv2gtk-build: missing staged library ${STAGED_A} (build lib first)" >&2
+			exit 1
+		fi
+		if [[ ! -f "${STAGED_VAPI_DIR}/webview2gtk-1.vapi" ]]; then
+			echo "wv2gtk-build: missing staged vapi in ${STAGED_VAPI_DIR}" >&2
+			exit 1
+		fi
+		GTK_DIR="${BUILD_DIR}/gtk-${MODE}"
+		rm -rf "${GTK_DIR}"
+		mkdir -p "${GTK_DIR}"
+		(
+			cd "${ROOT}"
+			# Example only — link against staged libwebview2gtk-1.a
+			valac "${GTK_VALA_ARGS[@]}" \
+				--vapidir "${STAGED_VAPI_DIR}" \
+				--vapidir "${VAPI}" \
+				--pkg webview2gtk-1 \
+				-C -d "${GTK_DIR}" \
+				"examples/${MODE}/main.vala"
+		)
+		MAIN_C="${GTK_DIR}/examples/${MODE}/main.c"
+		if [[ ! -f "${MAIN_C}" ]]; then
+			# flat -d layout
+			MAIN_C="${GTK_DIR}/main.c"
+		fi
+		if [[ ! -f "${MAIN_C}" ]]; then
+			echo "wv2gtk-build: valac did not emit main.c under ${GTK_DIR}" >&2
+			find "${GTK_DIR}" -name '*.c' >&2 || true
+			exit 1
+		fi
+		mkdir -p "$(dirname "${OUT}")"
+		# shellcheck disable=SC2086
+		${CC} "${CC_QUIET[@]}" -mwindows \
+			-I"${STAGED_INC}" \
+			-I"${WEBVIEW2_INC}" \
+			${GTK_CFLAGS} \
+			-o "${OUT}" \
+			"${MAIN_C}" \
+			"${STAGED_A}" \
+			"${WEBVIEW2_LINK[@]}" \
+			${GTK_LIBS}
+		cp -f "${ROOT}/build/vendor/webview2/x64/WebView2Loader.dll" "$(dirname "${OUT}")/" 2>/dev/null || true
 		;;
 	*)
 		echo "unknown mode: ${MODE}" >&2
 		exit 1
 		;;
 esac
-
-if [[ "${MODE}" != lib ]]; then
-	HOST_DIR="${BUILD_DIR}/host"
-	GTK_DIR="${BUILD_DIR}/gtk-${MODE}"
-	compile_host_c "${HOST_DIR}"
-	(
-		cd "${ROOT}"
-		valac "${GTK_VALA_ARGS[@]}" --vapidir "${VAPI}" -C -d "${GTK_DIR}" \
-			lib/webview2gtk/webview.vala \
-			"${CAPTURE_VALA[@]}" \
-			"examples/${MODE}/main.vala"
-	)
-	MAIN_C="${GTK_DIR}/examples/${MODE}/main.c"
-	GTK_C=()
-	shopt -s nullglob
-	for src in "${GTK_DIR}/lib/webview2gtk"/*.c \
-		"${GTK_DIR}/lib/webview2gtk"/win32atspi/*.c; do
-		GTK_C+=("${src}")
-	done
-	shopt -u nullglob
-	# shellcheck disable=SC2046,SC2086
-	cc "${CC_QUIET[@]}" $(inc_flags "${HOST_DIR}" "${GTK_DIR}") \
-		-o "${OUT}" \
-		"${MAIN_C}" \
-		"${GTK_C[@]}" \
-		"${GDK_WIN32_C}" \
-		$(host_c_files "${HOST_DIR}") \
-		"${WEBVIEW2_LINK[@]}" \
-		${GTK_LIBS}
-	cp -f "${ROOT}/build/vendor/webview2/x64/WebView2Loader.dll" "$(dirname "${OUT}")/" 2>/dev/null || true
-fi
 
 echo "wv2gtk-build: ${MODE} -> ${OUT}"

@@ -7,7 +7,9 @@ name: Release
 # with WEBVIEW2GTK_GPG_PRIVATE_KEY (see docs/plans/0.3-pacman-package-signatures.md).
 #
 # One meson compile feeds both the .pkg.tar.zst and the NSIS installer.
-# WebView2 NuGet is cached across runs via actions/cache.
+# WebView2 NuGet + ccache are cached across runs. Examples link the staged
+# static lib (no triple Vala rebuild). `meson install` no longer rebuilds lib
+# (stamp file is written).
 
 on:
   push:
@@ -42,6 +44,14 @@ jobs:
           path: build/vendor/webview2.nupkg
           key: webview2-nupkg-${{ steps.webview2-sdk.outputs.version }}
 
+      - name: Restore ccache
+        uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-ucrt64-${{ hashFiles('scripts/wv2gtk-build.sh', 'lib/**/*.c', 'lib/**/*.vala', 'generated/**/*.c') }}
+          restore-keys: |
+            ccache-ucrt64-
+
       - uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
@@ -51,6 +61,7 @@ jobs:
             base-devel
             gnupg
             unzip
+            ccache
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-vala
             mingw-w64-ucrt-x86_64-meson
@@ -89,8 +100,17 @@ jobs:
           echo "Imported packager key $FPR"
 
       - name: Build package + installer (single compile)
+        env:
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
+          CCACHE_MAXSIZE: 1G
         run: |
           set -euo pipefail
+          export CCACHE_DIR
+          export PATH="/usr/bin:${PATH}"
+          if command -v ccache >/dev/null 2>&1; then
+            ccache -z || true
+            export CC="ccache cc"
+          fi
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             export PKGVER="${GITHUB_REF#refs/tags/v}"
             echo "pkgver from tag: ${PKGVER}"
@@ -100,6 +120,9 @@ jobs:
             ./scripts/ci-windows-release-build.sh --sign
           else
             ./scripts/ci-windows-release-build.sh
+          fi
+          if command -v ccache >/dev/null 2>&1; then
+            ccache -s || true
           fi
 
       - name: Collect artifacts

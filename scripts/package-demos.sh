@@ -72,3 +72,9 @@ echo "  run-hello.bat / webview2gtk-hello.exe"
 echo "  run-browser.bat / webview2gtk-browser.exe"
 echo "Double-click the .bat launchers (or exes if fonts are configured)."
 echo "WebView2 Runtime must still be installed on the PC."
+
+# Meson custom_target stamp (optional arg) so install does not re-run this target.
+if [[ -n "${1:-}" ]]; then
+	mkdir -p "$(dirname "$1")"
+	touch "$1"
+fi
