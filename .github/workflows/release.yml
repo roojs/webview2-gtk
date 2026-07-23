@@ -58,13 +58,9 @@ jobs:
           mkdir -p ~/.gnupg
           chmod 700 ~/.gnupg
           # Non-interactive signing for makepkg --sign (CI has no pinentry TTY).
-          cat >> ~/.gnupg/gpg.conf <<'EOF'
-batch
-pinentry-mode loopback
-EOF
-          cat >> ~/.gnupg/gpg-agent.conf <<'EOF'
-allow-loopback-pinentry
-EOF
+          # Use printf (not a column-0 heredoc) so YAML block scalars stay valid.
+          printf '%s\n' 'batch' 'pinentry-mode loopback' >> ~/.gnupg/gpg.conf
+          printf '%s\n' 'allow-loopback-pinentry' >> ~/.gnupg/gpg-agent.conf
           gpgconf --kill gpg-agent || true
           printf '%s\n' "$WEBVIEW2GTK_GPG_PRIVATE_KEY" | gpg --batch --import
           FPR="$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')"
