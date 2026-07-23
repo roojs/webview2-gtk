@@ -231,6 +231,11 @@ private void dump_atspi (StringBuilder sb, Win32Atspi.Accessible acc, int depth,
 	}
 }
 
+private void start_sample_download (Gtk.Window parent) {
+	var uri = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
+	web.download_uri (uri);
+}
+
 public static int main (string[] args) {
 	var start = "https://example.com/";
 	if (args.length > 1) {
@@ -258,11 +263,39 @@ public static int main (string[] args) {
 		var inv_btn = new Gtk.Button.with_label ("Invoke link");
 		var fill_btn = new Gtk.Button.with_label ("Fill search");
 		var atspi_btn = new Gtk.Button.with_label ("Win32Atspi");
+		var dl_btn = new Gtk.Button.with_label ("Download");
 
 		web = new WebView ();
 		web.load_uri (start);
 		web.set_hexpand (true);
 		web.set_vexpand (true);
+
+		var dl_dir = Environment.get_user_special_dir (UserDirectory.DOWNLOAD);
+		if (dl_dir == null || dl_dir == "") {
+			dl_dir = Environment.get_tmp_dir ();
+		}
+		web.get_network_session ().download_started.connect ((download) => {
+			download.decide_destination.connect ((suggested) => {
+				var name = suggested != null && suggested != "" ? suggested : "download";
+				var dest = Path.build_filename (dl_dir, name);
+				print ("download decide_destination → %s\n", dest);
+				download.set_allow_overwrite (true);
+				download.set_destination (dest);
+				return true;
+			});
+			download.received_data.connect ((len) => {
+				print ("download progress %llu bytes (+%llu)\n",
+					download.get_received_data_length (), len);
+			});
+			download.finished.connect (() => {
+				print ("download finished\n");
+				show_text_window (window, "Download", "finished");
+			});
+			download.failed.connect ((err) => {
+				print ("download failed: %s\n", err.message);
+				show_text_window (window, "Download failed", err.message);
+			});
+		});
 
 		back_btn.clicked.connect (() => { web.go_back (); sync_url_entry (); });
 		fwd_btn.clicked.connect (() => { web.go_forward (); sync_url_entry (); });
@@ -272,6 +305,7 @@ public static int main (string[] args) {
 		inv_btn.clicked.connect (() => { invoke_first_hyperlink (window); });
 		fill_btn.clicked.connect (() => { fill_search_combobox (window); });
 		atspi_btn.clicked.connect (() => { show_atspi_tree (window); });
+		dl_btn.clicked.connect (() => { start_sample_download (window); });
 
 		bar.append (back_btn);
 		bar.append (fwd_btn);
@@ -281,6 +315,7 @@ public static int main (string[] args) {
 		bar.append (inv_btn);
 		bar.append (fill_btn);
 		bar.append (atspi_btn);
+		bar.append (dl_btn);
 
 		root.append (bar);
 		root.append (web);

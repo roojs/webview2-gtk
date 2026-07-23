@@ -69,6 +69,12 @@ extern void wv2_host_set_document_response_handler (
 	void* user_data
 );
 
+[CCode (cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_script_message_handler")]
+extern void wv2_host_set_script_message_handler (
+	void* handler,
+	void* user_data
+);
+
 namespace WebView2Gtk {
 
 /**
@@ -105,6 +111,7 @@ public class WebView : Gtk.Box {
 	private double _zoom_level = 1.0;
 	private WebViewSettings _capture_settings = new WebViewSettings ();
 	private NetworkSession _network_session = new NetworkSession ();
+	private UserContentManager _user_content_manager = new UserContentManager ();
 
 	public bool is_loading {
 		get { return _is_loading; }
@@ -169,6 +176,8 @@ public class WebView : Gtk.Box {
 
 	~WebView () {
 		if (_attached) {
+			wv2_host_set_script_message_handler (null, null);
+			_user_content_manager.unbind_host ();
 			wv2_host_set_document_response_handler (null, null);
 			wv2_host_set_event_handlers (null, null, null, null);
 			wv2_host_destroy ();
@@ -272,6 +281,44 @@ public class WebView : Gtk.Box {
 
 	public NetworkSession get_network_session () {
 		return _network_session;
+	}
+
+	/** WebKitGTK-shaped — manager for script message handlers. */
+	public unowned UserContentManager get_user_content_manager () {
+		return _user_content_manager;
+	}
+
+	/**
+	 * Start a download of ''uri'' using the WebView cookie jar.
+	 * Emits {@link NetworkSession.download_started} then {@link Download.decide_destination}.
+	 */
+	public Download download_uri (string uri) {
+		var trimmed = uri.strip ();
+		var id = wv2_host_download_create (trimmed);
+		if (id <= 0) {
+			var failed = new Download (_network_session, 0, trimmed, "download", "", -1);
+			Idle.add (() => {
+				failed.on_failed_message ("download create failed");
+				return false;
+			});
+			return failed;
+		}
+		var suggested = "download";
+		try {
+			var guri = GLib.Uri.parse (trimmed, GLib.UriFlags.NONE);
+			var path = guri.get_path ();
+			if (path != null && path != "" && path != "/") {
+				var leaf = GLib.Path.get_basename (path);
+				if (leaf != null && leaf != "" && leaf != "/" && leaf != ".") {
+					suggested = leaf;
+				}
+			}
+		} catch (GLib.Error e) {
+		}
+		var dl = new Download (_network_session, id, trimmed, suggested, "", -1);
+		_network_session.register_download (dl, id);
+		_network_session.emit_download_started (dl);
+		return dl;
 	}
 
 	public async Gdk.Texture get_snapshot (
@@ -435,6 +482,11 @@ public class WebView : Gtk.Box {
 			(void*) on_document_response_cb,
 			this
 		);
+		wv2_host_set_script_message_handler (
+			(void*) on_script_message_cb,
+			_user_content_manager
+		);
+		_user_content_manager.bind_host ();
 		wv2_host_set_event_handlers (
 			(void*) on_navigation_starting_cb,
 			(void*) on_navigation_completed_cb,
@@ -546,6 +598,15 @@ public class WebView : Gtk.Box {
 	[CCode (has_target = false)]
 	private static void on_document_title_changed_cb (void* user_data) {
 		((WebView) user_data).on_document_title_changed ();
+	}
+
+	[CCode (has_target = false)]
+	private static void on_script_message_cb (
+		void* user_data,
+		string handler_name,
+		string message_json
+	) {
+		((UserContentManager) user_data).emit_script_message (handler_name, message_json);
 	}
 }
 

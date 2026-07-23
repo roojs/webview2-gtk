@@ -95,10 +95,13 @@ How docs are built and marked up: [docs/code-documentation.md](docs/code-documen
 | `is_loading` / `estimated_load_progress` | same (progress approximate) |
 | `zoom_level` | same |
 | `load_changed(LoadEvent)` | same enum names |
+| `UserContentManager` / `get_user_content_manager()` | `register_script_message_handler` + detailed `script_message_received` |
+| `evaluate_javascript` | same (host→page replies) |
+| `download_uri` / `NetworkSession.download_started` / `Download` | same shapes (destination via `set_destination`) |
 
 WebView2Gtk-only: `ready`. Accessibility: **`Win32Atspi`** (above), not on `WebView`.
 
-Not implemented yet: settings, inspector, policy callbacks, JS bridge, etc. (`load_failed` and `JavaScriptResult.to_string` are implemented.)
+Not implemented yet: settings wiring, inspector, policy callbacks, `register_script_message_handler_with_reply`, etc. (`load_failed` and `JavaScriptResult.to_string` are implemented.)
 
 **Limitation:** one WebView2 host per process today (shared COM singleton).
 

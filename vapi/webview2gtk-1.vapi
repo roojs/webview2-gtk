@@ -71,9 +71,30 @@ namespace WebView2Gtk {
 	}
 
 	public class NetworkSession : GLib.Object {
+		public signal void download_started (Download download);
 		public CookieManager get_cookie_manager ();
 		public void set_proxy_settings (NetworkProxyMode mode, NetworkProxySettings? settings);
 		public void set_tls_errors_policy (TLSErrorsPolicy policy);
+	}
+
+	public class URIRequest : GLib.Object {
+		public string uri { get; }
+		public URIRequest (string uri);
+	}
+
+	public class Download : GLib.Object {
+		public URIRequest get_request ();
+		public string get_uri ();
+		public string? get_mime_type ();
+		public int64 get_estimated_content_length ();
+		public uint64 get_received_data_length ();
+		public signal bool decide_destination (string? suggested_filename);
+		public signal void received_data (uint64 data_length);
+		public signal void finished ();
+		public signal void failed (GLib.Error error);
+		public void set_allow_overwrite (bool allow);
+		public void set_destination (string destination_uri_or_path);
+		public void cancel ();
 	}
 
 	public class WebViewSettings : GLib.Object {
@@ -86,6 +107,14 @@ namespace WebView2Gtk {
 		public string to_json (int indent = 0);
 		public string to_string ();
 		public int32 to_int32 ();
+	}
+
+	public class UserContentManager : GLib.Object {
+		public UserContentManager ();
+		[Signal (detailed = true)]
+		public signal void script_message_received (JavaScriptResult values);
+		public bool register_script_message_handler (string name, string? world_name);
+		public void unregister_script_message_handler (string name, string? world_name);
 	}
 
 	public class PrintOperation : GLib.Object {
@@ -126,6 +155,8 @@ namespace WebView2Gtk {
 		public bool ready { get; }
 		public new WebViewSettings get_settings ();
 		public NetworkSession get_network_session ();
+		public unowned UserContentManager get_user_content_manager ();
+		public Download download_uri (string uri);
 		public async Gdk.Texture get_snapshot (
 			SnapshotRegion region,
 			SnapshotOptions options,

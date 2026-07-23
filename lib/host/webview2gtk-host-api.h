@@ -53,6 +53,42 @@ void vala_webview2_host_set_document_response_handler (
 	void *user_data
 );
 
+typedef void (*WebView2GtkScriptMessageCb) (
+	void *user_data,
+	const char *handler_name,
+	const char *message_json_utf8
+);
+
+void vala_webview2_host_set_script_message_handler (
+	WebView2GtkScriptMessageCb handler,
+	void *user_data
+);
+bool vala_webview2_host_register_script_message_handler (const char *name_utf8);
+bool vala_webview2_host_unregister_script_message_handler (const char *name_utf8);
+
+typedef void (*WebView2GtkDownloadStartedCb) (
+	int id,
+	const char *uri,
+	const char *suggested_filename,
+	const char *mime_type,
+	int64_t content_length,
+	void *user_data
+);
+typedef void (*WebView2GtkDownloadProgressCb) (int id, uint64_t received, void *user_data);
+typedef void (*WebView2GtkDownloadFinishedCb) (int id, void *user_data);
+typedef void (*WebView2GtkDownloadFailedCb) (int id, const char *message, void *user_data);
+
+void vala_webview2_host_set_download_handlers (
+	WebView2GtkDownloadStartedCb started,
+	WebView2GtkDownloadProgressCb progress,
+	WebView2GtkDownloadFinishedCb finished,
+	WebView2GtkDownloadFailedCb failed,
+	void *user_data
+);
+int vala_webview2_host_download_create (const char *uri_utf8);
+bool vala_webview2_host_download_start (int id, const char *dest_path_utf8, bool overwrite);
+void vala_webview2_host_download_cancel (int id);
+
 bool vala_webview2_host_execute_script_sync (const char *script_utf8, char **result_json_out);
 bool vala_webview2_host_capture_screenshot_sync (bool full_document, char **devtools_json_out);
 bool vala_webview2_host_print_to_pdf_sync (const char *output_path_utf8);

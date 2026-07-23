@@ -24,13 +24,14 @@ if [[ ! -f "${WEBVIEW2_INC}/WebView2.h" ]]; then
 	exit 1
 fi
 
+# Skip generated/win32-ui-webview2-events-bridge.vala: Vala target delegates warn
+# ("copying delegates is not supported"). Emit symbols live in host-listeners.
 HOST_VALA=(
 	"${HOST}/win32-ui-webview2-host.vala"
 	"${HOST}/webview2gtk-host-listeners.vala"
 	"${GEN}/win32-ui-webview2-host-glue.vala"
 	"${GEN}/win32-ui-webview2-com-sync.vala"
 	"${GEN}/win32-wide-strings.vala"
-	"${GEN}/win32-ui-webview2-events-bridge.vala"
 )
 
 HOST_VALA_ARGS=(
@@ -58,9 +59,12 @@ CAPTURE_VALA=(
 	lib/webview2gtk/Enums.vala
 	lib/webview2gtk/NetworkProxySettings.vala
 	lib/webview2gtk/CookieManager.vala
+	lib/webview2gtk/URIRequest.vala
+	lib/webview2gtk/Download.vala
 	lib/webview2gtk/NetworkSession.vala
 	lib/webview2gtk/Settings.vala
 	lib/webview2gtk/JavaScriptResult.vala
+	lib/webview2gtk/UserContentManager.vala
 	lib/webview2gtk/PrintOperation.vala
 )
 
@@ -70,12 +74,14 @@ CC_QUIET=(
 	-Wno-implicit-function-declaration
 )
 
-WEBVIEW2_LINK=( -lole32 -luuid -lshell32 -ladvapi32 -loleaut32 -luiautomationcore )
+WEBVIEW2_LINK=( -lole32 -luuid -lshell32 -ladvapi32 -loleaut32 -luiautomationcore -lwinhttp -lshlwapi )
 GTK_CFLAGS="$(pkg-config --cflags gtk4 libsoup-3.0 gee-0.8)"
 GTK_LIBS="$(pkg-config --libs gtk4 libsoup-3.0 gee-0.8)"
 
 compile_host_c() {
 	local host_dir="$1"
+	# Drop prior valac output so nested vs flat -d layouts cannot mix stale .c.
+	rm -rf "${host_dir}"
 	mkdir -p "${host_dir}"
 	valac "${HOST_VALA_ARGS[@]}" -C -d "${host_dir}" "${HOST_VALA[@]}"
 	local f
@@ -100,7 +106,6 @@ host_c_files() {
 			"${host_dir}/generated/win32-ui-webview2-host-glue.c"
 			"${host_dir}/generated/win32-ui-webview2-com-sync.c"
 			"${host_dir}/generated/win32-wide-strings.c"
-			"${host_dir}/generated/win32-ui-webview2-events-bridge.c"
 		)
 	else
 		valac_c=(
@@ -109,7 +114,6 @@ host_c_files() {
 			"${host_dir}/win32-ui-webview2-host-glue.c"
 			"${host_dir}/win32-ui-webview2-com-sync.c"
 			"${host_dir}/win32-wide-strings.c"
-			"${host_dir}/win32-ui-webview2-events-bridge.c"
 		)
 	fi
 	echo \
@@ -123,6 +127,8 @@ host_c_files() {
 		"${HOST}/win32-ui-webview2-print.c" \
 		"${HOST}/win32-ui-webview2-cookies.c" \
 		"${HOST}/win32-ui-webview2-document-response.c" \
+		"${HOST}/win32-ui-webview2-script-messages.c" \
+		"${HOST}/win32-ui-webview2-downloads.c" \
 		"${HOST}/win32-ui-webview2-a11y.c" \
 		"${HOST}/win32-ui-webview2-a11y-diag.c"
 }

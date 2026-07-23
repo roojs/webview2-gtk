@@ -1,8 +1,13 @@
-/* Bridges WebView2 COM events to the public host C API (one host per process). */
+/* Bridges WebView2 COM events to the public host C API (one host per process).
+ * Owns vala_webview2_emit_* (called from generated events.c) — no Vala delegate bridge.
+ */
 
 namespace Win32.Ui.WebView {
 
+[CCode (has_target = false)]
 private delegate void EventCb (void* ctx);
+
+[CCode (has_target = false)]
 private delegate void NavCompletedCb (void* ctx, bool success);
 
 private void* g_event_ctx;
@@ -10,19 +15,22 @@ private EventCb? g_event_start;
 private NavCompletedCb? g_event_completed;
 private EventCb? g_event_title;
 
-private void on_nav_starting_wrapper () {
+[CCode (cname = "vala_webview2_emit_navigation_starting")]
+public void emit_navigation_starting () {
 	if (g_event_start != null) {
 		g_event_start (g_event_ctx);
 	}
 }
 
-private void on_nav_completed_wrapper (bool success) {
+[CCode (cname = "vala_webview2_emit_navigation_completed")]
+public void emit_navigation_completed (int success) {
 	if (g_event_completed != null) {
-		g_event_completed (g_event_ctx, success);
+		g_event_completed (g_event_ctx, success != 0);
 	}
 }
 
-private void on_title_changed_wrapper () {
+[CCode (cname = "vala_webview2_emit_document_title_changed")]
+public void emit_document_title_changed () {
 	if (g_event_title != null) {
 		g_event_title (g_event_ctx);
 	}
@@ -39,24 +47,6 @@ public void set_event_handlers (
 	g_event_start = (EventCb?) navigation_starting;
 	g_event_completed = (NavCompletedCb?) navigation_completed;
 	g_event_title = (EventCb?) document_title_changed;
-
-	if (g_event_start != null) {
-		bind_navigation_starting (on_nav_starting_wrapper);
-	} else {
-		bind_navigation_starting (null);
-	}
-
-	if (g_event_completed != null) {
-		bind_navigation_completed (on_nav_completed_wrapper);
-	} else {
-		bind_navigation_completed (null);
-	}
-
-	if (g_event_title != null) {
-		bind_document_title_changed (on_title_changed_wrapper);
-	} else {
-		bind_document_title_changed (null);
-	}
 }
 
 }

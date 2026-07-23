@@ -17,3 +17,37 @@ extern bool wv2_add_cookie_sync (
 	bool http_only,
 	bool secure
 );
+
+[CCode (cheader_filename = "webview2gtk-host-api.h", has_target = false)]
+public delegate void Wv2DownloadStartedCb (
+	int id,
+	string uri,
+	string suggested_filename,
+	string mime_type,
+	int64 content_length,
+	void* user_data
+);
+[CCode (cheader_filename = "webview2gtk-host-api.h", has_target = false)]
+public delegate void Wv2DownloadProgressCb (int id, uint64 received, void* user_data);
+[CCode (cheader_filename = "webview2gtk-host-api.h", has_target = false)]
+public delegate void Wv2DownloadFinishedCb (int id, void* user_data);
+[CCode (cheader_filename = "webview2gtk-host-api.h", has_target = false)]
+public delegate void Wv2DownloadFailedCb (int id, string message, void* user_data);
+
+[CCode (cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_download_handlers")]
+extern void wv2_host_set_download_handlers (
+	Wv2DownloadStartedCb? started,
+	Wv2DownloadProgressCb? progress,
+	Wv2DownloadFinishedCb? finished,
+	Wv2DownloadFailedCb? failed,
+	void* user_data
+);
+
+[CCode (cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_download_create")]
+extern int wv2_host_download_create (string uri);
+
+[CCode (cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_download_start")]
+extern bool wv2_host_download_start (int id, string dest_path, bool overwrite);
+
+[CCode (cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_download_cancel")]
+extern void wv2_host_download_cancel (int id);
