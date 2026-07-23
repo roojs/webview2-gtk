@@ -38,7 +38,12 @@ _repo_root() {
   pwd
 }
 
+# CI sets WV2GTK_PREBUILT_DESTDIR to a meson --destdir tree (already under
+# $MINGW_PREFIX/…) so Release builds once and only packages here.
 prepare() {
+  if [[ -n "${WV2GTK_PREBUILT_DESTDIR:-}" ]]; then
+    return 0
+  fi
   local root="$(_repo_root)"
   rm -rf "$srcdir/webview2-gtk"
   mkdir -p "$srcdir/webview2-gtk"
@@ -47,6 +52,7 @@ prepare() {
   # Use tar only (no git): UCRT64 makepkg does not have /usr/bin/git on PATH.
   (cd "$root" && tar -cf - \
     --exclude='./packaging/msys2/src' \
+    --exclude='./packaging/msys2/pkg' \
     --exclude='./build' \
     --exclude='./build-remote' \
     --exclude='./dist' \
@@ -56,24 +62,33 @@ prepare() {
 }
 
 build() {
+  if [[ -n "${WV2GTK_PREBUILT_DESTDIR:-}" ]]; then
+    return 0
+  fi
   cd "$srcdir/webview2-gtk"
   ./scripts/vendor-webview2-sdk.sh
-  # Library package only — demos are built in the Release workflow NSIS step / locally.
-  meson setup build --prefix="$MINGW_PREFIX" -Dexamples=false
+  # Portable /ucrt64 — do not use a resolved absolute MSYS2 root (CI runners).
+  # Local makepkg: library only. Release CI builds demos via ci-windows-release-build.sh.
+  meson setup build --prefix=/ucrt64 -Dexamples=false
   meson compile -C build
 }
 
 package() {
-  cd "$srcdir/webview2-gtk"
-  meson install -C build --destdir="$pkgdir"
-
-  # pkg-config prefix must be the mingw root, not the staging path
-  local pc="$pkgdir${MINGW_PREFIX}/lib/pkgconfig/webview2gtk-1.pc"
-  if [[ -f "$pc" ]]; then
-    sed -i "s|^prefix=.*|prefix=${MINGW_PREFIX}|" "$pc"
+  if [[ -n "${WV2GTK_PREBUILT_DESTDIR:-}" ]]; then
+    if [[ ! -d "${WV2GTK_PREBUILT_DESTDIR}" ]]; then
+      echo "PKGBUILD: WV2GTK_PREBUILT_DESTDIR missing: ${WV2GTK_PREBUILT_DESTDIR}" >&2
+      return 1
+    fi
+    mkdir -p "$pkgdir"
+    cp -a "${WV2GTK_PREBUILT_DESTDIR}/." "$pkgdir/"
+    return 0
   fi
 
+  cd "$srcdir/webview2-gtk"
+  meson install -C build --destdir="$pkgdir"
+  "$srcdir/webview2-gtk/scripts/msys2-normalize-destdir.sh" "$pkgdir"
+
   if [[ -f LICENSE ]]; then
-    install -Dm644 LICENSE "$pkgdir${MINGW_PREFIX}/share/licenses/${pkgname}/LICENSE"
+    install -Dm644 LICENSE "$pkgdir/ucrt64/share/licenses/${pkgname}/LICENSE"
   fi
 }

@@ -6,6 +6,10 @@
 #   ./scripts/build-pacman-package.sh --sign          # needs GPGKEY / imported secret key
 #   PKGVER=0.2.7 ./scripts/build-pacman-package.sh    # override PKGBUILD pkgver (releases)
 #
+# Release CI (single compile + package): prefer
+#   ./scripts/ci-windows-release-build.sh [--sign]
+# which sets WV2GTK_PREBUILT_DESTDIR so PKGBUILD only packs (no second meson build).
+#
 # Output:
 #   packaging/msys2/mingw-w64-ucrt-x86_64-webview2gtk-*.pkg.tar.zst
 #   packaging/msys2/mingw-w64-ucrt-x86_64-webview2gtk-*.pkg.tar.zst.sig  (with --sign)

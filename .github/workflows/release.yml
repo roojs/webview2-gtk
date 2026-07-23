@@ -5,6 +5,9 @@ name: Release
 #
 # Pacman remote installs need a companion .sig. Tag releases sign the package
 # with WEBVIEW2GTK_GPG_PRIVATE_KEY (see docs/plans/0.3-pacman-package-signatures.md).
+#
+# One meson compile feeds both the .pkg.tar.zst and the NSIS installer.
+# WebView2 NuGet is cached across runs via actions/cache.
 
 on:
   push:
@@ -24,6 +27,20 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+
+      - name: Read WebView2 SDK version
+        id: webview2-sdk
+        shell: bash
+        run: |
+          ver="$(grep -v '^#' metadata/webview2-sdk-ref.txt | grep -v '^[[:space:]]*$' | head -1)"
+          echo "version=${ver}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore WebView2 NuGet cache
+        id: cache-webview2
+        uses: actions/cache@v6
+        with:
+          path: build/vendor/webview2.nupkg
+          key: webview2-nupkg-${{ steps.webview2-sdk.outputs.version }}
 
       - uses: msys2/setup-msys2@v2
         with:
@@ -71,7 +88,7 @@ jobs:
           echo "GPGKEY=$FPR" >> "$GITHUB_ENV"
           echo "Imported packager key $FPR"
 
-      - name: Build pacman package
+      - name: Build package + installer (single compile)
         run: |
           set -euo pipefail
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
@@ -80,20 +97,10 @@ jobs:
           fi
           if [[ -n "${GPGKEY:-}" ]]; then
             export GPGKEY
-            ./scripts/build-pacman-package.sh --sign
+            ./scripts/ci-windows-release-build.sh --sign
           else
-            ./scripts/build-pacman-package.sh
+            ./scripts/ci-windows-release-build.sh
           fi
-
-      - name: Build NSIS installer
-        run: |
-          ./scripts/vendor-webview2-sdk.sh
-          mkdir -p dist
-          meson setup build --prefix="$(pwd)/dist/webview2gtk"
-          meson compile -C build
-          meson install -C build
-          ./scripts/bundle-bin-runtime.sh dist/webview2gtk/bin
-          ./scripts/build-installer.sh dist/webview2gtk
 
       - name: Collect artifacts
         run: |
@@ -120,4 +127,4 @@ jobs:
         with:
           files: artifacts/*
           generate_release_notes: true
-          overwrite: true
+          overwrite_files: true
