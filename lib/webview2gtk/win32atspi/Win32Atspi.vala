@@ -136,10 +136,10 @@ public class Accessible : Object {
 		return ht;
 	}
 
-	public GenericArray<string> get_interfaces () {
-		var a = new GenericArray<string> ();
+	public GLib.Array<string> get_interfaces () {
+		var a = new GLib.Array<string> ();
 		foreach (var i in this.ifaces) {
-			a.add (i);
+			a.append_val (i);
 		}
 		return a;
 	}
