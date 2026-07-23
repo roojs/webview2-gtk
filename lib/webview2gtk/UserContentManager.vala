@@ -27,8 +27,9 @@ public class UserContentManager : Object {
 
 	/**
 	 * Registers a script message handler (WebKitGTK 6 signature).
-	 * @world_name null means the default world; non-null is accepted but
-	 * ignored (single world on WebView2).
+	 *
+	 * @param world_name null means the default world; non-null is accepted but
+	 *                   ignored (single world on WebView2).
 	 */
 	public bool register_script_message_handler (string name, string? world_name) {
 		if (name == null || name.length == 0) {
