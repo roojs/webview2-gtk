@@ -7,7 +7,7 @@ public class NetworkSession : Object {
 	private static bool handlers_installed = false;
 	private static weak NetworkSession? active_session = null;
 
-	private CookieManager _cookie_manager = new CookieManager ();
+	private CookieManager cookie_manager = new CookieManager ();
 	private GenericArray<Download> downloads = new GenericArray<Download> ();
 
 	public signal void download_started (Download download);
@@ -18,7 +18,7 @@ public class NetworkSession : Object {
 	}
 
 	public CookieManager get_cookie_manager () {
-		return this._cookie_manager;
+		return this.cookie_manager;
 	}
 
 	public void set_proxy_settings (

@@ -70,6 +70,7 @@ CAPTURE_VALA=(
 	lib/webview2gtk/NetworkProxySettings.vala
 	lib/webview2gtk/CookieManager.vala
 	lib/webview2gtk/URIRequest.vala
+	lib/webview2gtk/WebResource.vala
 	lib/webview2gtk/Download.vala
 	lib/webview2gtk/NetworkSession.vala
 	lib/webview2gtk/Settings.vala
@@ -139,6 +140,7 @@ host_c_files() {
 		"${HOST}/win32-ui-webview2-document-response.c" \
 		"${HOST}/win32-ui-webview2-script-messages.c" \
 		"${HOST}/win32-ui-webview2-downloads.c" \
+		"${HOST}/win32-ui-webview2-web-resources.c" \
 		"${HOST}/win32-ui-webview2-a11y.c" \
 		"${HOST}/win32-ui-webview2-a11y-diag.c"
 }
@@ -266,8 +268,9 @@ case "${MODE}" in
 			exit 1
 		fi
 		mkdir -p "$(dirname "${OUT}")"
+		# Default GUI (-mwindows). Set WINDOWS_SUBSYSTEM=-mconsole for stderr in a terminal.
 		# shellcheck disable=SC2086
-		${CC} "${CC_QUIET[@]}" -mwindows \
+		${CC} "${CC_QUIET[@]}" ${WINDOWS_SUBSYSTEM:--mwindows} \
 			-I"${STAGED_INC}" \
 			-I"${WEBVIEW2_INC}" \
 			${GTK_CFLAGS} \

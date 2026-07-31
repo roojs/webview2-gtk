@@ -82,6 +82,13 @@ namespace WebView2Gtk {
 		public URIRequest (string uri);
 	}
 
+	public class WebResource : GLib.Object {
+		public string uri { get; }
+		public unowned string get_uri ();
+		public signal void finished ();
+		public signal void failed (GLib.Error error);
+	}
+
 	public class Download : GLib.Object {
 		public URIRequest get_request ();
 		public string get_uri ();
@@ -133,6 +140,10 @@ namespace WebView2Gtk {
 		public signal void main_document_response (
 			uint status,
 			Soup.MessageHeaders headers
+		);
+		public signal void resource_load_started (
+			WebResource resource,
+			URIRequest request
 		);
 		public signal bool load_failed (LoadEvent load_event, string failing_uri, GLib.Error error);
 		public bool can_go_back ();

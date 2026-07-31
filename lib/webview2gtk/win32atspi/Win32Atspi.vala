@@ -31,35 +31,35 @@ public class ComponentExtents : Object {
 }
 
 public class Text : Object {
-	private string _text;
+	private string text;
 
 	public Text (string text) {
-		this._text = text ?? "";
+		this.text = text ?? "";
 	}
 
 	public int get_character_count () {
-		return (int) this._text.char_count ();
+		return (int) this.text.char_count ();
 	}
 
 	public string get_text (int start_offset, int end_offset) {
 		/* Typical AT-SPI clients ask 0..nchars — return full value. */
-		return this._text ?? "";
+		return this.text ?? "";
 	}
 }
 
 public class Hyperlink : Object {
-	private string _uri;
+	private string uri;
 
 	public Hyperlink (string uri) {
-		this._uri = uri ?? "";
+		this.uri = uri ?? "";
 	}
 
 	public int get_n_anchors () {
-		return this._uri != "" ? 1 : 0;
+		return this.uri != "" ? 1 : 0;
 	}
 
 	public string get_uri (int i) {
-		return i == 0 ? this._uri : "";
+		return i == 0 ? this.uri : "";
 	}
 }
 
@@ -67,10 +67,10 @@ public class Hyperlink : Object {
  * One node in the emulated AT-SPI tree (backed by UIA walk cache ids where set).
  */
 public class Accessible : Object {
-	internal string _name = "";
-	internal string _role_name = "";
-	internal string _description = "";
-	internal uint _process_id = 0;
+	internal string name = "";
+	internal string role_name = "";
+	internal string description = "";
+	internal uint process_id = 0;
 	internal int walk_id = -1;
 	internal int x = 0;
 	internal int y = 0;
@@ -105,19 +105,19 @@ public class Accessible : Object {
 	}
 
 	public string get_name () {
-		return this._name;
+		return this.name;
 	}
 
 	public string get_role_name () {
-		return this._role_name;
+		return this.role_name;
 	}
 
 	public string get_description () {
-		return this._description;
+		return this.description;
 	}
 
 	public uint get_process_id () {
-		return this._process_id;
+		return this.process_id;
 	}
 
 	public int get_child_count () {
@@ -208,7 +208,7 @@ public class Accessible : Object {
 	}
 
 	public Text get_text_iface () {
-		var t = this.value_text != "" ? this.value_text : this._name;
+		var t = this.value_text != "" ? this.value_text : this.name;
 		return new Text (t);
 	}
 
@@ -300,20 +300,20 @@ internal class Bridge : Object {
 		var pid = (uint) Posix.getpid ();
 
 		var desktop = new Accessible ();
-		desktop._name = "Desktop";
-		desktop._role_name = "desktop frame";
-		desktop._process_id = 0;
+		desktop.name = "Desktop";
+		desktop.role_name = "desktop frame";
+		desktop.process_id = 0;
 
 		var app = new Accessible ();
-		app._name = "Application";
-		app._role_name = "application";
-		app._process_id = pid;
+		app.name = "Application";
+		app.role_name = "application";
+		app.process_id = pid;
 		desktop.add_child (app);
 
 		var frame = new Accessible ();
-		frame._name = "Frame";
-		frame._role_name = "frame";
-		frame._process_id = pid;
+		frame.name = "Frame";
+		frame.role_name = "frame";
+		frame.process_id = pid;
 		frame.add_action ("default.activate");
 		app.add_child (frame);
 
@@ -350,8 +350,8 @@ internal class Bridge : Object {
 		}
 		if (doc != null) {
 			/* Prefer AT-SPI document role names used by tree walkers. */
-			if (doc._role_name != "document text" && doc._role_name != "document frame") {
-				doc._role_name = "document frame";
+			if (doc.role_name != "document text" && doc.role_name != "document frame") {
+				doc.role_name = "document frame";
 			}
 			frame.add_child (doc);
 		}
@@ -362,9 +362,9 @@ internal class Bridge : Object {
 	private static Accessible accessible_from_tree_node (WalkRow n, uint pid) {
 		var role = atspi_role (n.role);
 		var acc = new Accessible ();
-		acc._name = n.name;
-		acc._role_name = role;
-		acc._process_id = pid;
+		acc.name = n.name;
+		acc.role_name = role;
+		acc.process_id = pid;
 		acc.walk_id = n.id;
 		acc.x = n.x;
 		acc.y = n.y;
@@ -451,8 +451,8 @@ public Accessible get_desktop (int index) {
 		/* Return empty desktop so callers get a clear later failure. */
 		if (Bridge.desktop == null) {
 			Bridge.desktop = new Accessible ();
-			Bridge.desktop._name = "Desktop";
-			Bridge.desktop._role_name = "desktop frame";
+			Bridge.desktop.name = "Desktop";
+			Bridge.desktop.role_name = "desktop frame";
 		}
 	}
 	return Bridge.desktop;

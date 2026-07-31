@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <glib.h>
+
 #include "webview2gtk-host-api.h"
 #include "win32-ui-webview2-script-messages.h"
 #include "win32-ui-webview2-com-glue.h"
@@ -44,8 +46,8 @@ typedef struct {
 } MessageHandler;
 
 typedef struct {
-	volatile LONG done;
-	wchar_t *id;
+	LONG ref_count;
+	char *script_utf8;
 	ICoreWebView2AddScriptToExecuteOnDocumentCreatedCompletedHandler handler;
 	ICoreWebView2AddScriptToExecuteOnDocumentCreatedCompletedHandlerVtbl vtbl;
 } AddScriptHandler;
@@ -144,6 +146,8 @@ msg_invoke (
 	return S_OK;
 }
 
+static void clear_script_id (ICoreWebView2 *webview);
+
 static HRESULT STDMETHODCALLTYPE
 add_script_qi (
 	ICoreWebView2AddScriptToExecuteOnDocumentCreatedCompletedHandler *This,
@@ -154,6 +158,7 @@ add_script_qi (
 	    || IsEqualIID (riid,
 	                   &IID_ICoreWebView2AddScriptToExecuteOnDocumentCreatedCompletedHandler)) {
 		*ppv = This;
+		This->lpVtbl->AddRef (This);
 		return S_OK;
 	}
 	*ppv = NULL;
@@ -163,15 +168,35 @@ add_script_qi (
 static ULONG STDMETHODCALLTYPE
 add_script_addref (ICoreWebView2AddScriptToExecuteOnDocumentCreatedCompletedHandler *This)
 {
-	(void) This;
-	return 2;
+	AddScriptHandler *sh = CONTAINING_RECORD (This, AddScriptHandler, handler);
+	return (ULONG) InterlockedIncrement (&sh->ref_count);
 }
 
 static ULONG STDMETHODCALLTYPE
 add_script_release (ICoreWebView2AddScriptToExecuteOnDocumentCreatedCompletedHandler *This)
 {
-	(void) This;
-	return 1;
+	AddScriptHandler *sh = CONTAINING_RECORD (This, AddScriptHandler, handler);
+	LONG count = InterlockedDecrement (&sh->ref_count);
+	if (count == 0) {
+		free (sh->script_utf8);
+		CoTaskMemFree (sh);
+	}
+	return (ULONG) count;
+}
+
+/* Never ExecuteScript-sync from a WebView2 completion — re-enters sync_await and hangs. */
+static gboolean
+inject_script_idle (gpointer data)
+{
+	char *script = (char *) data;
+	char *ignored = NULL;
+
+	vala_webview2_host_execute_script_sync (script, &ignored);
+	free (script);
+	if (ignored != NULL) {
+		free (ignored);
+	}
+	return G_SOURCE_REMOVE;
 }
 
 static HRESULT STDMETHODCALLTYPE
@@ -181,14 +206,23 @@ add_script_invoke (
 	LPCWSTR result)
 {
 	AddScriptHandler *sh = CONTAINING_RECORD (This, AddScriptHandler, handler);
+
 	if (SUCCEEDED (error_code) && result != NULL) {
 		size_t len = wcslen (result);
-		sh->id = (wchar_t *) CoTaskMemAlloc ((len + 1) * sizeof (wchar_t));
-		if (sh->id != NULL) {
-			memcpy (sh->id, result, (len + 1) * sizeof (wchar_t));
+		wchar_t *id = (wchar_t *) CoTaskMemAlloc ((len + 1) * sizeof (wchar_t));
+		if (id != NULL) {
+			memcpy (id, result, (len + 1) * sizeof (wchar_t));
+			if (g_script_id != NULL) {
+				CoTaskMemFree (g_script_id);
+			}
+			g_script_id = id;
 		}
 	}
-	InterlockedExchange (&sh->done, 1);
+	if (sh->script_utf8 != NULL) {
+		char *script = sh->script_utf8;
+		sh->script_utf8 = NULL;
+		g_idle_add (inject_script_idle, script);
+	}
 	return S_OK;
 }
 
@@ -242,9 +276,8 @@ refresh_document_script (ICoreWebView2 *webview)
 {
 	char *script_utf8;
 	uint16_t *script_wide;
-	AddScriptHandler sh;
+	AddScriptHandler *sh;
 	HRESULT hr;
-	char *ignored = NULL;
 
 	if (webview == NULL) {
 		return false;
@@ -263,29 +296,33 @@ refresh_document_script (ICoreWebView2 *webview)
 		return false;
 	}
 
-	ZeroMemory (&sh, sizeof (sh));
-	sh.handler.lpVtbl = &sh.vtbl;
-	sh.vtbl.QueryInterface = add_script_qi;
-	sh.vtbl.AddRef = add_script_addref;
-	sh.vtbl.Release = add_script_release;
-	sh.vtbl.Invoke = add_script_invoke;
-
-	hr = ICoreWebView2_AddScriptToExecuteOnDocumentCreated (
-		webview, (LPCWSTR) script_wide, &sh.handler);
-	free (script_wide);
-	if (FAILED (hr)) {
+	/* Async only — sync_await here deadlocks when called from controller_invoke
+	 * (finish_setup → script_messages_register). */
+	sh = (AddScriptHandler *) CoTaskMemAlloc (sizeof (AddScriptHandler));
+	if (sh == NULL) {
+		free (script_wide);
 		free (script_utf8);
 		return false;
 	}
-	vala_webview2_com_sync_await (&sh.done);
-	g_script_id = sh.id;
+	ZeroMemory (sh, sizeof (*sh));
+	sh->handler.lpVtbl = &sh->vtbl;
+	sh->vtbl.QueryInterface = add_script_qi;
+	sh->vtbl.AddRef = add_script_addref;
+	sh->vtbl.Release = add_script_release;
+	sh->vtbl.Invoke = add_script_invoke;
+	sh->ref_count = 1;
+	sh->script_utf8 = script_utf8; /* ownership → completion / idle */
 
-	/* Run now so handlers work without a reload. */
-	vala_webview2_host_execute_script_sync (script_utf8, &ignored);
-	free (script_utf8);
-	if (ignored != NULL) {
-		free (ignored);
+	hr = ICoreWebView2_AddScriptToExecuteOnDocumentCreated (
+		webview, (LPCWSTR) script_wide, &sh->handler);
+	free (script_wide);
+	if (FAILED (hr)) {
+		free (sh->script_utf8);
+		sh->script_utf8 = NULL;
+		sh->handler.lpVtbl->Release (&sh->handler);
+		return false;
 	}
+	sh->handler.lpVtbl->Release (&sh->handler);
 	return true;
 }
 

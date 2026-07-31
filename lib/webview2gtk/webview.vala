@@ -97,44 +97,40 @@ public enum LoadEvent {
  * **Limitation (v0.1):** one WebView2 host per process (shared COM singleton).
  */
 public class WebView : Gtk.Box {
-	private Gtk.Widget _host;
-	private void* _parent_hwnd = null;
-	private bool _attached = false;
-	private bool _host_shown_on_screen = true;
-	private string? _pending_uri = null;
+	private Gtk.Widget host;
+	private void* parent_hwnd = null;
+	private bool attached = false;
+	private bool host_shown_on_screen = true;
+	private string pending_uri = "";
+	private string pending_html = "";
 
-	private string _uri = "about:blank";
-	private string _title = "";
-	private bool _is_loading = false;
-	private bool _load_cancelled = false;
-	private double _estimated_load_progress = 0.0;
-	private double _zoom_level = 1.0;
-	private WebViewSettings _capture_settings = new WebViewSettings ();
-	private NetworkSession _network_session = new NetworkSession ();
-	private UserContentManager _user_content_manager = new UserContentManager ();
+	private string uri = "about:blank";
+	private string title = "";
+	private bool load_cancelled = false;
+	private double zoom_level = 1.0;
+	private WebViewSettings capture_settings = new WebViewSettings ();
+	private NetworkSession network_session = new NetworkSession ();
+	private UserContentManager user_content_manager = new UserContentManager ();
+	private Gee.HashMap<int, WebResource> resources = new Gee.HashMap<int, WebResource> ();
 
-	public bool is_loading {
-		get { return _is_loading; }
-	}
+	public bool is_loading { get; private set; }
 
-	public double estimated_load_progress {
-		get { return _estimated_load_progress; }
-	}
+	public double estimated_load_progress { get; private set; }
 
 	/** WebView2Gtk-specific: host COM object is attached and ready. */
 	public bool ready {
-		get { return _attached && wv2_host_is_ready (); }
+		get { return attached && wv2_host_is_ready (); }
 	}
 
 	public WebView () {
 		Object (orientation: Gtk.Orientation.VERTICAL, spacing: 0);
-		_host = new Gtk.DrawingArea ();
-		_host.set_hexpand (true);
-		_host.set_vexpand (true);
-		append (_host);
+		host = new Gtk.DrawingArea ();
+		host.set_hexpand (true);
+		host.set_vexpand (true);
+		append (host);
 
-		_host.map.connect (on_host_map);
-		_host.add_tick_callback (on_frame_tick);
+		host.map.connect (on_host_map);
+		host.add_tick_callback (on_frame_tick);
 
 		this.notify["opacity"].connect (() => {
 			this.sync_host_visible ();
@@ -158,6 +154,17 @@ public class WebView : Gtk.Box {
 		Soup.MessageHeaders headers
 	);
 
+	/**
+	 * WebKitGTK-shaped — a subresource load began.
+	 *
+	 * Connect to {@link WebResource.finished} / {@link WebResource.failed} on
+	 * ''resource'' to track in-flight loads.
+	 */
+	public signal void resource_load_started (
+		WebResource resource,
+		URIRequest request
+	);
+
 	/** WebKitGTK-shaped — emitted when navigation fails or is cancelled. */
 	public signal bool load_failed (
 		LoadEvent load_event,
@@ -167,7 +174,7 @@ public class WebView : Gtk.Box {
 
 	protected override void size_allocate (int width, int height, int baseline) {
 		base.size_allocate (width, height, baseline);
-		if (!_attached) {
+		if (!attached) {
 			try_attach ();
 			return;
 		}
@@ -175,44 +182,46 @@ public class WebView : Gtk.Box {
 	}
 
 	~WebView () {
-		if (_attached) {
+		if (attached) {
 			wv2_host_set_script_message_handler (null, null);
-			_user_content_manager.unbind_host ();
+			user_content_manager.unbind_host ();
+			wv2_host_set_resource_handlers (null, null, null, null);
 			wv2_host_set_document_response_handler (null, null);
 			wv2_host_set_event_handlers (null, null, null, null);
 			wv2_host_destroy ();
-			_attached = false;
+			attached = false;
 		}
 	}
 
 	public bool can_go_back () {
-		return _attached && wv2_host_get_can_go_back ();
+		return attached && wv2_host_get_can_go_back ();
 	}
 
 	public bool can_go_forward () {
-		return _attached && wv2_host_get_can_go_forward ();
+		return attached && wv2_host_get_can_go_forward ();
 	}
 
 	public unowned string get_uri () {
-		if (_attached && wv2_host_is_ready ()) {
+		if (attached && wv2_host_is_ready ()) {
 			var live = wv2_host_get_source ();
 			if (live.length > 0) {
-				_uri = live;
+				uri = live;
 			}
 		}
-		return _uri;
+		return uri;
 	}
 
 	public unowned string get_title () {
-		if (_attached && wv2_host_is_ready ()) {
-			_title = wv2_host_get_document_title ();
+		if (attached && wv2_host_is_ready ()) {
+			title = wv2_host_get_document_title ();
 		}
-		return _title;
+		return title;
 	}
 
 	public void load_uri (string uri) {
-		_uri = uri;
-		_pending_uri = uri;
+		this.uri = uri;
+		pending_html = "";
+		pending_uri = uri;
 		try_navigate ();
 	}
 
@@ -224,13 +233,11 @@ public class WebView : Gtk.Box {
 				content
 			);
 		}
-		_uri = base_uri ?? "about:blank";
-		if (_attached && wv2_host_is_ready ()) {
-			wv2_host_navigate_to_string (html);
-		} else {
-			_pending_uri = "data:text/html;charset=utf-8," + Uri.escape_string (html, null);
-			try_navigate ();
-		}
+		uri = base_uri ?? "about:blank";
+		/* Prefer NavigateToString — deferred data: URIs are unreliable with WebView2. */
+		pending_uri = "";
+		pending_html = html;
+		try_navigate ();
 	}
 
 	public void load_plain_text (string plain_text) {
@@ -248,7 +255,7 @@ public class WebView : Gtk.Box {
 	}
 
 	public void stop_loading () {
-		_load_cancelled = true;
+		load_cancelled = true;
 		wv2_host_stop ();
 		set_loading (false, 0.0);
 	}
@@ -262,30 +269,30 @@ public class WebView : Gtk.Box {
 	}
 
 	public double get_zoom_level () {
-		if (_attached && wv2_host_is_ready ()) {
-			_zoom_level = wv2_host_get_zoom_factor ();
+		if (attached && wv2_host_is_ready ()) {
+			zoom_level = wv2_host_get_zoom_factor ();
 		}
-		return _zoom_level;
+		return zoom_level;
 	}
 
 	public void set_zoom_level (double zoom_level) {
-		_zoom_level = zoom_level;
-		if (_attached && wv2_host_is_ready ()) {
+		this.zoom_level = zoom_level;
+		if (attached && wv2_host_is_ready ()) {
 			wv2_host_put_zoom_factor (zoom_level);
 		}
 	}
 
 	public new WebViewSettings get_settings () {
-		return _capture_settings;
+		return capture_settings;
 	}
 
 	public NetworkSession get_network_session () {
-		return _network_session;
+		return network_session;
 	}
 
 	/** WebKitGTK-shaped — manager for script message handlers. */
 	public unowned UserContentManager get_user_content_manager () {
-		return _user_content_manager;
+		return user_content_manager;
 	}
 
 	/**
@@ -296,7 +303,7 @@ public class WebView : Gtk.Box {
 		var trimmed = uri.strip ();
 		var id = wv2_host_download_create (trimmed);
 		if (id <= 0) {
-			var failed = new Download (_network_session, 0, trimmed, "download", "", -1);
+			var failed = new Download (network_session, 0, trimmed, "download", "", -1);
 			Idle.add (() => {
 				failed.on_failed_message ("download create failed");
 				return false;
@@ -315,9 +322,9 @@ public class WebView : Gtk.Box {
 			}
 		} catch (GLib.Error e) {
 		}
-		var dl = new Download (_network_session, id, trimmed, suggested, "", -1);
-		_network_session.register_download (dl, id);
-		_network_session.emit_download_started (dl);
+		var dl = new Download (network_session, id, trimmed, suggested, "", -1);
+		network_session.register_download (dl, id);
+		network_session.emit_download_started (dl);
 		return dl;
 	}
 
@@ -367,32 +374,28 @@ public class WebView : Gtk.Box {
 		if (devtools_json == null) {
 			return null;
 		}
-		try {
-			string[] markers = { "\"data\":\"", "\"data\": \"" };
-			foreach (var marker in markers) {
-				var start = devtools_json.index_of (marker);
-				if (start < 0) {
-					continue;
-				}
-				start += marker.length;
-				var end = devtools_json.index_of_char ('"', start);
-				if (end < 0) {
-					continue;
-				}
-				return Base64.decode (devtools_json.substring (start, end - start));
+		string[] markers = { "\"data\":\"", "\"data\": \"" };
+		foreach (var marker in markers) {
+			var start = devtools_json.index_of (marker);
+			if (start < 0) {
+				continue;
 			}
-		} catch (GLib.Error e) {
-			return null;
+			start += marker.length;
+			var end = devtools_json.index_of_char ('"', start);
+			if (end < 0) {
+				continue;
+			}
+			return Base64.decode (devtools_json.substring (start, end - start));
 		}
 		return null;
 	}
 
 	private Gtk.Window? toplevel_window () {
-		return _host.get_root () as Gtk.Window;
+		return host.get_root () as Gtk.Window;
 	}
 
 	private void* toplevel_hwnd () {
-		var native = _host.get_native ();
+		var native = host.get_native ();
 		if (native == null) {
 			return null;
 		}
@@ -404,11 +407,11 @@ public class WebView : Gtk.Box {
 	}
 
 	private bool host_bounds (out int x, out int y, out int width, out int height) {
-		return widget_bounds_xywh (_host, out x, out y, out width, out height);
+		return widget_bounds_xywh (host, out x, out y, out width, out height);
 	}
 
 	private void push_bounds () {
-		if (!_attached || _parent_hwnd == null) {
+		if (!attached || parent_hwnd == null) {
 			return;
 		}
 		int x;
@@ -418,7 +421,7 @@ public class WebView : Gtk.Box {
 		if (!host_bounds (out x, out y, out width, out height)) {
 			return;
 		}
-		if (!_host_shown_on_screen) {
+		if (!host_shown_on_screen) {
 			/* Off-screen while GTK opacity is 0 — DevTools capture still needs IsVisible. */
 			x = -30000;
 			y = -30000;
@@ -427,15 +430,15 @@ public class WebView : Gtk.Box {
 	}
 
 	private void sync_host_visible () {
-		if (!_attached) {
+		if (!attached) {
 			return;
 		}
-		_host_shown_on_screen = this.get_mapped ()
+		host_shown_on_screen = this.get_mapped ()
 			&& this.get_visible ()
 			&& this.get_opacity () > 0.001;
 		/* Keep IsVisible for DevTools capture; park off-screen when not shown. */
 		wv2_host_put_is_visible (true);
-		if (!_host_shown_on_screen) {
+		if (!host_shown_on_screen) {
 			wv2_host_set_bounds_xywh (-30000, -30000, 1, 1);
 			return;
 		}
@@ -443,24 +446,39 @@ public class WebView : Gtk.Box {
 	}
 
 	private void try_navigate () {
-		if (_pending_uri == null || !_attached) {
+		if (!attached) {
 			return;
 		}
-		if (wv2_host_navigate (_pending_uri)) {
-			_pending_uri = null;
+		if (pending_html.length > 0) {
+			if (!wv2_host_is_ready ()) {
+				return;
+			}
+			/* Clear before navigate to avoid frame-tick re-entry storms. */
+			var html = pending_html;
+			pending_html = "";
+			if (!wv2_host_navigate_to_string (html)) {
+				warning ("WebView2Gtk: NavigateToString failed");
+			}
+			return;
+		}
+		if (pending_uri.length == 0) {
+			return;
+		}
+		if (wv2_host_navigate (pending_uri)) {
+			pending_uri = "";
 		}
 	}
 
 	private void try_attach () {
-		if (_attached) {
+		if (attached) {
 			return;
 		}
 		var window = toplevel_window ();
 		if (window == null) {
 			return;
 		}
-		_parent_hwnd = toplevel_hwnd ();
-		if (_parent_hwnd == null) {
+		parent_hwnd = toplevel_hwnd ();
+		if (parent_hwnd == null) {
 			return;
 		}
 
@@ -472,21 +490,27 @@ public class WebView : Gtk.Box {
 			return;
 		}
 
-		if (!wv2_host_create_with_xywh (_parent_hwnd, x, y, width, height, null)) {
+		if (!wv2_host_create_with_xywh (parent_hwnd, x, y, width, height, null)) {
 			warning ("WebView2Gtk: create_with_xywh failed (runtime/loader missing?)");
 			return;
 		}
-		_attached = true;
+		attached = true;
 		Win32Atspi.register_webview (this);
 		wv2_host_set_document_response_handler (
 			(void*) on_document_response_cb,
 			this
 		);
+		wv2_host_set_resource_handlers (
+			on_resource_started_cb,
+			on_resource_finished_cb,
+			on_resource_failed_cb,
+			this
+		);
 		wv2_host_set_script_message_handler (
 			(void*) on_script_message_cb,
-			_user_content_manager
+			user_content_manager
 		);
-		_user_content_manager.bind_host ();
+		user_content_manager.bind_host ();
 		wv2_host_set_event_handlers (
 			(void*) on_navigation_starting_cb,
 			(void*) on_navigation_completed_cb,
@@ -498,10 +522,12 @@ public class WebView : Gtk.Box {
 	}
 
 	private bool on_frame_tick (Gtk.Widget widget, Gdk.FrameClock frame_clock) {
-		if (!_attached) {
+		if (!attached) {
 			try_attach ();
 		} else {
 			push_bounds ();
+			/* Host ready is async — retry pending HTML / URI once COM is up. */
+			try_navigate ();
 		}
 		return Source.CONTINUE;
 	}
@@ -516,13 +542,11 @@ public class WebView : Gtk.Box {
 	}
 
 	private void set_loading (bool loading, double progress) {
-		if (_is_loading == loading && (!loading || _estimated_load_progress == progress)) {
+		if (this.is_loading == loading && (!loading || this.estimated_load_progress == progress)) {
 			return;
 		}
-		_is_loading = loading;
-		_estimated_load_progress = progress;
-		notify_property ("is-loading");
-		notify_property ("estimated-load-progress");
+		this.is_loading = loading;
+		this.estimated_load_progress = progress;
 	}
 
 	private void refresh_uri () {
@@ -540,22 +564,22 @@ public class WebView : Gtk.Box {
 
 	private void on_navigation_completed (bool success) {
 		if (!success) {
-			var uri = _pending_uri;
-			if (uri == null || uri.length == 0) {
-				uri = _uri;
+			var fail_uri = pending_uri;
+			if (fail_uri.length == 0) {
+				fail_uri = this.uri;
 			}
 			GLib.Error err;
-			if (_load_cancelled) {
-				_load_cancelled = false;
+			if (load_cancelled) {
+				load_cancelled = false;
 				err = new NetworkError.CANCELLED ("Load cancelled");
 			} else {
 				err = new NetworkError.FAILED ("Navigation failed");
 			}
-			load_failed (LoadEvent.STARTED, uri, err);
+			load_failed (LoadEvent.STARTED, fail_uri, err);
 			set_loading (false, 0.0);
 			return;
 		}
-		_load_cancelled = false;
+		load_cancelled = false;
 		refresh_uri ();
 		refresh_title ();
 		set_loading (false, 1.0);
@@ -570,12 +594,33 @@ public class WebView : Gtk.Box {
 		main_document_response (status, headers);
 	}
 
+	private void on_resource_started (int id, string uri) {
+		var resource = new WebResource (uri);
+		var request = new URIRequest (uri);
+		resources[id] = resource;
+		resource_load_started (resource, request);
+	}
+
+	private void on_resource_finished (int id) {
+		WebResource resource;
+		if (resources.unset (id, out resource)) {
+			resource.emit_finished ();
+		}
+	}
+
+	private void on_resource_failed (int id, string message) {
+		WebResource resource;
+		if (resources.unset (id, out resource)) {
+			resource.emit_failed (new NetworkError.FAILED ("%s", message));
+		}
+	}
+
 	[CCode (has_target = false)]
 	private static void on_document_response_cb (
 		void* user_data,
 		int status,
-		[CCode (array_length = false)] unowned string[] header_names,
-		[CCode (array_length = false)] unowned string[] header_values,
+		[CCode (array_length = false)] string[] header_names,
+		[CCode (array_length = false)] string[] header_values,
 		size_t header_count
 	) {
 		var headers = new Soup.MessageHeaders (Soup.MessageHeadersType.RESPONSE);
@@ -583,6 +628,21 @@ public class WebView : Gtk.Box {
 			headers.append (header_names[i], header_values[i]);
 		}
 		((WebView) user_data).on_document_response ((uint) status, headers);
+	}
+
+	[CCode (has_target = false)]
+	private static void on_resource_started_cb (int id, string uri, void* user_data) {
+		((WebView) user_data).on_resource_started (id, uri);
+	}
+
+	[CCode (has_target = false)]
+	private static void on_resource_finished_cb (int id, void* user_data) {
+		((WebView) user_data).on_resource_finished (id);
+	}
+
+	[CCode (has_target = false)]
+	private static void on_resource_failed_cb (int id, string message, void* user_data) {
+		((WebView) user_data).on_resource_failed (id, message);
 	}
 
 	[CCode (has_target = false)]

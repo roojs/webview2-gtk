@@ -28,6 +28,7 @@ valadoc_docs = custom_target(
     '../lib/webview2gtk/NetworkProxySettings.vala',
     '../lib/webview2gtk/CookieManager.vala',
     '../lib/webview2gtk/URIRequest.vala',
+    '../lib/webview2gtk/WebResource.vala',
     '../lib/webview2gtk/Download.vala',
     '../lib/webview2gtk/NetworkSession.vala',
     '../lib/webview2gtk/Settings.vala',

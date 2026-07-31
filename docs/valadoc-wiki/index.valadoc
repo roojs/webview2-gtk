@@ -13,6 +13,8 @@ Hand-written notes: [[https://github.com/roojs/webview2-gtk/blob/master/docs/a11
 == WebView ==
 
  * ''[[https://roojs.github.io/webview2-gtk/webview2gtk/WebView2Gtk.WebView.html|WebView2Gtk.WebView]]''
+ * ''[[https://roojs.github.io/webview2-gtk/webview2gtk/WebView2Gtk.WebResource.html|WebView2Gtk.WebResource]]''
+ * ''[[https://roojs.github.io/webview2-gtk/webview2gtk/WebView2Gtk.Download.html|WebView2Gtk.Download]]''
 
 == Accessibility ==
 

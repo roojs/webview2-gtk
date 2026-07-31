@@ -10,6 +10,7 @@ Build and link on **Windows**. Share Vala source with Linux via `#if WINDOWS` (W
 
 | Doc | |
 |-----|--|
+| [Changelog](CHANGELOG.md) | Notable changes per release |
 | [Install (setup.exe / pacman)](docs/install.md) | Get a prebuilt library |
 | [Build this library](docs/build-this-library.md) | Clone, MSYS2, meson, demos |
 | [Use in your app](docs/using-in-your-app.md) | Consumer Meson + `#if WINDOWS` |
@@ -98,6 +99,7 @@ How docs are built and marked up: [docs/code-documentation.md](docs/code-documen
 | `UserContentManager` / `get_user_content_manager()` | `register_script_message_handler` + detailed `script_message_received` |
 | `evaluate_javascript` | same (host→page replies) |
 | `download_uri` / `NetworkSession.download_started` / `Download` | same shapes (destination via `set_destination`) |
+| `resource_load_started` / `WebResource` | same (`finished` / `failed` on the resource) |
 
 WebView2Gtk-only: `ready`. Accessibility: **`Win32Atspi`** (above), not on `WebView`.
 

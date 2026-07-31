@@ -89,6 +89,25 @@ int vala_webview2_host_download_create (const char *uri_utf8);
 bool vala_webview2_host_download_start (int id, const char *dest_path_utf8, bool overwrite);
 void vala_webview2_host_download_cancel (int id);
 
+typedef void (*WebView2GtkResourceStartedCb) (
+	int id,
+	const char *uri_utf8,
+	void *user_data
+);
+typedef void (*WebView2GtkResourceFinishedCb) (int id, void *user_data);
+typedef void (*WebView2GtkResourceFailedCb) (
+	int id,
+	const char *message,
+	void *user_data
+);
+
+void vala_webview2_host_set_resource_handlers (
+	WebView2GtkResourceStartedCb started,
+	WebView2GtkResourceFinishedCb finished,
+	WebView2GtkResourceFailedCb failed,
+	void *user_data
+);
+
 bool vala_webview2_host_execute_script_sync (const char *script_utf8, char **result_json_out);
 bool vala_webview2_host_capture_screenshot_sync (bool full_document, char **devtools_json_out);
 bool vala_webview2_host_print_to_pdf_sync (const char *output_path_utf8);

@@ -51,3 +51,18 @@ extern bool wv2_host_download_start (int id, string dest_path, bool overwrite);
 
 [CCode (cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_download_cancel")]
 extern void wv2_host_download_cancel (int id);
+
+[CCode (cheader_filename = "webview2gtk-host-api.h", has_target = false)]
+public delegate void Wv2ResourceStartedCb (int id, string uri, void* user_data);
+[CCode (cheader_filename = "webview2gtk-host-api.h", has_target = false)]
+public delegate void Wv2ResourceFinishedCb (int id, void* user_data);
+[CCode (cheader_filename = "webview2gtk-host-api.h", has_target = false)]
+public delegate void Wv2ResourceFailedCb (int id, string message, void* user_data);
+
+[CCode (cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_resource_handlers")]
+extern void wv2_host_set_resource_handlers (
+	Wv2ResourceStartedCb? started,
+	Wv2ResourceFinishedCb? finished,
+	Wv2ResourceFailedCb? failed,
+	void* user_data
+);

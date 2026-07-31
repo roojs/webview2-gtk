@@ -1,36 +1,36 @@
 namespace WebView2Gtk {
 
 public class JavaScriptResult : Object {
-	private string _json;
+	private string json;
 
 	public JavaScriptResult (string json) {
-		_json = json;
+		this.json = json;
 	}
 
 	public string to_json (int indent = 0) {
-		return _json;
+		return json;
 	}
 
 	/** JSC.Value-shaped helper — unwrap JSON string literals. */
 	public string to_string () {
-		if (_json == null || _json == "" || _json == "null") {
+		if (json == null || json == "" || json == "null") {
 			return "";
 		}
-		if (_json.length >= 2
-			&& _json.has_prefix ("\"")
-			&& _json.has_suffix ("\"")) {
-			return _json.substring (1, _json.length - 2)
+		if (json.length >= 2
+			&& json.has_prefix ("\"")
+			&& json.has_suffix ("\"")) {
+			return json.substring (1, json.length - 2)
 				.replace ("\\\"", "\"")
 				.replace ("\\\\", "\\");
 		}
-		return _json;
+		return json;
 	}
 
 	public int32 to_int32 () {
-		if (_json == null || _json == "" || _json == "null") {
+		if (json == null || json == "" || json == "null") {
 			return 0;
 		}
-		return int.parse (_json);
+		return int.parse (json);
 	}
 }
 

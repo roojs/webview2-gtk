@@ -29,6 +29,15 @@ public static int main (string[] args) {
 		window.set_default_size (640, 480);
 
 		var web = new WebView ();
+		web.resource_load_started.connect ((resource, request) => {
+			print ("resource_load_started %s\n", request.uri);
+			resource.finished.connect (() => {
+				print ("resource finished %s\n", resource.uri);
+			});
+			resource.failed.connect ((err) => {
+				print ("resource failed %s: %s\n", resource.uri, err.message);
+			});
+		});
 		var mgr = web.get_user_content_manager ();
 		mgr.script_message_received["ping"].connect ((values) => {
 			var json = values.to_json ();
@@ -42,7 +51,7 @@ public static int main (string[] args) {
 					try {
 						web.evaluate_javascript.end (res);
 					} catch (Error e) {
-						warning ("echo failed: %s", e.message);
+						warning ("evaluate_javascript: %s", e.message);
 					}
 				}
 			);
