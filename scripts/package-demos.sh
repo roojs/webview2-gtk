@@ -15,14 +15,14 @@ COPY_DLLS="${ROOT}/scripts/copy-exe-runtime-dlls.sh"
 
 case "$(uname -s 2>/dev/null)" in
 MINGW*|MSYS*)
-	for image in webview2gtk-hello.exe webview2gtk-browser.exe; do
+	for image in webview2gtk-hello.exe webview2gtk-browser.exe webview2gtk-automation.exe; do
 		taskkill //F //IM "${image}" >/dev/null 2>&1 || true
 	done
 	sleep 1
 	;;
 esac
 
-for name in webview2gtk-hello.exe webview2gtk-browser.exe; do
+for name in webview2gtk-hello.exe webview2gtk-browser.exe webview2gtk-automation.exe; do
 	if [[ ! -f "${BUILD_DIR}/${name}" ]]; then
 		echo "package-demos: missing ${BUILD_DIR}/${name} — run: meson compile -C build" >&2
 		exit 1
@@ -34,6 +34,7 @@ mkdir -p "${OUT_DIR}"
 
 "${COPY_DLLS}" "${BUILD_DIR}/webview2gtk-hello.exe" "${OUT_DIR}" "${LOADER}"
 "${COPY_DLLS}" "${BUILD_DIR}/webview2gtk-browser.exe" "${OUT_DIR}" ""
+"${COPY_DLLS}" "${BUILD_DIR}/webview2gtk-automation.exe" "${OUT_DIR}" ""
 
 # Fontconfig + default fonts (needed when not running inside UCRT64 shell).
 MSYS_PREFIX="${MSYSTEM_PREFIX:-/ucrt64}"
@@ -66,10 +67,19 @@ if "%~1"=="" (
 )
 EOF
 
+cat > "${OUT_DIR}/run-automation.bat" << 'EOF'
+@echo off
+cd /d "%~dp0"
+set "FONTCONFIG_FILE=%~dp0etc\fonts\fonts.conf"
+set "XDG_DATA_DIRS=%~dp0share"
+webview2gtk-automation.exe %*
+EOF
+
 echo ""
 echo "Portable demos: ${OUT_DIR}/"
 echo "  run-hello.bat / webview2gtk-hello.exe"
 echo "  run-browser.bat / webview2gtk-browser.exe"
+echo "  run-automation.bat / webview2gtk-automation.exe"
 echo "Double-click the .bat launchers (or exes if fonts are configured)."
 echo "WebView2 Runtime must still be installed on the PC."
 

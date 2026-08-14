@@ -1,13 +1,13 @@
-/* Hand stub until Foundation.json is vendored (POINT, RECT, …). */
+/* Hand stub until Foundation.json is vendored(POINT, RECT, …). */
 
 namespace Win32.Foundation {
-	[CCode (cname = "POINT")]
+	[CCode(cname = "POINT")]
 	public struct Point {
 		public int x;
 		public int y;
 	}
 
-	[CCode (cname = "RECT")]
+	[CCode(cname = "RECT")]
 	public struct Rect {
 		public int left;
 		public int top;
@@ -15,7 +15,7 @@ namespace Win32.Foundation {
 		public int bottom;
 	}
 
-	[CCode (cname = "SIZE")]
+	[CCode(cname = "SIZE")]
 	public struct Size {
 		public int cx;
 		public int cy;

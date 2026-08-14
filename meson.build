@@ -74,12 +74,22 @@ browser_exe = custom_target(
   install_dir: get_option('bindir'),
 )
 
+automation_exe = custom_target(
+  'webview2gtk-automation',
+  output: 'webview2gtk-automation.exe',
+  command: [_build_bash, wv2gtk_build_sh, 'automation', build_root / 'automation', '@OUTPUT@', lib_stage],
+  depends: lib_target,
+  build_by_default: get_option('examples'),
+  install: get_option('examples'),
+  install_dir: get_option('bindir'),
+)
+
 package_demos_sh = files('scripts/package-demos.sh')
 custom_target(
   'package-demos',
   output: 'package-demos.stamp',
   command: [_build_bash, package_demos_sh, '@OUTPUT@'],
-  depends: [hello_exe, browser_exe],
+  depends: [hello_exe, browser_exe, automation_exe],
   build_by_default: get_option('examples'),
 )
 

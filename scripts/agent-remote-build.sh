@@ -39,14 +39,23 @@ sync_to_windows() {
 
 run_remote_build() {
 	echo "[agent-remote-build] build on ${REMOTE_HOST} (C: mirror)"
+	# Prefer ninja targets; package-demos often fails if dist-demos is locked.
 	ssh -o BatchMode=yes "${REMOTE_HOST}" \
-		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && (test -d build/meson-private || meson setup build) && meson compile -C build 2>&1 | tee build/last-build.log && ./scripts/package-demos.sh\""
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup --reconfigure build && ninja -C build libwebview2gtk-1.stamp webview2gtk-hello.exe webview2gtk-browser.exe webview2gtk-automation.exe 2>&1 | tee build/last-build.log && (OUT_DIR=/c/msys64/tmp/webview2-gtk/portable-demos ./scripts/package-demos.sh || true)\""
 }
 
 run_remote_smoke() {
-	echo "[agent-remote-build] smoke run portable hello (3s) on ${REMOTE_HOST}"
+	echo "[agent-remote-build] smoke run hello (3s) on ${REMOTE_HOST}"
 	ssh -o BatchMode=yes "${REMOTE_HOST}" \
-		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk/dist-demos && timeout 3 ./webview2gtk-hello.exe 2>&1 | tee smoke-run.log || true\""
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk/build && cp -f vendor/webview2/x64/WebView2Loader.dll . 2>/dev/null || cp -f ../build/vendor/webview2/x64/WebView2Loader.dll .; timeout 3 ./webview2gtk-hello.exe 2>&1 | tee smoke-run.log || true\""
+}
+
+run_remote_automation_smoke() {
+	echo "[agent-remote-build] automation --smoke (interactive RDP session) on ${REMOTE_HOST}"
+	# SSH session 0 has no Win32 desktop — GUI exes segfault there.
+	# Run via schtasks /IT into the logged-on session; DLL-complete portable-demos.
+	ssh -o BatchMode=yes "${REMOTE_HOST}" \
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"bash /c/msys64/tmp/webview2-gtk/scripts/run-automation-smoke-interactive.sh\""
 }
 
 pull_artifacts() {
@@ -75,7 +84,13 @@ print_hint() {
 		echo "--- tail last-build.log ---"
 		tail -20 "${ROOT}/build-remote/last-build.log"
 	fi
-	if [[ -f "${ROOT}/build-remote/smoke-run.log" ]]; then
+	if [[ -f "${ROOT}/build-remote/automation-smoke.log" ]]; then
+		echo "--- automation-smoke.log ---"
+		cat "${ROOT}/build-remote/automation-smoke.log"
+	elif [[ -f "${ROOT}/build-remote/portable/automation-smoke.log" ]]; then
+		echo "--- automation-smoke.log ---"
+		cat "${ROOT}/build-remote/portable/automation-smoke.log"
+	elif [[ -f "${ROOT}/build-remote/smoke-run.log" ]]; then
 		echo "--- smoke-run.log ---"
 		cat "${ROOT}/build-remote/smoke-run.log"
 	fi
@@ -89,6 +104,7 @@ case "${cmd}" in
 		build_rc=0
 		run_remote_build || build_rc=$?
 		run_remote_smoke || true
+		run_remote_automation_smoke || build_rc=$?
 		pull_artifacts || true
 		print_hint
 		exit "${build_rc}"
@@ -99,6 +115,7 @@ case "${cmd}" in
 	remote-build)
 		run_remote_build
 		run_remote_smoke || true
+		run_remote_automation_smoke || true
 		pull_artifacts || true
 		print_hint
 		;;
@@ -111,8 +128,17 @@ case "${cmd}" in
 		pull_artifacts || true
 		print_hint
 		;;
+	automation)
+		sync_to_windows
+		build_rc=0
+		run_remote_build || build_rc=$?
+		run_remote_automation_smoke || build_rc=$?
+		pull_artifacts || true
+		print_hint
+		exit "${build_rc}"
+		;;
 	*)
-		echo "usage: $0 [build|sync|remote-build|pull|run]" >&2
+		echo "usage: $0 [build|sync|remote-build|pull|run|automation]" >&2
 		exit 1
 		;;
 esac

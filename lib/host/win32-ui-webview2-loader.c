@@ -1,11 +1,13 @@
 /* WebView2Loader.dll bootstrap only (Phase 7i). */
 
+#define COBJMACROS
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <objbase.h>
 #include <stdio.h>
 
 #include "win32-ui-webview2-loader.h"
+#include "win32-ui-webview2-automation.h"
 #include "win32-ui-webview2-sdk.h"
 
 typedef HRESULT (STDMETHODCALLTYPE *PFN_CreateCoreWebView2EnvironmentWithOptions)(
@@ -56,8 +58,18 @@ BOOL vala_webview2_loader_init (void)
 HRESULT vala_webview2_loader_create_environment (
 	struct ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler *handler)
 {
+	ICoreWebView2EnvironmentOptions *options = NULL;
+	HRESULT hr;
+
 	if (g_create_env_with_options == NULL || handler == NULL) {
 		return E_FAIL;
 	}
-	return g_create_env_with_options (NULL, NULL, NULL, handler);
+
+	/* Honor WEBKIT_INSPECTOR_SERVER → --remote-debugging-port (CDP attach). */
+	options = vala_webview2_host_create_environment_options ();
+	hr = g_create_env_with_options (NULL, NULL, options, handler);
+	if (options != NULL) {
+		ICoreWebView2EnvironmentOptions_Release (options);
+	}
+	return hr;
 }

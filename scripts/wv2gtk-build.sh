@@ -73,6 +73,9 @@ CAPTURE_VALA=(
 	lib/webview2gtk/WebResource.vala
 	lib/webview2gtk/Download.vala
 	lib/webview2gtk/NetworkSession.vala
+	lib/webview2gtk/ApplicationInfo.vala
+	lib/webview2gtk/AutomationSession.vala
+	lib/webview2gtk/WebContext.vala
 	lib/webview2gtk/Settings.vala
 	lib/webview2gtk/JavaScriptResult.vala
 	lib/webview2gtk/UserContentManager.vala
@@ -133,6 +136,7 @@ host_c_files() {
 		"${GEN}/win32-ui-webview2-events.c" \
 		"${HOST}/win32-ui-webview2-loader.c" \
 		"${HOST}/win32-ui-webview2-com-glue.c" \
+		"${HOST}/win32-ui-webview2-automation.c" \
 		"${HOST}/win32-ui-webview2-script.c" \
 		"${HOST}/win32-ui-webview2-capture.c" \
 		"${HOST}/win32-ui-webview2-print.c" \
@@ -231,7 +235,7 @@ case "${MODE}" in
 		mkdir -p "$(dirname "${STAMP}")"
 		touch "${STAMP}"
 		;;
-	hello|browser)
+	hello|browser|automation)
 		LIB_STAGE="${4:?lib-stage from meson (install-staging)}"
 		STAGED_A="${LIB_STAGE}/lib/libwebview2gtk-1.a"
 		STAGED_INC="${LIB_STAGE}/include/webview2gtk-1"
@@ -268,9 +272,13 @@ case "${MODE}" in
 			exit 1
 		fi
 		mkdir -p "$(dirname "${OUT}")"
-		# Default GUI (-mwindows). Set WINDOWS_SUBSYSTEM=-mconsole for stderr in a terminal.
+		# automation: console so automation-started / inspector lines show in SSH smoke.
+		_subsys="${WINDOWS_SUBSYSTEM:--mwindows}"
+		if [[ "${MODE}" == "automation" && -z "${WINDOWS_SUBSYSTEM:-}" ]]; then
+			_subsys="-mconsole"
+		fi
 		# shellcheck disable=SC2086
-		${CC} "${CC_QUIET[@]}" ${WINDOWS_SUBSYSTEM:--mwindows} \
+		${CC} "${CC_QUIET[@]}" ${_subsys} \
 			-I"${STAGED_INC}" \
 			-I"${WEBVIEW2_INC}" \
 			${GTK_CFLAGS} \
