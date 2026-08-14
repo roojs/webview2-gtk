@@ -41,7 +41,7 @@ run_remote_build() {
 	echo "[agent-remote-build] build on ${REMOTE_HOST} (C: mirror)"
 	# Prefer ninja targets; package-demos often fails if dist-demos is locked.
 	ssh -o BatchMode=yes "${REMOTE_HOST}" \
-		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup --reconfigure build && ninja -C build libwebview2gtk-1.stamp webview2gtk-hello.exe webview2gtk-browser.exe webview2gtk-automation.exe 2>&1 | tee build/last-build.log && (OUT_DIR=/c/msys64/tmp/webview2-gtk/portable-demos ./scripts/package-demos.sh || true)\""
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup --reconfigure build && ninja -C build libwebview2gtk-1.stamp webview2gtk-hello.exe webview2gtk-browser.exe webview2gtk-automation.exe webview2gtk-cdp-attach.exe 2>&1 | tee build/last-build.log && (OUT_DIR=/c/msys64/tmp/webview2-gtk/portable-demos ./scripts/package-demos.sh || true)\""
 }
 
 run_remote_smoke() {

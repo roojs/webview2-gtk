@@ -80,7 +80,7 @@ Built demos(after `package-demos` on the Windows build machine):
 Pass: console shows `automation-started session=…`.  
 Chromium may print `Failed to unregister class Chrome_WidgetWin_0` on quit — known WebView2 teardown noise.
 
-### Attach + fill via CDP(3.3)
+### Attach + fill via CDP (3.3)
 
 **Terminal 1** (leave running — no `--smoke`):
 
@@ -91,15 +91,15 @@ Chromium may print `Failed to unregister class Chrome_WidgetWin_0` on quit — k
 **Terminal 2:**
 
 ```powershell
-& 'C:\msys64\tmp\webview2-gtk\portable-demos\cdp-attach-smoke.ps1'
+& 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-cdp-attach.exe'
 ```
 
 Pass: `ATTACH_FILL_PASS` and the page’s `#q` field shows `webview2gtk-cdp-fill`.
 
-The script only uses the public CDP endpoint(`/json/version`, page WebSocket, `Runtime.evaluate`). It does not call any library fill API.
+`webview2gtk-cdp-attach` is a small Vala/libsoup CDP client (not a library fill API).
 
 ## Related
 
 - Plan: [plans/3.0-engine-fill-input.md](plans/3.0-engine-fill-input.md)
 - Example source: [examples/automation/](../examples/automation/)
-- Attach script: [scripts/cdp-attach-smoke.ps1](../scripts/cdp-attach-smoke.ps1)
+- Attach client: [examples/cdp-attach/](../examples/cdp-attach/)

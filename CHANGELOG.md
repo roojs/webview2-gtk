@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - WebKitGTK-shaped automation **setup** (`WebContext` / `AutomationSession` / `ApplicationInfo`, controlled `WebView`) and `WEBKIT_INSPECTOR_SERVER` → WebView2 CDP `--remote-debugging-port` ([plan 3.0](docs/plans/3.0-engine-fill-input.md)). Fill stays with an external driver/CDP client — see [docs/automation.md](docs/automation.md).
-- `examples/automation` smoke + `scripts/cdp-attach-smoke.ps1` for attach/fill via CDP.
+- `examples/automation` smoke + `examples/cdp-attach` (`webview2gtk-cdp-attach.exe`) for attach/fill via CDP.
 
 ## [0.4.0] - 2026-07-31
 

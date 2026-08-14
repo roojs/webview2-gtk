@@ -84,12 +84,21 @@ automation_exe = custom_target(
   install_dir: get_option('bindir'),
 )
 
+cdp_attach_exe = custom_target(
+  'webview2gtk-cdp-attach',
+  output: 'webview2gtk-cdp-attach.exe',
+  command: [_build_bash, wv2gtk_build_sh, 'cdp-attach', build_root / 'cdp-attach', '@OUTPUT@'],
+  build_by_default: get_option('examples'),
+  install: get_option('examples'),
+  install_dir: get_option('bindir'),
+)
+
 package_demos_sh = files('scripts/package-demos.sh')
 custom_target(
   'package-demos',
   output: 'package-demos.stamp',
   command: [_build_bash, package_demos_sh, '@OUTPUT@'],
-  depends: [hello_exe, browser_exe, automation_exe],
+  depends: [hello_exe, browser_exe, automation_exe, cdp_attach_exe],
   build_by_default: get_option('examples'),
 )
 
