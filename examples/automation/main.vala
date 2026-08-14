@@ -41,7 +41,8 @@ class AutomationWindow : Gtk.ApplicationWindow {
 			session.create_web_view.connect (() => {
 				return this.view;
 			});
-			print ("automation-started session=%s\n", session.id);
+			/* stderr — survives --smoke quit (stdout may not flush). */
+			GLib.message ("automation-started session=%s", session.id);
 		});
 
 		this.set_child (this.view);
@@ -106,6 +107,7 @@ public static int main (string[] args) {
 			"inspector 127.0.0.1:%u — CDP --remote-debugging-port (WEBKIT_INSPECTOR_SERVER)\n",
 			insp
 		);
+		stdout.flush ();
 		window.present ();
 		if (smoke) {
 			Timeout.add (2500, () => {
