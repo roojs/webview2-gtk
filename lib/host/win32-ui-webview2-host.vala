@@ -32,7 +32,7 @@ extern void co_task_mem_free(void* ptr);
 private struct HostState {
 	public void* parent;
 	public Microsoft.Web.WebView2.Win32.Rect bounds;
-	/* Raw COM pointers — not Vala interface types (gobject profile would Release them). */
+	/* Raw COM pointers — not Vala interface types(gobject profile would Release them). */
 	public void* controller;
 	public void* webview;
 	public WideString? pending_url;

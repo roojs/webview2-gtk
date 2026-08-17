@@ -3,8 +3,10 @@
 #
 # Usage:
 #   wv2gtk-build.sh lib      <builddir> <prefix> <stamp>
-#   wv2gtk-build.sh hello    <builddir> <out.exe> <lib-stage>
-#   wv2gtk-build.sh browser  <builddir> <out.exe> <lib-stage>
+#   wv2gtk-build.sh hello       <builddir> <out.exe> <lib-stage>
+#   wv2gtk-build.sh browser     <builddir> <out.exe> <lib-stage>
+#   wv2gtk-build.sh automation  <builddir> <out.exe> <lib-stage>
+#   wv2gtk-build.sh cdp-attach  <builddir> <out.exe>   # soup+json only
 #
 # Examples link the staged static library from `lib` — they do not recompile
 # the widget/host tree (that was tripling CI compile time).
@@ -73,6 +75,9 @@ CAPTURE_VALA=(
 	lib/webview2gtk/WebResource.vala
 	lib/webview2gtk/Download.vala
 	lib/webview2gtk/NetworkSession.vala
+	lib/webview2gtk/ApplicationInfo.vala
+	lib/webview2gtk/AutomationSession.vala
+	lib/webview2gtk/WebContext.vala
 	lib/webview2gtk/Settings.vala
 	lib/webview2gtk/JavaScriptResult.vala
 	lib/webview2gtk/UserContentManager.vala
@@ -133,6 +138,7 @@ host_c_files() {
 		"${GEN}/win32-ui-webview2-events.c" \
 		"${HOST}/win32-ui-webview2-loader.c" \
 		"${HOST}/win32-ui-webview2-com-glue.c" \
+		"${HOST}/win32-ui-webview2-automation.c" \
 		"${HOST}/win32-ui-webview2-script.c" \
 		"${HOST}/win32-ui-webview2-capture.c" \
 		"${HOST}/win32-ui-webview2-print.c" \
@@ -231,7 +237,7 @@ case "${MODE}" in
 		mkdir -p "$(dirname "${STAMP}")"
 		touch "${STAMP}"
 		;;
-	hello|browser)
+	hello|browser|automation)
 		LIB_STAGE="${4:?lib-stage from meson (install-staging)}"
 		STAGED_A="${LIB_STAGE}/lib/libwebview2gtk-1.a"
 		STAGED_INC="${LIB_STAGE}/include/webview2gtk-1"
@@ -268,9 +274,13 @@ case "${MODE}" in
 			exit 1
 		fi
 		mkdir -p "$(dirname "${OUT}")"
-		# Default GUI (-mwindows). Set WINDOWS_SUBSYSTEM=-mconsole for stderr in a terminal.
+		# automation: console so automation-started / inspector lines show in SSH smoke.
+		_subsys="${WINDOWS_SUBSYSTEM:--mwindows}"
+		if [[ "${MODE}" == "automation" && -z "${WINDOWS_SUBSYSTEM:-}" ]]; then
+			_subsys="-mconsole"
+		fi
 		# shellcheck disable=SC2086
-		${CC} "${CC_QUIET[@]}" ${WINDOWS_SUBSYSTEM:--mwindows} \
+		${CC} "${CC_QUIET[@]}" ${_subsys} \
 			-I"${STAGED_INC}" \
 			-I"${WEBVIEW2_INC}" \
 			${GTK_CFLAGS} \
@@ -280,6 +290,38 @@ case "${MODE}" in
 			"${WEBVIEW2_LINK[@]}" \
 			${GTK_LIBS}
 		cp -f "${ROOT}/build/vendor/webview2/x64/WebView2Loader.dll" "$(dirname "${OUT}")/" 2>/dev/null || true
+		;;
+	cdp-attach)
+		# Console CDP client — libsoup + json-glib only (no WebView2 / GTK widget).
+		GTK_DIR="${BUILD_DIR}/gtk-cdp-attach"
+		rm -rf "${GTK_DIR}"
+		mkdir -p "${GTK_DIR}"
+		(
+			cd "${ROOT}"
+			valac \
+				--pkg libsoup-3.0 \
+				--pkg json-glib-1.0 \
+				-C -d "${GTK_DIR}" \
+				"examples/cdp-attach/main.vala"
+		)
+		MAIN_C="${GTK_DIR}/examples/cdp-attach/main.c"
+		if [[ ! -f "${MAIN_C}" ]]; then
+			MAIN_C="${GTK_DIR}/main.c"
+		fi
+		if [[ ! -f "${MAIN_C}" ]]; then
+			echo "wv2gtk-build: valac did not emit main.c under ${GTK_DIR}" >&2
+			find "${GTK_DIR}" -name '*.c' >&2 || true
+			exit 1
+		fi
+		mkdir -p "$(dirname "${OUT}")"
+		CDP_CFLAGS="$(pkg-config --cflags libsoup-3.0 json-glib-1.0)"
+		CDP_LIBS="$(pkg-config --libs libsoup-3.0 json-glib-1.0)"
+		# shellcheck disable=SC2086
+		${CC} "${CC_QUIET[@]}" -mconsole \
+			${CDP_CFLAGS} \
+			-o "${OUT}" \
+			"${MAIN_C}" \
+			${CDP_LIBS}
 		;;
 	*)
 		echo "unknown mode: ${MODE}" >&2

@@ -171,6 +171,10 @@ bool vala_webview2_host_a11y_type_text (const char *utf8);
 /* Virtual-key press+release (e.g. VK_BACK = 0x08). */
 bool vala_webview2_host_a11y_key_vk (unsigned short vk);
 
+/* Automation / inspector (WEBKIT_INSPECTOR_SERVER → CDP remote-debugging-port). */
+void vala_webview2_host_set_automation_allowed (bool allowed);
+bool vala_webview2_host_get_automation_allowed (void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -17,7 +17,7 @@ public bool get_can_go_back() {
 		return false;
 	}
 	int val = 0;
-	if (!com_ok(com_webview_get_can_go_back (host_webview_com(), out val))) {
+	if (!com_ok(com_webview_get_can_go_back(host_webview_com(), out val))) {
 		return false;
 	}
 	return val != 0;
@@ -29,7 +29,7 @@ public bool get_can_go_forward() {
 		return false;
 	}
 	int val = 0;
-	if (!com_ok(com_webview_get_can_go_forward (host_webview_com(), out val))) {
+	if (!com_ok(com_webview_get_can_go_forward(host_webview_com(), out val))) {
 		return false;
 	}
 	return val != 0;
@@ -41,7 +41,7 @@ public bool get_contains_full_screen_element() {
 		return false;
 	}
 	int val = 0;
-	if (!com_ok(com_webview_get_contains_full_screen_element (host_webview_com(), out val))) {
+	if (!com_ok(com_webview_get_contains_full_screen_element(host_webview_com(), out val))) {
 		return false;
 	}
 	return val != 0;
@@ -53,7 +53,7 @@ public string get_document_title() {
 		return "";
 	}
 	uint16* title = null;
-	if (!com_ok(com_webview_get_document_title (host_webview_com(), out title))) {
+	if (!com_ok(com_webview_get_document_title(host_webview_com(), out title))) {
 		return "";
 	}
 	return take_com_string(title);
@@ -65,7 +65,7 @@ public bool get_is_visible() {
 		return false;
 	}
 	int val = 0;
-	if (!com_ok(com_controller_get_is_visible (host_controller_com(), out val))) {
+	if (!com_ok(com_controller_get_is_visible(host_controller_com(), out val))) {
 		return false;
 	}
 	return val != 0;
@@ -77,7 +77,7 @@ public string get_source() {
 		return "";
 	}
 	uint16* uri = null;
-	if (!com_ok(com_webview_get_source (host_webview_com(), out uri))) {
+	if (!com_ok(com_webview_get_source(host_webview_com(), out uri))) {
 		return "";
 	}
 	return take_com_string(uri);
@@ -89,7 +89,7 @@ public double get_zoom_factor() {
 		return 1.0;
 	}
 	double val = 1.0;
-	if (!com_ok(com_controller_get_zoom_factor (host_controller_com(), out val))) {
+	if (!com_ok(com_controller_get_zoom_factor(host_controller_com(), out val))) {
 		return 1.0;
 	}
 	return val;
@@ -100,7 +100,7 @@ public bool go_back() {
 	if (!webview_ready()) {
 		return false;
 	}
-	return com_ok(com_webview_go_back (host_webview_com()));
+	return com_ok(com_webview_go_back(host_webview_com()));
 }
 
 [CCode(cname = "vala_webview2_host_go_forward")]
@@ -108,7 +108,7 @@ public bool go_forward() {
 	if (!webview_ready()) {
 		return false;
 	}
-	return com_ok(com_webview_go_forward (host_webview_com()));
+	return com_ok(com_webview_go_forward(host_webview_com()));
 }
 
 [CCode(cname = "vala_webview2_host_navigate_to_string")]
@@ -116,7 +116,7 @@ public bool navigate_to_string(string html) {
 	if (!webview_ready() || html.length == 0) {
 		return false;
 	}
-	return com_ok(com_webview_navigate_to_string (host_webview_com(), WideString(html).ptr));
+	return com_ok(com_webview_navigate_to_string(host_webview_com(), WideString(html).ptr));
 }
 
 [CCode(cname = "vala_webview2_host_open_dev_tools_window")]
@@ -124,7 +124,7 @@ public bool open_dev_tools_window() {
 	if (!webview_ready()) {
 		return false;
 	}
-	return com_ok(com_webview_open_dev_tools_window (host_webview_com()));
+	return com_ok(com_webview_open_dev_tools_window(host_webview_com()));
 }
 
 [CCode(cname = "vala_webview2_host_post_web_message_as_json")]
@@ -132,7 +132,7 @@ public bool post_web_message_as_json(string json) {
 	if (!webview_ready() || json.length == 0) {
 		return false;
 	}
-	return com_ok(com_webview_post_web_message_as_json (host_webview_com(), WideString(json).ptr));
+	return com_ok(com_webview_post_web_message_as_json(host_webview_com(), WideString(json).ptr));
 }
 
 [CCode(cname = "vala_webview2_host_post_web_message_as_string")]
@@ -140,7 +140,7 @@ public bool post_web_message_as_string(string text) {
 	if (!webview_ready() || text.length == 0) {
 		return false;
 	}
-	return com_ok(com_webview_post_web_message_as_string (host_webview_com(), WideString(text).ptr));
+	return com_ok(com_webview_post_web_message_as_string(host_webview_com(), WideString(text).ptr));
 }
 
 [CCode(cname = "vala_webview2_host_put_is_visible")]
@@ -149,7 +149,7 @@ public bool put_is_visible(bool visible) {
 	if (!controller_ready()) {
 		return true;
 	}
-	return com_ok(com_controller_put_is_visible (host_controller_com(), visible ? 1 : 0));
+	return com_ok(com_controller_put_is_visible(host_controller_com(), visible ? 1 : 0));
 }
 
 [CCode(cname = "vala_webview2_host_put_zoom_factor")]
@@ -157,7 +157,7 @@ public bool put_zoom_factor(double zoom) {
 	if (!controller_ready()) {
 		return false;
 	}
-	return com_ok(com_controller_put_zoom_factor (host_controller_com(), zoom));
+	return com_ok(com_controller_put_zoom_factor(host_controller_com(), zoom));
 }
 
 [CCode(cname = "vala_webview2_host_reload")]
@@ -165,7 +165,7 @@ public bool reload() {
 	if (!webview_ready()) {
 		return false;
 	}
-	return com_ok(com_webview_reload (host_webview_com()));
+	return com_ok(com_webview_reload(host_webview_com()));
 }
 
 [CCode(cname = "vala_webview2_host_stop")]
@@ -173,7 +173,7 @@ public bool stop() {
 	if (!webview_ready()) {
 		return false;
 	}
-	return com_ok(com_webview_stop (host_webview_com()));
+	return com_ok(com_webview_stop(host_webview_com()));
 }
 
 

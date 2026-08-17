@@ -14,6 +14,7 @@ Build and link on **Windows**. Share Vala source with Linux via `#if WINDOWS` (W
 | [Install (setup.exe / pacman)](docs/install.md) | Get a prebuilt library |
 | [Build this library](docs/build-this-library.md) | Clone, MSYS2, meson, demos |
 | [Use in your app](docs/using-in-your-app.md) | Consumer Meson + `#if WINDOWS` |
+| [Automation](docs/automation.md) | WebKit-shaped setup; fill via external CDP/driver |
 | [Deploying a Windows build](docs/deploying-windows.md) | Bundle GTK / WebView2Loader DLLs |
 | **[API docs (Valadoc)](https://roojs.github.io/webview2-gtk/)** | Generated reference on GitHub Pages |
 
@@ -100,10 +101,14 @@ How docs are built and marked up: [docs/code-documentation.md](docs/code-documen
 | `evaluate_javascript` | same (host→page replies) |
 | `download_uri` / `NetworkSession.download_started` / `Download` | same shapes (destination via `set_destination`) |
 | `resource_load_started` / `WebResource` | same (`finished` / `failed` on the resource) |
+| `WebContext` automation allow / `automation_started` | same names; see [automation.md](docs/automation.md) |
+| `AutomationSession` / `ApplicationInfo` | same names |
+| `WEBKIT_INSPECTOR_SERVER` | honored → WebView2 CDP `--remote-debugging-port` |
 
 WebView2Gtk-only: `ready`. Accessibility: **`Win32Atspi`** (above), not on `WebView`.
 
-Not implemented yet: settings wiring, inspector, policy callbacks, `register_script_message_handler_with_reply`, etc. (`load_failed` and `JavaScriptResult.to_string` are implemented.)
+Not implemented yet: settings wiring, policy callbacks, `register_script_message_handler_with_reply`, etc. (`load_failed` and `JavaScriptResult.to_string` are implemented.)  
+🚫 Public `WebView` click/type APIs are intentional omissions — fill stays with an **external** driver/CDP client ([automation.md](docs/automation.md)).
 
 **Limitation:** one WebView2 host per process today (shared COM singleton).
 
@@ -117,8 +122,9 @@ lib/webview2gtk/    Public GTK 4 widget + Win32Atspi (Vala)
 vapi/               Bindings
 examples/hello/     Minimal demo
 examples/browser/   Browser chrome + Win32Atspi smoke
+examples/automation/  Automation setup smoke (plan 3.0)
 examples/consumer-meson.build
-docs/               Install / build / use / deploy / a11y / Valadoc
+docs/               Install / build / use / deploy / a11y / automation / Valadoc
 packaging/          NSIS + MSYS2 PKGBUILD
 scripts/            Vendor SDK, build, package demos, sample consumer helpers
 ```
