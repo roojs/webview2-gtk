@@ -161,10 +161,9 @@ namespace WebView2Gtk {
 	[CCode(cheader_filename = "webview2gtk.h")]
 	public class WebView : Gtk.Box {
 		public WebView();
-		public WebContext web_context { get; }
-		public NetworkSession network_session { get; }
-		public bool is_controlled_by_automation { get; }
-		public void set_controlled_by_automation(WebContext context, NetworkSession session);
+		public WebContext web_context { owned get; construct; }
+		public NetworkSession network_session { get; construct; }
+		public bool is_controlled_by_automation { get; construct; }
 		public signal void load_changed(LoadEvent load_event);
 		public signal void main_document_response(
 			uint status,

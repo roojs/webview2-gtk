@@ -54,10 +54,7 @@ public static int main(string[] args) {
 			error("get_network_session_for_automation returned null");
 		}
 
-		WebView view = new WebView();
-		view.set_controlled_by_automation(context, ns);
-		view.set_hexpand(true);
-		view.set_vexpand(true);
+		WebView view = new WebViewAuto(context, ns);
 
 		context.automation_started.connect((session) => {
 			var info = new ApplicationInfo();
@@ -107,4 +104,20 @@ body{font-family:sans-serif;margin:2rem}
 	});
 
 	return app.run(gtk_args);
+}
+
+class WebViewAuto : WebView
+{
+	public WebViewAuto(WebContext context, NetworkSession session)
+	{
+		Object(
+			orientation: Gtk.Orientation.VERTICAL,
+			spacing: 0,
+			hexpand: true,
+			vexpand: true,
+			web_context: context,
+			is_controlled_by_automation: true,
+			network_session: session
+		);
+	}
 }

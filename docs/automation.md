@@ -42,12 +42,9 @@ var context = WebContext.get_default();
 context.set_automation_allowed(true);
 
 var ns = context.get_network_session_for_automation();
-var view = new WebView();
-#if WINDOWS
-view.set_controlled_by_automation(context, ns);
-#else
-/* Linux: Object.new with is-controlled-by-automation / network-session / web-context */
-#endif
+/* Subclass Object(…) chain-up — construct-only on WebKitGTK and webview2-gtk.
+ * new WebView() { is_controlled_by_automation = true } does not compile. */
+var view = new WebViewAuto(context, ns);
 
 context.automation_started.connect((session) => {
 	var info = new ApplicationInfo();
@@ -61,9 +58,7 @@ Environment.set_variable("WEBKIT_INSPECTOR_SERVER", "127.0.0.1:19222", true);
 /* set before the WebView2 environment is created(before first present/attach) */
 ```
 
-On Windows today, mark the controlled view with `WebView.set_controlled_by_automation(context, session)` after `new WebView()`. (WebKitGTK uses construct properties on `Object.new`; matching that exact construct form may land later.)
-
-Set **`WEBKIT_INSPECTOR_SERVER` before** creating/attaching the host WebView so the environment picks up `--remote-debugging-port`.
+`web_context`, `is_controlled_by_automation`, and `network_session` are construct-only (webkitgtk-6.0). Set them in a subclass `Object(…)` chain-up (`WebViewAuto`, same shape as Snappr `src/UI/WebViewAuto.vala`). There is no `set_controlled_by_automation`. See `examples/automation/`.
 
 ## Demo and smokes
 

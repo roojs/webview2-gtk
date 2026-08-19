@@ -113,13 +113,25 @@ public class WebView : Gtk.Box {
 	private Gee.HashMap<int, WebResource> resources = new Gee.HashMap<int, WebResource> ();
 
 	/** WebKitGTK-shaped — context for this view. */
-	public WebContext web_context { get; private set; }
+	public WebContext web_context { owned get; construct; }
 
 	/** WebKitGTK-shaped — network session for this view. */
-	public NetworkSession network_session { get; private set; }
+	public NetworkSession network_session { get; construct; }
 
 	/** WebKitGTK-shaped — this view is owned by an automation session. */
-	public bool is_controlled_by_automation { get; private set; }
+	public bool is_controlled_by_automation { get; construct; }
+
+	construct {
+		if (this.web_context == null) {
+			this.web_context = WebContext.get_default();
+		}
+		if (this.network_session == null) {
+			this.network_session = new NetworkSession();
+		}
+		if (this.is_controlled_by_automation) {
+			this.web_context.register_controlled_webview(this);
+		}
+	}
 
 	public bool is_loading { get; private set; }
 
@@ -132,9 +144,6 @@ public class WebView : Gtk.Box {
 
 	public WebView() {
 		Object(orientation: Gtk.Orientation.VERTICAL, spacing: 0);
-		this.web_context = WebContext.get_default();
-		this.network_session = new NetworkSession();
-		this.is_controlled_by_automation = false;
 
 		host = new Gtk.DrawingArea();
 		host.set_hexpand(true);
@@ -156,17 +165,6 @@ public class WebView : Gtk.Box {
 		this.unmap.connect(() => {
 			this.sync_host_visible();
 		});
-	}
-
-	/**
-	 * Mark this view as automation-controlled(WebKitGTK is-controlled-by-automation).
-	 * Call after construct; registers with ''context'' for automation_started.
-	 */
-	public void set_controlled_by_automation(WebContext context, NetworkSession session) {
-		this.web_context = context;
-		this.network_session = session;
-		this.is_controlled_by_automation = true;
-		context.register_controlled_webview(this);
 	}
 
 	public signal void load_changed(LoadEvent load_event);
