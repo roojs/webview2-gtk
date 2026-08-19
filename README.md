@@ -15,6 +15,7 @@ Build and link on **Windows**. Share Vala source with Linux via `#if WINDOWS` (W
 | [Build this library](docs/build-this-library.md) | Clone, MSYS2, meson, demos |
 | [Use in your app](docs/using-in-your-app.md) | Consumer Meson + `#if WINDOWS` |
 | [Automation](docs/automation.md) | WebKit-shaped setup; fill via external CDP/driver |
+| [Releasing](docs/releasing.md) | Tag-driven release flow and changelog preflight |
 | [Deploying a Windows build](docs/deploying-windows.md) | Bundle GTK / WebView2Loader DLLs |
 | **[API docs (Valadoc)](https://roojs.github.io/webview2-gtk/)** | Generated reference on GitHub Pages |
 

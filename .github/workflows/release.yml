@@ -138,6 +138,16 @@ jobs:
           fi
           ls -lh artifacts
 
+      - name: Render release notes from CHANGELOG.md
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/release/changelog.sh
+          scripts/release/changelog.sh release-notes "${GITHUB_REF#refs/tags/}" -o release-notes.md
+          echo "---- release-notes.md ----"
+          cat release-notes.md
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
         with:
@@ -148,6 +158,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          body_path: release-notes.md
           files: artifacts/*
-          generate_release_notes: true
           overwrite_files: true
