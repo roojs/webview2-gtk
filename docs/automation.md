@@ -58,7 +58,9 @@ Environment.set_variable("WEBKIT_INSPECTOR_SERVER", "127.0.0.1:19222", true);
 /* set before the WebView2 environment is created(before first present/attach) */
 ```
 
-`web_context`, `is_controlled_by_automation`, and `network_session` are construct-only (webkitgtk-6.0). Set them in a subclass `Object(…)` chain-up (`WebViewAuto`, same shape as Snappr `src/UI/WebViewAuto.vala`). There is no `set_controlled_by_automation`. See `examples/automation/`.
+`web_context`, `is_controlled_by_automation`, `network_session`, and `website_policies` are construct-only (webkitgtk-6.0). Set them in a subclass `Object(…)` chain-up (`WebViewAuto`, same shape as Snappr `src/UI/WebViewAuto.vala`). There is no `set_controlled_by_automation`. See `examples/automation/`.
+
+Also shared: `get_settings().enable_developer_extras` and `get_inspector().show()` (opens Edge DevTools when extras are enabled).
 
 ## Demo and smokes
 

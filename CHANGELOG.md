@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - WebKitGTK-shaped automation **setup** (`WebContext` / `AutomationSession` / `ApplicationInfo`, controlled `WebView`) and `WEBKIT_INSPECTOR_SERVER` → WebView2 CDP `--remote-debugging-port` ([plan 3.0](docs/plans/3.0-engine-fill-input.md)). Fill stays with an external driver/CDP client — see [docs/automation.md](docs/automation.md).
 - `WebView` automation construct properties (`web_context`, `network_session`, `is_controlled_by_automation`) — WebKitGTK shape; `WebViewAuto` subclass in `examples/automation` ([plan 3.6](docs/plans/3.6-webview-construct-automation.md)).
+- `WebsitePolicies` / `AutoplayPolicy` construct on `WebView`; `DENY` → `--autoplay-policy=user-gesture-required`. `enable_developer_extras` + `WebInspector.show()` → Edge DevTools ([plan 3.7](docs/plans/3.7-website-policies.md)).
 - `examples/cdp-attach` (`webview2gtk-cdp-attach.exe`) for attach/fill via CDP.
 
 ## [0.4.0] - 2026-07-31
