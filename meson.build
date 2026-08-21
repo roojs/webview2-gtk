@@ -1,7 +1,7 @@
 project(
   'webview2-gtk',
   ['c', 'vala'],
-  version: '0.4.2',
+  version: '0.4.3',
   meson_version: '>= 1.0.0',
   default_options: ['buildtype=debugoptimized', 'c_std=c11'],
 )
@@ -113,7 +113,10 @@ meson.add_install_script(_py, files('scripts/meson-install.py'), lib_stage)
 configure_file(
   input: 'webview2gtk-1.pc.in',
   output: 'webview2gtk-1.pc',
-  configuration: {'prefix': prefix},
+  configuration: {
+    'prefix': prefix,
+    'version': meson.project_version(),
+  },
   install: true,
   install_dir: get_option('libdir') / 'pkgconfig',
 )

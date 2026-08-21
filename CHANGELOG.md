@@ -6,7 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.4.2] - Unreleased
+## [0.4.3] - Unreleased
+
+### Fixed
+
+- Installed `webview2gtk-1.vapi`: `Win32Atspi` now has `cheader_filename = "webview2gtk.h"`, so consumer `.vala` that only uses a11y emits `#include <webview2gtk.h>` and links without needing `WebView` in the same file ([bug](docs/bugs/2026-08-21-win32atspi-vapi-missing-cheader.md)).
+- Nested `WebView` stayed unattached (0×0 host `DrawingArea`) inside `ScrolledWindow` / overlays; the host now has a minimal content size, the box expands, and `map` retries attach + pending navigate ([bug](docs/bugs/2026-08-21-webview-nested-zero-size-attach.md)).
+- `webview2gtk-1.pc` `Version` now matches the project version (`pkg-config --modversion` was stuck at `0.2.0`).
+
+## [0.4.2] - 2026-08-21
 
 ### Added
 
@@ -15,10 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Media settings on `WebViewSettings`: `enable_media_stream`, `enable_webrtc`, and `media_playback_requires_user_gesture`.
 - `WebView.is_muted` (honoured via WebView2 mute).
 - `permission_request` / `query_permission_state` with WebKitGTK-shaped `PermissionRequest` / `PermissionStateQuery` (host denies via `PermissionRequested` when unhandled or media is disabled).
-
-### Fixed
-
-- Installed `webview2gtk-1.vapi`: `Win32Atspi` now has `cheader_filename = "webview2gtk.h"`, so consumer `.vala` that only uses a11y emits `#include <webview2gtk.h>` and links without needing `WebView` in the same file ([bug](docs/bugs/2026-08-21-win32atspi-vapi-missing-cheader.md)).
 
 ## [0.4.1] - 2026-08-19
 

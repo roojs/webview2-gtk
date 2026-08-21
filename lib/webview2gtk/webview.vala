@@ -186,9 +186,15 @@ public class WebView : Gtk.Box {
 	public WebView() {
 		Object(orientation: Gtk.Orientation.VERTICAL, spacing: 0);
 
+		this.set_hexpand(true);
+		this.set_vexpand(true);
+
 		host = new Gtk.DrawingArea();
 		host.set_hexpand(true);
 		host.set_vexpand(true);
+		/* Natural size so nested layouts (ScrolledWindow, overlay) don't stay 0×0. */
+		host.set_content_width(1);
+		host.set_content_height(1);
 		append(host);
 
 		host.map.connect(on_host_map);
@@ -200,9 +206,7 @@ public class WebView : Gtk.Box {
 		this.notify["visible"].connect(() => {
 			this.sync_host_visible();
 		});
-		this.map.connect(() => {
-			this.sync_host_visible();
-		});
+		this.map.connect(on_webview_map);
 		this.unmap.connect(() => {
 			this.sync_host_visible();
 		});
@@ -619,6 +623,16 @@ public class WebView : Gtk.Box {
 			try_navigate();
 		}
 		return Source.CONTINUE;
+	}
+
+	private void on_webview_map() {
+		this.sync_host_visible();
+		try_attach();
+		Idle.add(() => {
+			try_attach();
+			try_navigate();
+			return false;
+		});
 	}
 
 	private void on_host_map() {

@@ -17,6 +17,7 @@ BUILD_DIR="${2:?build directory}"
 OUT="${3:?output (prefix for lib, exe for examples)}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+VERSION="$(grep -E "^[[:space:]]*version:" "${ROOT}/meson.build" | head -1 | sed -E "s/.*'([^']+)'.*/\1/")"
 VAPI="${ROOT}/vapi"
 GEN="${ROOT}/generated"
 HOST="${ROOT}/lib/host"
@@ -235,7 +236,7 @@ case "${MODE}" in
 		cp -f "${GTK_HEADER}" "${PREFIX}/include/webview2gtk-1/webview2gtk.h"
 		cp -f "${GTK_HEADER}" "${WIDGET_INC}/webview2gtk.h"
 		cp -f "${HOST}/webview2gtk-host-api.h" "${PREFIX}/include/webview2gtk-1/"
-		sed "s|@prefix@|${PREFIX}|g" "${ROOT}/webview2gtk-1.pc.in" > "${PREFIX}/lib/pkgconfig/webview2gtk-1.pc"
+		sed -e "s|@prefix@|${PREFIX}|g" -e "s|@version@|${VERSION}|g" "${ROOT}/webview2gtk-1.pc.in" > "${PREFIX}/lib/pkgconfig/webview2gtk-1.pc"
 		cp -f "${ROOT}/build/vendor/webview2/x64/WebView2Loader.dll" "${PREFIX}/lib/" 2>/dev/null || true
 		# Meson custom_target output — without this, `meson install` rebuilds lib every time.
 		mkdir -p "$(dirname "${STAMP}")"

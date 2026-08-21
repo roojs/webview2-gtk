@@ -98,7 +98,7 @@ void walk () {
 
 - ℹ️ In-tree `lib/webview2gtk/webview2gtk.h` is a **stale** valac dump (WebView only). Install copies the generated header; the committed file does not. Easy to misread when debugging.
 - ℹ️ Vapi is installed to **`lib/webview2gtk-1.vapi`**, not `share/vala/vapi`. Consumers need `--vapidir ${prefix}/lib` (or equivalent). Valac `Package webview2gtk-1 not found` without that.
-- ℹ️ `webview2gtk-1.pc.in` still says `Version: 0.2.0` while `meson.build` is `0.4.2`. `pkg-config --modversion` lies.
+- ℹ️ `webview2gtk-1.pc` `Version` was stuck at `0.2.0` on the 0.4.2 install (`pkg-config --modversion` lied). Fixed in 0.4.3.
 
 ## Attempts
 
