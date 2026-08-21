@@ -6,13 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.4.1] - Unreleased
+## [0.4.2] - Unreleased
+
+### Added
+
+- `WebsitePolicies` / `AutoplayPolicy` construct on `WebView`; `DENY` → `--autoplay-policy=user-gesture-required`. `enable_developer_extras` + `WebInspector.show()` → Edge DevTools. Media settings (`enable_media_stream` / `enable_webrtc` / `media_playback_requires_user_gesture`), `WebView.is_muted`, and `permission_request` / `query_permission_state` ([plan 3.7](docs/plans/3.7-website-policies.md)).
+
+## [0.4.1] - 2026-08-19
 
 ### Added
 
 - WebKitGTK-shaped automation **setup** (`WebContext` / `AutomationSession` / `ApplicationInfo`, controlled `WebView`) and `WEBKIT_INSPECTOR_SERVER` → WebView2 CDP `--remote-debugging-port` ([plan 3.0](docs/plans/3.0-engine-fill-input.md)). Fill stays with an external driver/CDP client — see [docs/automation.md](docs/automation.md).
 - `WebView` automation construct properties (`web_context`, `network_session`, `is_controlled_by_automation`) — WebKitGTK shape; `WebViewAuto` subclass in `examples/automation` ([plan 3.6](docs/plans/3.6-webview-construct-automation.md)).
-- `WebsitePolicies` / `AutoplayPolicy` construct on `WebView`; `DENY` → `--autoplay-policy=user-gesture-required`. `enable_developer_extras` + `WebInspector.show()` → Edge DevTools. Media settings (`enable_media_stream` / `enable_webrtc` / `media_playback_requires_user_gesture`), `WebView.is_muted`, and `permission_request` / `query_permission_state` ([plan 3.7](docs/plans/3.7-website-policies.md)).
 - `examples/cdp-attach` (`webview2gtk-cdp-attach.exe`) for attach/fill via CDP.
 
 ## [0.4.0] - 2026-07-31

@@ -28,7 +28,7 @@ Pushing `vX.Y.Z` triggers [`.github/workflows/release.yml`](../.github/workflows
 Before releasing, the first section in `CHANGELOG.md` must look like:
 
 ```md
-## [0.4.1] - Unreleased
+## [0.4.2] - Unreleased
 ```
 
 After the tag lands, convert that section to a dated entry and add a fresh `## [Unreleased]` section for the next cycle.
