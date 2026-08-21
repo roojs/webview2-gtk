@@ -743,8 +743,6 @@ public class WebView : Gtk.Box {
 			}
 			return 1;
 		}
-		/* Host applies media_stream / webrtc deny for camera/mic when undecided. */
-		(void) permission_kind;
 		return 0;
 	}
 
