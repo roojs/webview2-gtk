@@ -105,10 +105,14 @@ How docs are built and marked up: [docs/code-documentation.md](docs/code-documen
 | `WebContext` automation allow / `automation_started` | same names; see [automation.md](docs/automation.md) |
 | `AutomationSession` / `ApplicationInfo` | same names |
 | `WEBKIT_INSPECTOR_SERVER` | honored → WebView2 CDP `--remote-debugging-port` |
+| `WebsitePolicies` / `autoplay` | construct on `WebView`; `DENY` → Chromium autoplay flag |
+| `enable_developer_extras` / `get_inspector().show()` | Edge DevTools window |
+| `enable_media_stream` / `enable_webrtc` / gesture | settings; mute + `PermissionRequested` deny on host |
+| `is_muted` / `permission_request` | mute via `ICoreWebView2_8`; WebKit-shaped permission signals |
 
 WebView2Gtk-only: `ready`. Accessibility: **`Win32Atspi`** (above), not on `WebView`.
 
-Not implemented yet: settings wiring, policy callbacks, `register_script_message_handler_with_reply`, etc. (`load_failed` and `JavaScriptResult.to_string` are implemented.)  
+Not implemented yet: full settings surface, policy callbacks, `register_script_message_handler_with_reply`, mute/WebRTC/permission APIs, etc. (`load_failed` and `JavaScriptResult.to_string` are implemented.)  
 🚫 Public `WebView` click/type APIs are intentional omissions — fill stays with an **external** driver/CDP client ([automation.md](docs/automation.md)).
 
 **Limitation:** one WebView2 host per process today (shared COM singleton).

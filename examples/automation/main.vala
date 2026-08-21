@@ -124,5 +124,17 @@ class WebViewAuto : WebView
 			)
 		);
 		this.get_settings().enable_developer_extras = true;
+		this.get_settings().enable_media_stream = false;
+		this.get_settings().enable_webrtc = false;
+		this.get_settings().media_playback_requires_user_gesture = true;
+		this.is_muted = true;
+		this.permission_request.connect((request) => {
+			request.deny();
+			return true;
+		});
+		this.query_permission_state.connect((query) => {
+			query.finish(PermissionState.DENIED);
+			return true;
+		});
 	}
 }
