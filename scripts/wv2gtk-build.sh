@@ -78,10 +78,13 @@ CAPTURE_VALA=(
 	lib/webview2gtk/ApplicationInfo.vala
 	lib/webview2gtk/AutomationSession.vala
 	lib/webview2gtk/WebContext.vala
+	lib/webview2gtk/WebsitePolicies.vala
 	lib/webview2gtk/Settings.vala
+	lib/webview2gtk/PermissionRequest.vala
 	lib/webview2gtk/JavaScriptResult.vala
 	lib/webview2gtk/UserContentManager.vala
 	lib/webview2gtk/PrintOperation.vala
+	lib/webview2gtk/WebInspector.vala
 )
 
 CC_QUIET=(
@@ -147,6 +150,7 @@ host_c_files() {
 		"${HOST}/win32-ui-webview2-script-messages.c" \
 		"${HOST}/win32-ui-webview2-downloads.c" \
 		"${HOST}/win32-ui-webview2-web-resources.c" \
+		"${HOST}/win32-ui-webview2-permissions.c" \
 		"${HOST}/win32-ui-webview2-a11y.c" \
 		"${HOST}/win32-ui-webview2-a11y-diag.c"
 }

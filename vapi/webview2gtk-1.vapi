@@ -45,6 +45,12 @@ namespace WebView2Gtk {
 		SQLITE
 	}
 
+	public enum AutoplayPolicy {
+		ALLOW,
+		ALLOW_WITHOUT_SOUND,
+		DENY
+	}
+
 	public errordomain NetworkError {
 		FAILED,
 		TRANSPORT,
@@ -102,6 +108,29 @@ namespace WebView2Gtk {
 		public signal void automation_started(AutomationSession session);
 	}
 
+	public class WebsitePolicies : GLib.Object {
+		public WebsitePolicies();
+		public AutoplayPolicy get_autoplay_policy();
+		public AutoplayPolicy autoplay { get; construct; }
+	}
+
+	public enum PermissionState {
+		GRANTED,
+		DENIED,
+		PROMPT
+	}
+
+	public interface PermissionRequest : GLib.Object {
+		public abstract void allow();
+		public abstract void deny();
+	}
+
+	public class PermissionStateQuery : GLib.Object {
+		public PermissionStateQuery(string name);
+		public void finish(PermissionState state);
+		public unowned string get_name();
+	}
+
 	public class URIRequest : GLib.Object {
 		public string uri { get; }
 		public URIRequest(string uri);
@@ -133,6 +162,15 @@ namespace WebView2Gtk {
 		public string user_agent { get; set; }
 		public HardwareAccelerationPolicy hardware_acceleration_policy { get; set; }
 		public bool enable_javascript { get; set; }
+		public bool enable_developer_extras { get; set; }
+		public bool enable_media_stream { get; set; }
+		public bool enable_webrtc { get; set; }
+		public bool media_playback_requires_user_gesture { get; set; }
+	}
+
+	public class WebInspector : GLib.Object {
+		public void show();
+		public void close();
 	}
 
 	public class JavaScriptResult : GLib.Object {
@@ -164,6 +202,8 @@ namespace WebView2Gtk {
 		public WebContext web_context { owned get; construct; }
 		public NetworkSession network_session { get; construct; }
 		public bool is_controlled_by_automation { get; construct; }
+		public WebsitePolicies website_policies { get; construct; }
+		public bool is_muted { get; set; }
 		public signal void load_changed(LoadEvent load_event);
 		public signal void main_document_response(
 			uint status,
@@ -174,6 +214,8 @@ namespace WebView2Gtk {
 			URIRequest request
 		);
 		public signal bool load_failed(LoadEvent load_event, string failing_uri, GLib.Error error);
+		public signal bool permission_request(PermissionRequest permission_request);
+		public signal bool query_permission_state(PermissionStateQuery query);
 		public bool can_go_back();
 		public bool can_go_forward();
 		public unowned string get_uri();
@@ -194,6 +236,7 @@ namespace WebView2Gtk {
 		public bool ready { get; }
 		public new WebViewSettings get_settings();
 		public unowned UserContentManager get_user_content_manager();
+		public unowned WebInspector get_inspector();
 		public Download download_uri(string uri);
 		public async Gdk.Texture get_snapshot(
 			SnapshotRegion region,

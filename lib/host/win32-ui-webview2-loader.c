@@ -65,7 +65,7 @@ HRESULT vala_webview2_loader_create_environment (
 		return E_FAIL;
 	}
 
-	/* Honor WEBKIT_INSPECTOR_SERVER → --remote-debugging-port (CDP attach). */
+	/* Honor WEBKIT_INSPECTOR_SERVER / autoplay DENY → AdditionalBrowserArguments. */
 	options = vala_webview2_host_create_environment_options ();
 	hr = g_create_env_with_options (NULL, NULL, options, handler);
 	if (options != NULL) {

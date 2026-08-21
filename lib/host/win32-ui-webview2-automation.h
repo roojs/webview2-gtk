@@ -16,9 +16,13 @@ extern "C" {
 void vala_webview2_host_set_automation_allowed (bool allowed);
 bool vala_webview2_host_get_automation_allowed (void);
 
+/* 0=ALLOW, 1=ALLOW_WITHOUT_SOUND, 2=DENY — match AutoplayPolicy */
+void vala_webview2_host_set_autoplay_policy (int policy);
+
 /*
- * Build ICoreWebView2EnvironmentOptions when WEBKIT_INSPECTOR_SERVER is set.
- * Caller must Release the result. Returns NULL when no remote-debugging args.
+ * Build ICoreWebView2EnvironmentOptions when WEBKIT_INSPECTOR_SERVER is set
+ * and/or autoplay DENY needs --autoplay-policy=. Caller must Release.
+ * Returns NULL when no additional browser args are needed.
  */
 struct ICoreWebView2EnvironmentOptions *
 vala_webview2_host_create_environment_options (void);

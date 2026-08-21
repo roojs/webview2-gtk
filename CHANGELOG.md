@@ -6,7 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.4.1] - Unreleased
+## [0.4.2] - Unreleased
+
+### Added
+
+- `WebsitePolicies` / `AutoplayPolicy` construct on `WebView` (`DENY` maps to `--autoplay-policy=user-gesture-required`) ([plan 3.7](docs/plans/3.7-website-policies.md)).
+- `WebViewSettings.enable_developer_extras` and `WebInspector.show()` open the Edge DevTools window.
+- Media settings on `WebViewSettings`: `enable_media_stream`, `enable_webrtc`, and `media_playback_requires_user_gesture`.
+- `WebView.is_muted` (honoured via WebView2 mute).
+- `permission_request` / `query_permission_state` with WebKitGTK-shaped `PermissionRequest` / `PermissionStateQuery` (host denies via `PermissionRequested` when unhandled or media is disabled).
+
+## [0.4.1] - 2026-08-19
 
 ### Added
 

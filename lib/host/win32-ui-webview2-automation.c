@@ -12,6 +12,8 @@
 #include "win32-ui-webview2-sdk.h"
 
 static BOOL g_automation_allowed = FALSE;
+/* 0=ALLOW, 1=ALLOW_WITHOUT_SOUND, 2=DENY — match WebView2Gtk.AutoplayPolicy */
+static int g_autoplay_policy = 0;
 
 void
 vala_webview2_host_set_automation_allowed (bool allowed)
@@ -23,6 +25,12 @@ bool
 vala_webview2_host_get_automation_allowed (void)
 {
 	return g_automation_allowed ? true : false;
+}
+
+void
+vala_webview2_host_set_autoplay_policy (int policy)
+{
+	g_autoplay_policy = policy;
 }
 
 /* --- ICoreWebView2EnvironmentOptions (minimal C implementation) --- */
@@ -249,10 +257,13 @@ vala_webview2_host_create_environment_options (void)
 {
 	unsigned port;
 	EnvOptions *opt;
-	wchar_t args[128];
+	wchar_t args[256];
+	size_t used = 0;
+	BOOL need_deny;
 
 	port = parse_inspector_port ();
-	if (port == 0) {
+	need_deny = (g_autoplay_policy == 2); /* DENY */
+	if (port == 0 && !need_deny) {
 		return NULL;
 	}
 
@@ -261,27 +272,49 @@ vala_webview2_host_create_environment_options (void)
 		return NULL;
 	}
 
-	/*
-	 * WebKit twin: WEBKIT_INSPECTOR_SERVER host:port → CDP listen.
-	 * --remote-allow-origins=* required for modern Chromium CDP clients.
-	 */
-	_snwprintf (
-		args,
-		sizeof (args) / sizeof (args[0]),
-		L"--remote-debugging-port=%u --remote-allow-origins=*",
-		port
-	);
-	args[(sizeof (args) / sizeof (args[0])) - 1] = L'\0';
+	args[0] = L'\0';
+	if (port != 0) {
+		/*
+		 * WebKit twin: WEBKIT_INSPECTOR_SERVER host:port → CDP listen.
+		 * --remote-allow-origins=* required for modern Chromium CDP clients.
+		 */
+		used = (size_t) _snwprintf (
+			args,
+			sizeof (args) / sizeof (args[0]),
+			L"--remote-debugging-port=%u --remote-allow-origins=*",
+			port
+		);
+		if (used >= sizeof (args) / sizeof (args[0])) {
+			used = (sizeof (args) / sizeof (args[0])) - 1;
+		}
+		args[used] = L'\0';
+		fprintf (
+			stderr,
+			"webview2gtk: automation CDP listen --remote-debugging-port=%u (from WEBKIT_INSPECTOR_SERVER)\n",
+			port
+		);
+	}
+	if (need_deny) {
+		if (used > 0 && used + 1 < sizeof (args) / sizeof (args[0])) {
+			args[used++] = L' ';
+			args[used] = L'\0';
+		}
+		_snwprintf (
+			args + used,
+			(sizeof (args) / sizeof (args[0])) - used,
+			L"--autoplay-policy=user-gesture-required"
+		);
+		args[(sizeof (args) / sizeof (args[0])) - 1] = L'\0';
+		fprintf (
+			stderr,
+			"webview2gtk: autoplay DENY (--autoplay-policy=user-gesture-required)\n"
+		);
+	}
 
 	if (FAILED (envopt_put_args (&opt->iface, args))) {
 		ICoreWebView2EnvironmentOptions_Release (&opt->iface);
 		return NULL;
 	}
 
-	fprintf (
-		stderr,
-		"webview2gtk: automation CDP listen --remote-debugging-port=%u (from WEBKIT_INSPECTOR_SERVER)\n",
-		port
-	);
 	return &opt->iface;
 }

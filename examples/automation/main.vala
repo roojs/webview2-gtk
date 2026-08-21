@@ -1,9 +1,9 @@
-/* Automation setup smoke — WebKitGTK-shaped APIs on WebView2Gtk(plan 3.0 / 3.2).
+/* Automation setup smoke — WebKitGTK-shaped APIs on WebView2Gtk (plan 3.0 / 3.2).
  *
- * Port of Snappr tests/automation-browser(setup only: no WebDriver, no click/type).
+ * Setup only: no WebDriver, no click/type.
  *
- *   --inspector-port <n>   (default 19222; also SNAPPR_INSPECTOR_PORT)
- *   --smoke               quit shortly after start(remote CI)
+ *   --inspector-port <n>   (default 19222; also WV2GTK_INSPECTOR_PORT)
+ *   --smoke               quit shortly after start (remote CI)
  */
 
 using Gtk;
@@ -12,7 +12,7 @@ using WebView2Gtk;
 public static int main(string[] args) {
 	var insp = (uint16) 19222;
 	var smoke = false;
-	var env_port = Environment.get_variable("SNAPPR_INSPECTOR_PORT");
+	var env_port = Environment.get_variable("WV2GTK_INSPECTOR_PORT");
 	if (env_port != null && env_port != "") {
 		insp = (uint16) int.parse(env_port);
 	}
@@ -117,7 +117,24 @@ class WebViewAuto : WebView
 			vexpand: true,
 			web_context: context,
 			is_controlled_by_automation: true,
-			network_session: session
+			network_session: session,
+			website_policies: (WebsitePolicies) Object.new(
+				typeof(WebsitePolicies),
+				"autoplay", AutoplayPolicy.DENY
+			)
 		);
+		this.get_settings().enable_developer_extras = true;
+		this.get_settings().enable_media_stream = false;
+		this.get_settings().enable_webrtc = false;
+		this.get_settings().media_playback_requires_user_gesture = true;
+		this.is_muted = true;
+		this.permission_request.connect((request) => {
+			request.deny();
+			return true;
+		});
+		this.query_permission_state.connect((query) => {
+			query.finish(PermissionState.DENIED);
+			return true;
+		});
 	}
 }
