@@ -13,9 +13,6 @@ public static int main(string[] args) {
 	var insp = (uint16) 19222;
 	var smoke = false;
 	var env_port = Environment.get_variable("WV2GTK_INSPECTOR_PORT");
-	if (env_port == null || env_port == "") {
-		env_port = Environment.get_variable("SNAPPR_INSPECTOR_PORT");
-	}
 	if (env_port != null && env_port != "") {
 		insp = (uint16) int.parse(env_port);
 	}
