@@ -36,6 +36,7 @@ valadoc_docs = custom_target(
     '../lib/webview2gtk/WebContext.vala',
     '../lib/webview2gtk/WebsitePolicies.vala',
     '../lib/webview2gtk/Settings.vala',
+    '../lib/webview2gtk/PermissionRequest.vala',
     '../lib/webview2gtk/JavaScriptResult.vala',
     '../lib/webview2gtk/UserContentManager.vala',
     '../lib/webview2gtk/PrintOperation.vala',

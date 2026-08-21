@@ -255,6 +255,7 @@ public void destroy() {
 		script_messages_unregister(host_webview_com());
 		downloads_unregister(host_webview_com());
 		web_resources_unregister(host_webview_com());
+		permissions_unregister(host_webview_com());
 		events_unregister(host_webview_com());
 	}
 	com_release_host();
@@ -279,6 +280,9 @@ extern void downloads_register(ICoreWebView2 webview);
 [CCode(cheader_filename = "win32-ui-webview2-web-resources.h", cname = "vala_webview2_web_resources_register")]
 extern void web_resources_register(ICoreWebView2 webview);
 
+[CCode(cheader_filename = "win32-ui-webview2-permissions.h", cname = "vala_webview2_permissions_register")]
+extern void permissions_register(ICoreWebView2 webview);
+
 [CCode(cheader_filename = "win32-ui-webview2-a11y-diag.h", cname = "vala_webview2_a11y_diag_register")]
 extern void a11y_diag_register(ICoreWebView2 webview);
 
@@ -293,6 +297,9 @@ extern void downloads_unregister(ICoreWebView2 webview);
 
 [CCode(cheader_filename = "win32-ui-webview2-web-resources.h", cname = "vala_webview2_web_resources_unregister")]
 extern void web_resources_unregister(ICoreWebView2 webview);
+
+[CCode(cheader_filename = "win32-ui-webview2-permissions.h", cname = "vala_webview2_permissions_unregister")]
+extern void permissions_unregister(ICoreWebView2 webview);
 
 [CCode(cname = "vala_webview2_host_is_ready")]
 public bool is_ready() {
