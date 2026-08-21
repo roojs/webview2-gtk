@@ -117,7 +117,12 @@ class WebViewAuto : WebView
 			vexpand: true,
 			web_context: context,
 			is_controlled_by_automation: true,
-			network_session: session
+			network_session: session,
+			website_policies: (WebsitePolicies) Object.new(
+				typeof(WebsitePolicies),
+				"autoplay", AutoplayPolicy.DENY
+			)
 		);
+		this.get_settings().enable_developer_extras = true;
 	}
 }
