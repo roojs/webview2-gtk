@@ -98,7 +98,9 @@ perm_invoke (
 	ICoreWebView2PermissionRequestedEventArgs_get_PermissionKind (args, &kind);
 
 	if (g_decide_cb != NULL) {
-		decided = g_decide_cb ((int) kind, &allow, g_decide_ctx);
+		int allow_i = 0;
+		decided = g_decide_cb ((int) kind, &allow_i, g_decide_ctx);
+		allow = allow_i ? TRUE : FALSE;
 	}
 
 	if (!decided) {

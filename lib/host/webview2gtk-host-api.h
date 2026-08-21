@@ -175,6 +175,31 @@ bool vala_webview2_host_a11y_key_vk (unsigned short vk);
 void vala_webview2_host_set_automation_allowed (bool allowed);
 bool vala_webview2_host_get_automation_allowed (void);
 
+/* 0=ALLOW, 1=ALLOW_WITHOUT_SOUND, 2=DENY — match AutoplayPolicy */
+void vala_webview2_host_set_autoplay_policy (int policy);
+
+bool vala_webview2_host_open_dev_tools_window (void);
+
+/* Media / mute / PermissionRequested (plan 3.7 §9). */
+void vala_webview2_host_set_media_flags (bool enable_media_stream, bool enable_webrtc);
+bool vala_webview2_host_set_is_muted (bool muted);
+bool vala_webview2_host_get_is_muted (void);
+
+/*
+ * Decide callback: return non-zero if the app handled the request.
+ * When handled, *allow_out is 1=allow / 0=deny.
+ * permission_kind matches COREWEBVIEW2_PERMISSION_KIND.
+ */
+typedef int (*WebView2GtkPermissionDecideCb) (
+	int permission_kind,
+	int *allow_out,
+	void *user_data
+);
+void vala_webview2_host_set_permission_handler (
+	WebView2GtkPermissionDecideCb decide,
+	void *user_data
+);
+
 #ifdef __cplusplus
 }
 #endif

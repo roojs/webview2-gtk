@@ -168,6 +168,7 @@ public void finish_setup(
 	script_messages_register(host_webview_com());
 	downloads_register(host_webview_com());
 	web_resources_register(host_webview_com());
+	permissions_register(host_webview_com());
 	/* A11y Invoke diagnostics — off in general builds.
 	 * To enable: set WEBVIEW2GTK_A11Y_DIAG_COMPILE to 1 in
 	 * win32-ui-webview2-a11y-diag.h, uncomment the next line, rebuild,
