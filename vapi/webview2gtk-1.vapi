@@ -254,6 +254,7 @@ namespace WebView2Gtk {
 }
 
 /* Win32 AT-SPI facade — see docs/a11y.md */
+[CCode(cheader_filename = "webview2gtk.h")]
 namespace Win32Atspi {
 	public enum CoordType { SCREEN, WINDOW, PARENT }
 	public enum ScrollType { TOP_EDGE, BOTTOM_EDGE, LEFT_EDGE, RIGHT_EDGE, ANYWHERE }

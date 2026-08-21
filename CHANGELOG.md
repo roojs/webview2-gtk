@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WebView.is_muted` (honoured via WebView2 mute).
 - `permission_request` / `query_permission_state` with WebKitGTK-shaped `PermissionRequest` / `PermissionStateQuery` (host denies via `PermissionRequested` when unhandled or media is disabled).
 
+### Fixed
+
+- Installed `webview2gtk-1.vapi`: `Win32Atspi` now has `cheader_filename = "webview2gtk.h"`, so consumer `.vala` that only uses a11y emits `#include <webview2gtk.h>` and links without needing `WebView` in the same file ([bug](docs/bugs/2026-08-21-win32atspi-vapi-missing-cheader.md)).
+
 ## [0.4.1] - 2026-08-19
 
 ### Added
