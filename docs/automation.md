@@ -60,7 +60,7 @@ Environment.set_variable("WEBKIT_INSPECTOR_SERVER", "127.0.0.1:19222", true);
 
 `web_context`, `is_controlled_by_automation`, `network_session`, and `website_policies` are construct-only (webkitgtk-6.0). Set them in a subclass `Object(…)` chain-up (see `WebViewAuto` in `examples/automation/`). There is no `set_controlled_by_automation`.
 
-Also shared: `get_settings().enable_developer_extras` and `get_inspector().show()` (opens Edge DevTools when extras are enabled).
+Also shared: `get_settings().enable_developer_extras` and `get_inspector().show()` (opens Edge DevTools when extras are enabled). Media settings, `is_muted`, and `permission_request` / `query_permission_state` match WebKitGTK shapes (mute + `PermissionRequested` on the host).
 
 ## Demo and smokes
 
