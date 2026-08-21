@@ -8,6 +8,7 @@ public class WebViewSettings : Object {
 		default = HardwareAccelerationPolicy.ON_DEMAND;
 	}
 	public bool enable_javascript { get; set; default = true; }
+	public bool enable_developer_extras { get; set; default = false; }
 }
 
 }

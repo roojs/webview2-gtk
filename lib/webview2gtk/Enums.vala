@@ -37,6 +37,13 @@ public enum CookiePersistentStorage {
 	SQLITE
 }
 
+/** WebKitGTK-shaped — media autoplay policy for {@link WebsitePolicies}. */
+public enum AutoplayPolicy {
+	ALLOW,
+	ALLOW_WITHOUT_SOUND,
+	DENY
+}
+
 /** WebKitGTK-shaped subset — used by {@link WebView.load_failed}. */
 public errordomain NetworkError {
 	FAILED,
