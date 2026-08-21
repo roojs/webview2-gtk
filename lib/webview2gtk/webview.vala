@@ -55,6 +55,24 @@ extern bool wv2_host_put_zoom_factor(double zoom);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_put_is_visible")]
 extern bool wv2_host_put_is_visible(bool visible);
 
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_autoplay_policy")]
+extern void wv2_host_set_autoplay_policy(int policy);
+
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_open_dev_tools_window")]
+extern bool wv2_host_open_dev_tools_window();
+
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_media_flags")]
+extern void wv2_host_set_media_flags(bool enable_media_stream, bool enable_webrtc);
+
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_is_muted")]
+extern bool wv2_host_set_is_muted(bool muted);
+
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_get_is_muted")]
+extern bool wv2_host_get_is_muted();
+
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_permission_handler")]
+extern void wv2_host_set_permission_handler(void* decide, void* user_data);
+
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_event_handlers")]
 extern void wv2_host_set_event_handlers(
 	void* navigation_starting,
@@ -111,6 +129,8 @@ public class WebView : Gtk.Box {
 	private WebViewSettings capture_settings = new WebViewSettings();
 	private UserContentManager user_content_manager = new UserContentManager();
 	private Gee.HashMap<int, WebResource> resources = new Gee.HashMap<int, WebResource> ();
+	private WebInspector? inspector = null;
+	private bool muted = false;
 
 	/** WebKitGTK-shaped — context for this view. */
 	public WebContext web_context { owned get; construct; }
@@ -121,6 +141,23 @@ public class WebView : Gtk.Box {
 	/** WebKitGTK-shaped — this view is owned by an automation session. */
 	public bool is_controlled_by_automation { get; construct; }
 
+	/** WebKitGTK-shaped — website policies (autoplay, …). */
+	public WebsitePolicies website_policies { get; construct; }
+
+	/** WebKitGTK-shaped — mute page audio. */
+	public bool is_muted {
+		get {
+			if (attached && wv2_host_is_ready()) {
+				muted = wv2_host_get_is_muted();
+			}
+			return muted;
+		}
+		set {
+			muted = value;
+			wv2_host_set_is_muted(value);
+		}
+	}
+
 	construct {
 		if (this.web_context == null) {
 			this.web_context = WebContext.get_default();
@@ -128,6 +165,10 @@ public class WebView : Gtk.Box {
 		if (this.network_session == null) {
 			this.network_session = new NetworkSession();
 		}
+		if (this.website_policies == null) {
+			this.website_policies = new WebsitePolicies();
+		}
+		wv2_host_set_autoplay_policy((int) this.website_policies.autoplay);
 		if (this.is_controlled_by_automation) {
 			this.web_context.register_controlled_webview(this);
 		}
@@ -165,6 +206,9 @@ public class WebView : Gtk.Box {
 		this.unmap.connect(() => {
 			this.sync_host_visible();
 		});
+
+		this.capture_settings.notify.connect(on_settings_notify);
+		this.push_media_settings(false);
 	}
 
 	public signal void load_changed(LoadEvent load_event);
@@ -193,6 +237,12 @@ public class WebView : Gtk.Box {
 		GLib.Error error
 	);
 
+	/** WebKitGTK-shaped — permission prompt; return true if handled. */
+	public signal bool permission_request(PermissionRequest permission_request);
+
+	/** WebKitGTK-shaped — permission-state query (API parity; host may never emit). */
+	public signal bool query_permission_state(PermissionStateQuery query);
+
 	protected override void size_allocate(int width, int height, int baseline) {
 		base.size_allocate(width, height, baseline);
 		if (!attached) {
@@ -204,6 +254,7 @@ public class WebView : Gtk.Box {
 
 	~WebView() {
 		if (attached) {
+			wv2_host_set_permission_handler(null, null);
 			wv2_host_set_script_message_handler(null, null);
 			user_content_manager.unbind_host();
 			wv2_host_set_resource_handlers(null, null, null, null);
@@ -310,6 +361,21 @@ public class WebView : Gtk.Box {
 	/** WebKitGTK-shaped — manager for script message handlers. */
 	public unowned UserContentManager get_user_content_manager() {
 		return user_content_manager;
+	}
+
+	/** WebKitGTK-shaped — page inspector (DevTools). */
+	public unowned WebInspector get_inspector() {
+		if (this.inspector == null) {
+			this.inspector = new WebInspector(this);
+		}
+		return this.inspector;
+	}
+
+	internal void open_devtools_window() {
+		if (!attached || !wv2_host_is_ready()) {
+			return;
+		}
+		wv2_host_open_dev_tools_window();
 	}
 
 	/**
@@ -513,6 +579,12 @@ public class WebView : Gtk.Box {
 		}
 		attached = true;
 		Win32Atspi.register_webview(this);
+		this.push_media_settings(false);
+		wv2_host_set_is_muted(this.muted);
+		wv2_host_set_permission_handler(
+			(void*) on_permission_decide_cb,
+			this
+		);
 		wv2_host_set_document_response_handler(
 			(void*) on_document_response_cb,
 			this
@@ -630,6 +702,48 @@ public class WebView : Gtk.Box {
 		if (resources.unset(id, out resource)) {
 			resource.emit_failed(new NetworkError.FAILED("%s", message));
 		}
+	}
+
+	private void on_settings_notify(ParamSpec pspec) {
+		switch (pspec.name) {
+		case "enable-media-stream":
+		case "enable-webrtc":
+			this.push_media_settings(false);
+			break;
+		case "media-playback-requires-user-gesture":
+			this.push_media_settings(true);
+			break;
+		}
+	}
+
+	private void push_media_settings(bool from_gesture_prop) {
+		var s = this.capture_settings;
+		wv2_host_set_media_flags(s.enable_media_stream, s.enable_webrtc);
+		if (s.media_playback_requires_user_gesture) {
+			if (from_gesture_prop && attached && wv2_host_is_ready()) {
+				warning(
+					"WebView2Gtk: media_playback_requires_user_gesture after env create — stored only; restart required for Chromium autoplay flag"
+				);
+			}
+			wv2_host_set_autoplay_policy((int) AutoplayPolicy.DENY);
+		}
+	}
+
+	[CCode(has_target = false)]
+	private static int on_permission_decide_cb(
+		int permission_kind,
+		int* allow_out,
+		void* user_data
+	) {
+		var view = (WebView) user_data;
+		var req = new SimplePermissionRequest();
+		if (view.permission_request(req) && req.decided) {
+			if (allow_out != null) {
+				*allow_out = req.allowed ? 1 : 0;
+			}
+			return 1;
+		}
+		return 0;
 	}
 
 	[CCode(has_target = false)]
