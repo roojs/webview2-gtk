@@ -1,12 +1,14 @@
 namespace WebView2Gtk {
 
 public class PrintOperation : Object {
+	private weak WebView? web_view;
 	private Gtk.PrintSettings? print_settings;
 
 	public signal void finished();
 	public signal void failed(GLib.Error error);
 
 	public PrintOperation(WebView web_view) {
+		this.web_view = web_view;
 	}
 
 	public void set_page_setup(Gtk.PageSetup page_setup) {
@@ -22,9 +24,14 @@ public class PrintOperation : Object {
 			failed(new GLib.IOError.FAILED("Missing PDF output path"));
 			return;
 		}
+		var host = this.web_view != null ? this.web_view.get_host_handle() : null;
+		if (host == null) {
+			failed(new GLib.IOError.FAILED("WebView host not ready"));
+			return;
+		}
 		/* PrintToPdf COM on GTK/UI thread; defer signals so async capture does not resume inside sync_await. */
 		GLib.Idle.add(() => {
-			var ok = wv2_print_to_pdf_sync(output_path);
+			var ok = wv2_print_to_pdf_sync(host, output_path);
 			GLib.Idle.add(() => {
 				if (ok) {
 					finished();

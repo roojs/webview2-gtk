@@ -190,14 +190,14 @@ static HRESULT STDMETHODCALLTYPE cookies_invoke (
 }
 
 static ICoreWebView2CookieManager *
-cookie_manager_from_webview (void)
+cookie_manager_from_host (WebView2Host *host)
 {
 	ICoreWebView2 *webview;
 	ICoreWebView2_2 *webview2 = NULL;
 	ICoreWebView2CookieManager *manager = NULL;
 	HRESULT hr;
 
-	webview = vala_webview2_com_get_webview ();
+	webview = vala_webview2_com_get_webview_for (host);
 	if (webview == NULL) {
 		return NULL;
 	}
@@ -216,6 +216,7 @@ cookie_manager_from_webview (void)
 
 bool
 vala_webview2_host_add_cookie_sync (
+	WebView2Host *host,
 	const char *name_utf8,
 	const char *value_utf8,
 	const char *domain_utf8,
@@ -245,7 +246,7 @@ vala_webview2_host_add_cookie_sync (
 		path = "/";
 	}
 
-	manager = cookie_manager_from_webview ();
+	manager = cookie_manager_from_host (host);
 	if (manager == NULL) {
 		return false;
 	}
@@ -289,7 +290,7 @@ out:
 }
 
 bool
-vala_webview2_host_get_cookies_sync (const char *uri_utf8, char **cookies_text_out)
+vala_webview2_host_get_cookies_sync (WebView2Host *host, const char *uri_utf8, char **cookies_text_out)
 {
 	ICoreWebView2CookieManager *manager = NULL;
 	uint16_t *uri_wide = NULL;
@@ -303,7 +304,7 @@ vala_webview2_host_get_cookies_sync (const char *uri_utf8, char **cookies_text_o
 	if (uri_utf8 == NULL || uri_utf8[0] == '\0') {
 		return false;
 	}
-	manager = cookie_manager_from_webview ();
+	manager = cookie_manager_from_host (host);
 	if (manager == NULL) {
 		return false;
 	}

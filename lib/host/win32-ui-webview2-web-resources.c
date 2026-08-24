@@ -1,4 +1,4 @@
-/* Resource load lifecycle — WebResourceRequested + WebResourceResponseReceived. */
+/* Resource load lifecycle — per WebView2Host (plan 4.3). */
 
 #define COBJMACROS
 #define WIN32_LEAN_AND_MEAN
@@ -12,48 +12,32 @@
 
 #include "webview2gtk-host-api.h"
 #include "win32-ui-webview2-web-resources.h"
+#include "win32-ui-webview2-host-priv.h"
 #include "win32-ui-webview2-com-glue.h"
 #include "win32-ui-webview2-sdk.h"
-
-#define MAX_PENDING 512
-
-typedef struct {
-	int id;
-	char *uri;
-} PendingResource;
 
 typedef struct {
 	ICoreWebView2WebResourceRequestedEventHandler iface;
 	ICoreWebView2WebResourceRequestedEventHandlerVtbl vtbl;
 	LONG ref_count;
+	WebView2Host *host;
 } RequestedHandler;
 
 typedef struct {
 	ICoreWebView2WebResourceResponseReceivedEventHandler iface;
 	ICoreWebView2WebResourceResponseReceivedEventHandlerVtbl vtbl;
 	LONG ref_count;
+	WebView2Host *host;
 } ResponseHandler;
 
 /* Idle payload: uri non-NULL => started; uri NULL => finished. */
 typedef struct {
+	WebView2Host *host;
 	int id;
 	char *uri;
 } ResourceIdle;
 
-static PendingResource g_pending[MAX_PENDING];
 static volatile LONG g_next_id = 1;
-static EventRegistrationToken g_requested_token;
-static EventRegistrationToken g_response_token;
-static BOOL g_requested_registered;
-static BOOL g_response_registered;
-static BOOL g_filter_added;
-static RequestedHandler *g_requested_handler;
-static ResponseHandler *g_response_handler;
-
-static WebView2GtkResourceStartedCb g_started_cb;
-static WebView2GtkResourceFinishedCb g_finished_cb;
-static WebView2GtkResourceFailedCb g_failed_cb;
-static void *g_cb_ctx;
 
 static char *
 request_uri_utf8 (ICoreWebView2WebResourceRequest *request)
@@ -78,14 +62,19 @@ static gboolean
 resource_idle_cb (gpointer data)
 {
 	ResourceIdle *job = (ResourceIdle *) data;
+	WebView2Host *host = job->host;
 
-	if (job->uri != NULL) {
-		if (g_started_cb != NULL) {
-			g_started_cb (job->id, job->uri, g_cb_ctx);
+	if (host != NULL) {
+		if (job->uri != NULL) {
+			if (host->cb_res_started != NULL) {
+				host->cb_res_started (job->id, job->uri, host->res_ctx);
+			}
+			free (job->uri);
+		} else if (host->cb_res_finished != NULL) {
+			host->cb_res_finished (job->id, host->res_ctx);
 		}
+	} else {
 		free (job->uri);
-	} else if (g_finished_cb != NULL) {
-		g_finished_cb (job->id, g_cb_ctx);
 	}
 	g_free (job);
 	return G_SOURCE_REMOVE;
@@ -129,15 +118,16 @@ static HRESULT STDMETHODCALLTYPE requested_invoke (
 	ICoreWebView2 *sender,
 	ICoreWebView2WebResourceRequestedEventArgs *args)
 {
+	RequestedHandler *self = (RequestedHandler *) This;
+	WebView2Host *host = self->host;
 	ICoreWebView2WebResourceRequest *request = NULL;
 	char *uri = NULL;
 	int slot = -1;
 	int i;
 	int id;
 
-	(void) This;
 	(void) sender;
-	if (args == NULL || g_started_cb == NULL) {
+	if (args == NULL || host == NULL || host->cb_res_started == NULL) {
 		return S_OK;
 	}
 	if (FAILED (ICoreWebView2WebResourceRequestedEventArgs_get_Request (
@@ -151,8 +141,8 @@ static HRESULT STDMETHODCALLTYPE requested_invoke (
 		free (uri);
 		return S_OK;
 	}
-	for (i = 0; i < MAX_PENDING; i++) {
-		if (g_pending[i].uri == NULL) {
+	for (i = 0; i < WV2_MAX_PENDING_RESOURCES; i++) {
+		if (host->pending_resources[i].uri == NULL) {
 			slot = i;
 			break;
 		}
@@ -162,15 +152,15 @@ static HRESULT STDMETHODCALLTYPE requested_invoke (
 		return S_OK;
 	}
 	id = (int) InterlockedIncrement (&g_next_id);
-	g_pending[slot].id = id;
-	g_pending[slot].uri = strdup (uri);
+	host->pending_resources[slot].id = id;
+	host->pending_resources[slot].uri = strdup (uri);
 	{
 		ResourceIdle *job = g_new0 (ResourceIdle, 1);
+		job->host = host;
 		job->id = id;
 		job->uri = uri; /* ownership → idle */
 		g_idle_add (resource_idle_cb, job);
 	}
-	/* No custom response / deferral — request continues normally. */
 	return S_OK;
 }
 
@@ -212,14 +202,15 @@ static HRESULT STDMETHODCALLTYPE response_invoke (
 	ICoreWebView2 *sender,
 	ICoreWebView2WebResourceResponseReceivedEventArgs *args)
 {
+	ResponseHandler *self = (ResponseHandler *) This;
+	WebView2Host *host = self->host;
 	ICoreWebView2WebResourceRequest *request = NULL;
 	char *uri = NULL;
 	int i;
 	int id;
 
-	(void) This;
 	(void) sender;
-	if (args == NULL || g_finished_cb == NULL) {
+	if (args == NULL || host == NULL || host->cb_res_finished == NULL) {
 		return S_OK;
 	}
 	if (FAILED (ICoreWebView2WebResourceResponseReceivedEventArgs_get_Request (
@@ -232,17 +223,19 @@ static HRESULT STDMETHODCALLTYPE response_invoke (
 	if (uri == NULL) {
 		return S_OK;
 	}
-	for (i = 0; i < MAX_PENDING; i++) {
-		if (g_pending[i].uri == NULL || strcmp (g_pending[i].uri, uri) != 0) {
+	for (i = 0; i < WV2_MAX_PENDING_RESOURCES; i++) {
+		if (host->pending_resources[i].uri == NULL
+		    || strcmp (host->pending_resources[i].uri, uri) != 0) {
 			continue;
 		}
-		id = g_pending[i].id;
-		free (g_pending[i].uri);
-		g_pending[i].uri = NULL;
-		g_pending[i].id = 0;
+		id = host->pending_resources[i].id;
+		free (host->pending_resources[i].uri);
+		host->pending_resources[i].uri = NULL;
+		host->pending_resources[i].id = 0;
 		free (uri);
 		{
 			ResourceIdle *job = g_new0 (ResourceIdle, 1);
+			job->host = host;
 			job->id = id;
 			g_idle_add (resource_idle_cb, job);
 		}
@@ -254,29 +247,35 @@ static HRESULT STDMETHODCALLTYPE response_invoke (
 
 void
 vala_webview2_host_set_resource_handlers (
+	WebView2Host *host,
 	WebView2GtkResourceStartedCb started,
 	WebView2GtkResourceFinishedCb finished,
 	WebView2GtkResourceFailedCb failed,
 	void *user_data)
 {
-	g_started_cb = started;
-	g_finished_cb = finished;
-	g_failed_cb = failed;
-	g_cb_ctx = user_data;
+	if (host == NULL) {
+		return;
+	}
+	host->cb_res_started = started;
+	host->cb_res_finished = finished;
+	host->cb_res_failed = failed;
+	host->res_ctx = user_data;
 }
 
 void
-vala_webview2_web_resources_register (ICoreWebView2 *webview)
+vala_webview2_web_resources_register_host (WebView2Host *host)
 {
+	ICoreWebView2 *webview;
 	HRESULT hr;
 	ICoreWebView2_2 *webview2 = NULL;
 	static const WCHAR filter_uri[] = L"*";
 
-	if (webview == NULL) {
+	if (host == NULL || host->webview == NULL || host->resources_registered) {
 		return;
 	}
+	webview = host->webview;
 
-	if (!g_filter_added) {
+	if (!host->resource_filter_added) {
 		hr = ICoreWebView2_AddWebResourceRequestedFilter (
 			webview, filter_uri, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
 		if (FAILED (hr)) {
@@ -285,31 +284,32 @@ vala_webview2_web_resources_register (ICoreWebView2 *webview)
 			         (unsigned long) hr);
 			return;
 		}
-		g_filter_added = TRUE;
+		host->resource_filter_added = TRUE;
 	}
 
-	if (!g_requested_registered) {
-		g_requested_handler = (RequestedHandler *) CoTaskMemAlloc (
+	{
+		RequestedHandler *handler = (RequestedHandler *) CoTaskMemAlloc (
 			sizeof (RequestedHandler));
-		if (g_requested_handler != NULL) {
-			ZeroMemory (g_requested_handler, sizeof (*g_requested_handler));
-			g_requested_handler->iface.lpVtbl = &g_requested_handler->vtbl;
-			g_requested_handler->vtbl.QueryInterface = requested_qi;
-			g_requested_handler->vtbl.AddRef = requested_addref;
-			g_requested_handler->vtbl.Release = requested_release;
-			g_requested_handler->vtbl.Invoke = requested_invoke;
-			g_requested_handler->ref_count = 1;
+		if (handler != NULL) {
+			ZeroMemory (handler, sizeof (*handler));
+			handler->iface.lpVtbl = &handler->vtbl;
+			handler->vtbl.QueryInterface = requested_qi;
+			handler->vtbl.AddRef = requested_addref;
+			handler->vtbl.Release = requested_release;
+			handler->vtbl.Invoke = requested_invoke;
+			handler->ref_count = 1;
+			handler->host = host;
 			hr = ICoreWebView2_add_WebResourceRequested (
-				webview, &g_requested_handler->iface, &g_requested_token);
-			if (SUCCEEDED (hr)) {
-				g_requested_registered = TRUE;
-			} else {
+				webview, &handler->iface, &host->tok_resource_requested);
+			if (FAILED (hr)) {
 				fprintf (stderr,
 				         "WebView2 add_WebResourceRequested failed: 0x%08lx\n",
 				         (unsigned long) hr);
 				ICoreWebView2WebResourceRequestedEventHandler_Release (
-					&g_requested_handler->iface);
-				g_requested_handler = NULL;
+					&handler->iface);
+			} else {
+				ICoreWebView2WebResourceRequestedEventHandler_Release (
+					&handler->iface);
 			}
 		}
 	}
@@ -323,83 +323,91 @@ vala_webview2_web_resources_register (ICoreWebView2 *webview)
 		return;
 	}
 
-	if (!g_response_registered) {
-		g_response_handler = (ResponseHandler *) CoTaskMemAlloc (
+	{
+		ResponseHandler *handler = (ResponseHandler *) CoTaskMemAlloc (
 			sizeof (ResponseHandler));
-		if (g_response_handler != NULL) {
-			ZeroMemory (g_response_handler, sizeof (*g_response_handler));
-			g_response_handler->iface.lpVtbl = &g_response_handler->vtbl;
-			g_response_handler->vtbl.QueryInterface = response_qi;
-			g_response_handler->vtbl.AddRef = response_addref;
-			g_response_handler->vtbl.Release = response_release;
-			g_response_handler->vtbl.Invoke = response_invoke;
-			g_response_handler->ref_count = 1;
+		if (handler != NULL) {
+			ZeroMemory (handler, sizeof (*handler));
+			handler->iface.lpVtbl = &handler->vtbl;
+			handler->vtbl.QueryInterface = response_qi;
+			handler->vtbl.AddRef = response_addref;
+			handler->vtbl.Release = response_release;
+			handler->vtbl.Invoke = response_invoke;
+			handler->ref_count = 1;
+			handler->host = host;
 			hr = ICoreWebView2_2_add_WebResourceResponseReceived (
-				webview2, &g_response_handler->iface, &g_response_token);
-			if (SUCCEEDED (hr)) {
-				g_response_registered = TRUE;
-			} else {
+				webview2, &handler->iface, &host->tok_resource_response);
+			if (FAILED (hr)) {
 				fprintf (stderr,
 				         "WebView2 add_WebResourceResponseReceived (resources) "
 				         "failed: 0x%08lx\n",
 				         (unsigned long) hr);
 				ICoreWebView2WebResourceResponseReceivedEventHandler_Release (
-					&g_response_handler->iface);
-				g_response_handler = NULL;
+					&handler->iface);
+			} else {
+				ICoreWebView2WebResourceResponseReceivedEventHandler_Release (
+					&handler->iface);
 			}
 		}
 	}
 
 	ICoreWebView2_2_Release (webview2);
+	host->resources_registered = TRUE;
+}
+
+void
+vala_webview2_web_resources_unregister_host (WebView2Host *host)
+{
+	ICoreWebView2 *webview;
+	ICoreWebView2_2 *webview2 = NULL;
+	int i;
+
+	if (host == NULL) {
+		return;
+	}
+
+	for (i = 0; i < WV2_MAX_PENDING_RESOURCES; i++) {
+		if (host->pending_resources[i].uri == NULL) {
+			continue;
+		}
+		if (host->cb_res_failed != NULL) {
+			host->cb_res_failed (host->pending_resources[i].id,
+			                     "WebView destroyed", host->res_ctx);
+		}
+		free (host->pending_resources[i].uri);
+		host->pending_resources[i].uri = NULL;
+		host->pending_resources[i].id = 0;
+	}
+
+	if (!host->resources_registered || host->webview == NULL) {
+		return;
+	}
+	webview = host->webview;
+	ICoreWebView2_remove_WebResourceRequested (webview, host->tok_resource_requested);
+	if (host->resource_filter_added) {
+		ICoreWebView2_RemoveWebResourceRequestedFilter (
+			webview, L"*", COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+		host->resource_filter_added = FALSE;
+	}
+	if (SUCCEEDED (ICoreWebView2_QueryInterface (webview, &IID_ICoreWebView2_2,
+	                                              (void **) &webview2))
+	    && webview2 != NULL) {
+		ICoreWebView2_2_remove_WebResourceResponseReceived (
+			webview2, host->tok_resource_response);
+		ICoreWebView2_2_Release (webview2);
+	}
+	host->resources_registered = FALSE;
+}
+
+void
+vala_webview2_web_resources_register (ICoreWebView2 *webview)
+{
+	(void) webview;
+	fprintf (stderr, "WebView2: web_resources_register(webview) obsolete; use *_host\n");
 }
 
 void
 vala_webview2_web_resources_unregister (ICoreWebView2 *webview)
 {
-	ICoreWebView2_2 *webview2 = NULL;
-	int i;
-
-	for (i = 0; i < MAX_PENDING; i++) {
-		if (g_pending[i].uri == NULL) {
-			continue;
-		}
-		if (g_failed_cb != NULL) {
-			g_failed_cb (g_pending[i].id, "WebView destroyed", g_cb_ctx);
-		}
-		free (g_pending[i].uri);
-		g_pending[i].uri = NULL;
-		g_pending[i].id = 0;
-	}
-
-	if (webview == NULL) {
-		return;
-	}
-	if (g_requested_registered) {
-		ICoreWebView2_remove_WebResourceRequested (webview, g_requested_token);
-		if (g_requested_handler != NULL) {
-			ICoreWebView2WebResourceRequestedEventHandler_Release (
-				&g_requested_handler->iface);
-			g_requested_handler = NULL;
-		}
-		g_requested_registered = FALSE;
-	}
-	if (g_filter_added) {
-		ICoreWebView2_RemoveWebResourceRequestedFilter (
-			webview, L"*", COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
-		g_filter_added = FALSE;
-	}
-	if (g_response_registered
-	    && SUCCEEDED (ICoreWebView2_QueryInterface (webview, &IID_ICoreWebView2_2,
-	                                              (void **) &webview2))
-	    && webview2 != NULL) {
-		ICoreWebView2_2_remove_WebResourceResponseReceived (
-			webview2, g_response_token);
-		ICoreWebView2_2_Release (webview2);
-		if (g_response_handler != NULL) {
-			ICoreWebView2WebResourceResponseReceivedEventHandler_Release (
-				&g_response_handler->iface);
-			g_response_handler = NULL;
-		}
-		g_response_registered = FALSE;
-	}
+	(void) webview;
 }

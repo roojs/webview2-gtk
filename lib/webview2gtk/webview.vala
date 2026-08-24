@@ -21,60 +21,61 @@ extern void* gdk_win32_surface_get_handle(Gdk.Surface surface);
 extern bool widget_bounds_xywh(Gtk.Widget widget, out int x, out int y, out int width, out int height);
 
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_create_with_xywh")]
-extern bool wv2_host_create_with_xywh(void* parent_hwnd, int x, int y, int width, int height, uint16* url);
+extern void* wv2_host_create_with_xywh(void* parent_hwnd, int x, int y, int width, int height, uint16* url);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_bounds_xywh")]
-extern void wv2_host_set_bounds_xywh(int x, int y, int width, int height);
+extern void wv2_host_set_bounds_xywh(void* host, int x, int y, int width, int height);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_navigate")]
-extern bool wv2_host_navigate(string url);
+extern bool wv2_host_navigate(void* host, string url);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_navigate_to_string")]
-extern bool wv2_host_navigate_to_string(string html);
+extern bool wv2_host_navigate_to_string(void* host, string html);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_destroy")]
-extern void wv2_host_destroy();
+extern void wv2_host_destroy(void* host);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_is_ready")]
-extern bool wv2_host_is_ready();
+extern bool wv2_host_is_ready(void* host);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_go_back")]
-extern bool wv2_host_go_back();
+extern bool wv2_host_go_back(void* host);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_go_forward")]
-extern bool wv2_host_go_forward();
+extern bool wv2_host_go_forward(void* host);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_reload")]
-extern bool wv2_host_reload();
+extern bool wv2_host_reload(void* host);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_stop")]
-extern bool wv2_host_stop();
+extern bool wv2_host_stop(void* host);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_get_can_go_back")]
-extern bool wv2_host_get_can_go_back();
+extern bool wv2_host_get_can_go_back(void* host);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_get_can_go_forward")]
-extern bool wv2_host_get_can_go_forward();
+extern bool wv2_host_get_can_go_forward(void* host);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_get_source")]
-extern string wv2_host_get_source();
+extern string wv2_host_get_source(void* host);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_get_document_title")]
-extern string wv2_host_get_document_title();
+extern string wv2_host_get_document_title(void* host);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_get_zoom_factor")]
-extern double wv2_host_get_zoom_factor();
+extern double wv2_host_get_zoom_factor(void* host);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_put_zoom_factor")]
-extern bool wv2_host_put_zoom_factor(double zoom);
+extern bool wv2_host_put_zoom_factor(void* host, double zoom);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_put_is_visible")]
-extern bool wv2_host_put_is_visible(bool visible);
+extern bool wv2_host_put_is_visible(void* host, bool visible);
 
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_autoplay_policy")]
 extern void wv2_host_set_autoplay_policy(int policy);
 
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_open_dev_tools_window")]
-extern bool wv2_host_open_dev_tools_window();
+extern bool wv2_host_open_dev_tools_window(void* host);
 
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_media_flags")]
-extern void wv2_host_set_media_flags(bool enable_media_stream, bool enable_webrtc);
+extern void wv2_host_set_media_flags(void* host, bool enable_media_stream, bool enable_webrtc);
 
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_is_muted")]
-extern bool wv2_host_set_is_muted(bool muted);
+extern bool wv2_host_set_is_muted(void* host, bool muted);
 
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_get_is_muted")]
-extern bool wv2_host_get_is_muted();
+extern bool wv2_host_get_is_muted(void* host);
 
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_permission_handler")]
-extern void wv2_host_set_permission_handler(void* decide, void* user_data);
+extern void wv2_host_set_permission_handler(void* host, void* decide, void* user_data);
 
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_event_handlers")]
 extern void wv2_host_set_event_handlers(
+	void* host,
 	void* navigation_starting,
 	void* navigation_completed,
 	void* document_title_changed,
@@ -82,10 +83,10 @@ extern void wv2_host_set_event_handlers(
 );
 
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_document_response_handler")]
-extern void wv2_host_set_document_response_handler(void* handler, void* user_data);
+extern void wv2_host_set_document_response_handler(void* host, void* handler, void* user_data);
 
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_script_message_handler")]
-extern void wv2_host_set_script_message_handler(void* handler, void* user_data);
+extern void wv2_host_set_script_message_handler(void* host, void* handler, void* user_data);
 
 namespace WebView2Gtk {
 
@@ -106,11 +107,12 @@ public enum LoadEvent {
  * API surface matches WebKitGTK 6 `WebKit.WebView` for navigation, URI/title
  * queries, HTML loading, zoom, and `load_changed`.
  *
- * **Limitation(v0.1):** one WebView2 host per process(shared COM singleton).
+ * Each WebView owns a WebView2 host handle (plan 4.0).
  */
 public class WebView : Gtk.Box {
 	private Gtk.DrawingArea host;
 	private void* parent_hwnd = null;
+	private void* host_handle = null;
 	private bool attached = false;
 	private bool host_shown_on_screen = true;
 	private string pending_uri = "";
@@ -141,14 +143,16 @@ public class WebView : Gtk.Box {
 	/** WebKitGTK-shaped — mute page audio. */
 	public bool is_muted {
 		get {
-			if (attached && wv2_host_is_ready()) {
-				muted = wv2_host_get_is_muted();
+			if (attached && wv2_host_is_ready(host_handle)) {
+				muted = wv2_host_get_is_muted(host_handle);
 			}
 			return muted;
 		}
 		set {
 			muted = value;
-			wv2_host_set_is_muted(value);
+			if (host_handle != null) {
+				wv2_host_set_is_muted(host_handle, value);
+			}
 		}
 	}
 
@@ -174,7 +178,7 @@ public class WebView : Gtk.Box {
 
 	/** WebView2Gtk-specific: host COM object is attached and ready. */
 	public bool ready {
-		get { return attached && wv2_host_is_ready(); }
+		get { return attached && wv2_host_is_ready(host_handle); }
 	}
 
 	public WebView() {
@@ -242,28 +246,35 @@ public class WebView : Gtk.Box {
 
 	~WebView() {
 		if (attached) {
-			wv2_host_set_permission_handler(null, null);
-			wv2_host_set_script_message_handler(null, null);
-			user_content_manager.unbind_host();
-			wv2_host_set_resource_handlers(null, null, null, null);
-			wv2_host_set_document_response_handler(null, null);
-			wv2_host_set_event_handlers(null, null, null, null);
-			wv2_host_destroy();
+			wv2_host_set_permission_handler(host_handle, null, null);
+			wv2_host_set_script_message_handler(host_handle, null, null);
+			user_content_manager.unbind_host(host_handle);
+			this.network_session.unbind_download_host(host_handle);
+			wv2_host_set_resource_handlers(host_handle, null, null, null, null);
+			wv2_host_set_document_response_handler(host_handle, null, null);
+			wv2_host_set_event_handlers(host_handle, null, null, null, null);
+			wv2_host_destroy(host_handle);
+			host_handle = null;
 			attached = false;
 		}
 	}
 
+	/** Internal: opaque WebView2 host for this widget. */
+	internal void* get_host_handle() {
+		return this.host_handle;
+	}
+
 	public bool can_go_back() {
-		return attached && wv2_host_get_can_go_back();
+		return attached && wv2_host_get_can_go_back(host_handle);
 	}
 
 	public bool can_go_forward() {
-		return attached && wv2_host_get_can_go_forward();
+		return attached && wv2_host_get_can_go_forward(host_handle);
 	}
 
 	public unowned string get_uri() {
-		if (attached && wv2_host_is_ready()) {
-			var live = wv2_host_get_source();
+		if (attached && wv2_host_is_ready(host_handle)) {
+			var live = wv2_host_get_source(host_handle);
 			if (live.length > 0) {
 				uri = live;
 			}
@@ -272,8 +283,8 @@ public class WebView : Gtk.Box {
 	}
 
 	public unowned string get_title() {
-		if (attached && wv2_host_is_ready()) {
-			title = wv2_host_get_document_title();
+		if (attached && wv2_host_is_ready(host_handle)) {
+			title = wv2_host_get_document_title(host_handle);
 		}
 		return title;
 	}
@@ -303,39 +314,39 @@ public class WebView : Gtk.Box {
 	}
 
 	public void reload() {
-		wv2_host_reload();
+		wv2_host_reload(host_handle);
 	}
 
 	public void reload_bypass_cache() {
 		/* WebView2 has no WebKit-style cache bypass; reload is the closest match. */
-		wv2_host_reload();
+		wv2_host_reload(host_handle);
 	}
 
 	public void stop_loading() {
 		load_cancelled = true;
-		wv2_host_stop();
+		wv2_host_stop(host_handle);
 		set_loading(false, 0.0);
 	}
 
 	public void go_back() {
-		wv2_host_go_back();
+		wv2_host_go_back(host_handle);
 	}
 
 	public void go_forward() {
-		wv2_host_go_forward();
+		wv2_host_go_forward(host_handle);
 	}
 
 	public double get_zoom_level() {
-		if (attached && wv2_host_is_ready()) {
-			zoom_level = wv2_host_get_zoom_factor();
+		if (attached && wv2_host_is_ready(host_handle)) {
+			zoom_level = wv2_host_get_zoom_factor(host_handle);
 		}
 		return zoom_level;
 	}
 
 	public void set_zoom_level(double zoom_level) {
 		this.zoom_level = zoom_level;
-		if (attached && wv2_host_is_ready()) {
-			wv2_host_put_zoom_factor(zoom_level);
+		if (attached && wv2_host_is_ready(host_handle)) {
+			wv2_host_put_zoom_factor(host_handle, zoom_level);
 		}
 	}
 
@@ -357,10 +368,10 @@ public class WebView : Gtk.Box {
 	}
 
 	internal void open_devtools_window() {
-		if (!attached || !wv2_host_is_ready()) {
+		if (!attached || !wv2_host_is_ready(host_handle)) {
 			return;
 		}
-		wv2_host_open_dev_tools_window();
+		wv2_host_open_dev_tools_window(host_handle);
 	}
 
 	/**
@@ -369,7 +380,7 @@ public class WebView : Gtk.Box {
 	 */
 	public Download download_uri(string uri) {
 		var trimmed = uri.strip();
-		var id = wv2_host_download_create(trimmed);
+		var id = (host_handle != null) ? wv2_host_download_create(host_handle, trimmed) : 0;
 		if (id <= 0) {
 			var failed = new Download(this.network_session, 0, trimmed, "download", "", -1);
 			Idle.add(() => {
@@ -404,7 +415,7 @@ public class WebView : Gtk.Box {
 		/* WebView2 COM + message pump must run on the GTK/UI thread. */
 		var full_document = region == SnapshotRegion.FULL_DOCUMENT;
 		string? devtools_json = null;
-		var capture_ok = wv2_capture_screenshot_sync(full_document, out devtools_json);
+		var capture_ok = wv2_capture_screenshot_sync(host_handle, full_document, out devtools_json);
 		var png_bytes = devtools_json_to_png_bytes(devtools_json);
 		if (!capture_ok || png_bytes == null) {
 			if (devtools_json != null) {
@@ -425,7 +436,7 @@ public class WebView : Gtk.Box {
 	) throws GLib.Error {
 		/* Same thread rule as get_snapshot — ExecuteScript is COM on the UI thread. */
 		string? raw = null;
-		var script_ok = wv2_execute_script_sync(script, out raw);
+		var script_ok = wv2_execute_script_sync(host_handle, script, out raw);
 		if (!script_ok) {
 			throw new GLib.IOError.FAILED("execute_script failed");
 		}
@@ -478,7 +489,7 @@ public class WebView : Gtk.Box {
 			x = -30000;
 			y = -30000;
 		}
-		wv2_host_set_bounds_xywh(x, y, width, height);
+		wv2_host_set_bounds_xywh(host_handle, x, y, width, height);
 	}
 
 	private void sync_host_visible() {
@@ -489,9 +500,9 @@ public class WebView : Gtk.Box {
 			&& this.get_visible()
 			&& this.get_opacity() > 0.001;
 		/* Keep IsVisible for DevTools capture; park off-screen when not shown. */
-		wv2_host_put_is_visible(true);
+		wv2_host_put_is_visible(host_handle, true);
 		if (!host_shown_on_screen) {
-			wv2_host_set_bounds_xywh(-30000, -30000, 1, 1);
+			wv2_host_set_bounds_xywh(host_handle, -30000, -30000, 1, 1);
 			return;
 		}
 		push_bounds();
@@ -502,13 +513,13 @@ public class WebView : Gtk.Box {
 			return;
 		}
 		if (pending_html.length > 0) {
-			if (!wv2_host_is_ready()) {
+			if (!wv2_host_is_ready(host_handle)) {
 				return;
 			}
 			/* Clear before navigate to avoid frame-tick re-entry storms. */
 			var html = pending_html;
 			pending_html = "";
-			if (!wv2_host_navigate_to_string(html)) {
+			if (!wv2_host_navigate_to_string(host_handle, html)) {
 				warning("WebView2Gtk: NavigateToString failed");
 			}
 			return;
@@ -516,7 +527,7 @@ public class WebView : Gtk.Box {
 		if (pending_uri.length == 0) {
 			return;
 		}
-		if (wv2_host_navigate(pending_uri)) {
+		if (wv2_host_navigate(host_handle, pending_uri)) {
 			pending_uri = "";
 		}
 	}
@@ -538,21 +549,23 @@ public class WebView : Gtk.Box {
 			return;
 		}
 
-		if (!wv2_host_create_with_xywh(parent_hwnd, x, y, width, height, null)) {
+		host_handle = wv2_host_create_with_xywh(parent_hwnd, x, y, width, height, null);
+		if (host_handle == null) {
 			warning("WebView2Gtk: create_with_xywh failed(runtime/loader missing?)");
 			return;
 		}
 		attached = true;
 		Win32Atspi.register_webview(this);
 		this.push_media_settings(false);
-		wv2_host_set_is_muted(this.muted);
-		wv2_host_set_permission_handler((void*) on_permission_decide_cb, this);
-		wv2_host_set_document_response_handler((void*) on_document_response_cb, this);
-		wv2_host_set_resource_handlers(on_resource_started_cb, on_resource_finished_cb,
+		wv2_host_set_is_muted(host_handle, this.muted);
+		wv2_host_set_permission_handler(host_handle, (void*) on_permission_decide_cb, this);
+		wv2_host_set_document_response_handler(host_handle, (void*) on_document_response_cb, this);
+		wv2_host_set_resource_handlers(host_handle, on_resource_started_cb, on_resource_finished_cb,
 			on_resource_failed_cb, this);
-		wv2_host_set_script_message_handler((void*) on_script_message_cb, user_content_manager);
-		user_content_manager.bind_host();
-		wv2_host_set_event_handlers((void*) on_navigation_starting_cb,
+		wv2_host_set_script_message_handler(host_handle, (void*) on_script_message_cb, user_content_manager);
+		user_content_manager.bind_host(host_handle);
+		this.network_session.bind_download_host(host_handle);
+		wv2_host_set_event_handlers(host_handle, (void*) on_navigation_starting_cb,
 			(void*) on_navigation_completed_cb, (void*) on_document_title_changed_cb, this);
 		this.sync_host_visible();
 		try_navigate();
@@ -660,9 +673,11 @@ public class WebView : Gtk.Box {
 
 	private void push_media_settings(bool from_gesture_prop) {
 		var s = this.capture_settings;
-		wv2_host_set_media_flags(s.enable_media_stream, s.enable_webrtc);
+		if (host_handle != null) {
+			wv2_host_set_media_flags(host_handle, s.enable_media_stream, s.enable_webrtc);
+		}
 		if (s.media_playback_requires_user_gesture) {
-			if (from_gesture_prop && attached && wv2_host_is_ready()) {
+			if (from_gesture_prop && attached && wv2_host_is_ready(host_handle)) {
 				warning(
 					"WebView2Gtk: media_playback_requires_user_gesture after env create — stored only; restart required for Chromium autoplay flag"
 				);

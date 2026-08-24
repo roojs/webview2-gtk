@@ -89,7 +89,7 @@ create_print_settings_with_backgrounds (ICoreWebView2 *webview)
 }
 
 bool
-vala_webview2_host_print_to_pdf_sync (const char *output_path_utf8)
+vala_webview2_host_print_to_pdf_sync (WebView2Host *host, const char *output_path_utf8)
 {
 	ICoreWebView2 *webview;
 	ICoreWebView2_7 *webview7 = NULL;
@@ -101,7 +101,7 @@ vala_webview2_host_print_to_pdf_sync (const char *output_path_utf8)
 	if (output_path_utf8 == NULL || output_path_utf8[0] == '\0') {
 		return false;
 	}
-	webview = vala_webview2_com_get_webview ();
+	webview = vala_webview2_com_get_webview_for (host);
 	if (webview == NULL) {
 		return false;
 	}

@@ -1,4 +1,5 @@
 /* WebKitGTK-shaped script message handlers via WebView2 web messages.
+ * Per WebView2Host (plan 4.3).
  *
  * Page: window.webkit.messageHandlers.<name>.postMessage(value)
  * Host: WebMessageReceived → UTF-8 JSON body for Vala JavaScriptResult.
@@ -15,10 +16,9 @@
 
 #include "webview2gtk-host-api.h"
 #include "win32-ui-webview2-script-messages.h"
+#include "win32-ui-webview2-host-priv.h"
 #include "win32-ui-webview2-com-glue.h"
 #include "win32-ui-webview2-sdk.h"
-
-#define MAX_HANDLERS 64
 
 #define SCRIPT_PREFIX \
 	"(function(){" \
@@ -43,23 +43,21 @@ typedef struct {
 	ICoreWebView2WebMessageReceivedEventHandler iface;
 	ICoreWebView2WebMessageReceivedEventHandlerVtbl vtbl;
 	LONG ref_count;
+	WebView2Host *host;
 } MessageHandler;
 
 typedef struct {
 	LONG ref_count;
 	char *script_utf8;
+	WebView2Host *host;
 	ICoreWebView2AddScriptToExecuteOnDocumentCreatedCompletedHandler handler;
 	ICoreWebView2AddScriptToExecuteOnDocumentCreatedCompletedHandlerVtbl vtbl;
 } AddScriptHandler;
 
-static char *g_handler_names[MAX_HANDLERS];
-static size_t g_handler_count;
-static EventRegistrationToken g_msg_token;
-static BOOL g_msg_registered;
-static MessageHandler *g_msg_handler;
-static wchar_t *g_script_id;
-static WebView2GtkScriptMessageCb g_cb;
-static void *g_cb_ctx;
+typedef struct {
+	WebView2Host *host;
+	char *script;
+} InjectIdle;
 
 static HRESULT STDMETHODCALLTYPE
 msg_qi (ICoreWebView2WebMessageReceivedEventHandler *This, REFIID riid, void **ppv)
@@ -98,6 +96,8 @@ msg_invoke (
 	ICoreWebView2 *sender,
 	ICoreWebView2WebMessageReceivedEventArgs *args)
 {
+	MessageHandler *self = (MessageHandler *) This;
+	WebView2Host *host = self->host;
 	LPWSTR wide = NULL;
 	char *utf8 = NULL;
 	char *nl;
@@ -105,10 +105,9 @@ msg_invoke (
 	char *name;
 	char *body;
 
-	(void) This;
 	(void) sender;
 
-	if (g_cb == NULL || args == NULL) {
+	if (host == NULL || host->cb_script_msg == NULL || args == NULL) {
 		return S_OK;
 	}
 	if (FAILED (ICoreWebView2WebMessageReceivedEventArgs_TryGetWebMessageAsString (
@@ -140,13 +139,13 @@ msg_invoke (
 		free (name);
 		return S_OK;
 	}
-	g_cb (g_cb_ctx, name, body);
+	host->cb_script_msg (host->script_msg_ctx, name, body);
 	free (name);
 	free (body);
 	return S_OK;
 }
 
-static void clear_script_id (ICoreWebView2 *webview);
+static void clear_script_id (WebView2Host *host);
 
 static HRESULT STDMETHODCALLTYPE
 add_script_qi (
@@ -188,14 +187,21 @@ add_script_release (ICoreWebView2AddScriptToExecuteOnDocumentCreatedCompletedHan
 static gboolean
 inject_script_idle (gpointer data)
 {
-	char *script = (char *) data;
-	char *ignored = NULL;
+	InjectIdle *job = (InjectIdle *) data;
+	ICoreWebView2 *wv;
+	uint16_t *wide;
 
-	vala_webview2_host_execute_script_sync (script, &ignored);
-	free (script);
-	if (ignored != NULL) {
-		free (ignored);
+	wv = (job->host != NULL) ? job->host->webview : NULL;
+	if (wv != NULL && job->script != NULL) {
+		wide = win32_ui_utf8_to_utf16 (job->script, NULL);
+		if (wide != NULL) {
+			/* Fire-and-forget into this host's document (handler may be NULL). */
+			ICoreWebView2_ExecuteScript (wv, (LPCWSTR) wide, NULL);
+			free (wide);
+		}
 	}
+	free (job->script);
+	g_free (job);
 	return G_SOURCE_REMOVE;
 }
 
@@ -206,36 +212,42 @@ add_script_invoke (
 	LPCWSTR result)
 {
 	AddScriptHandler *sh = CONTAINING_RECORD (This, AddScriptHandler, handler);
+	WebView2Host *host = sh->host;
 
-	if (SUCCEEDED (error_code) && result != NULL) {
+	if (SUCCEEDED (error_code) && result != NULL && host != NULL) {
 		size_t len = wcslen (result);
 		wchar_t *id = (wchar_t *) CoTaskMemAlloc ((len + 1) * sizeof (wchar_t));
 		if (id != NULL) {
 			memcpy (id, result, (len + 1) * sizeof (wchar_t));
-			if (g_script_id != NULL) {
-				CoTaskMemFree (g_script_id);
+			if (host->script_inject_id != NULL) {
+				CoTaskMemFree (host->script_inject_id);
 			}
-			g_script_id = id;
+			host->script_inject_id = id;
 		}
 	}
 	if (sh->script_utf8 != NULL) {
-		char *script = sh->script_utf8;
+		InjectIdle *job = g_new0 (InjectIdle, 1);
+		job->host = host;
+		job->script = sh->script_utf8;
 		sh->script_utf8 = NULL;
-		g_idle_add (inject_script_idle, script);
+		g_idle_add (inject_script_idle, job);
 	}
 	return S_OK;
 }
 
 static char *
-build_inject_script (void)
+build_inject_script (WebView2Host *host)
 {
 	size_t i;
 	size_t cap = sizeof (SCRIPT_PREFIX) + sizeof (SCRIPT_SUFFIX) + 64;
 	char *out;
 	size_t len = 0;
 
-	for (i = 0; i < g_handler_count; i++) {
-		cap += strlen (g_handler_names[i]) * 2 + 8;
+	if (host == NULL) {
+		return NULL;
+	}
+	for (i = 0; i < host->script_handler_count; i++) {
+		cap += strlen (host->script_handler_names[i]) * 2 + 8;
 	}
 	out = (char *) malloc (cap);
 	if (out == NULL) {
@@ -243,8 +255,8 @@ build_inject_script (void)
 	}
 	memcpy (out, SCRIPT_PREFIX, sizeof (SCRIPT_PREFIX) - 1);
 	len = sizeof (SCRIPT_PREFIX) - 1;
-	for (i = 0; i < g_handler_count; i++) {
-		const char *n = g_handler_names[i];
+	for (i = 0; i < host->script_handler_count; i++) {
+		const char *n = host->script_handler_names[i];
 		size_t nlen = strlen (n);
 		if (i > 0) {
 			out[len++] = ',';
@@ -259,34 +271,37 @@ build_inject_script (void)
 }
 
 static void
-clear_script_id (ICoreWebView2 *webview)
+clear_script_id (WebView2Host *host)
 {
-	if (g_script_id == NULL) {
+	if (host == NULL || host->script_inject_id == NULL) {
 		return;
 	}
-	if (webview != NULL) {
-		ICoreWebView2_RemoveScriptToExecuteOnDocumentCreated (webview, g_script_id);
+	if (host->webview != NULL) {
+		ICoreWebView2_RemoveScriptToExecuteOnDocumentCreated (
+			host->webview, host->script_inject_id);
 	}
-	CoTaskMemFree (g_script_id);
-	g_script_id = NULL;
+	CoTaskMemFree (host->script_inject_id);
+	host->script_inject_id = NULL;
 }
 
 static bool
-refresh_document_script (ICoreWebView2 *webview)
+refresh_document_script (WebView2Host *host)
 {
+	ICoreWebView2 *webview;
 	char *script_utf8;
 	uint16_t *script_wide;
 	AddScriptHandler *sh;
 	HRESULT hr;
 
-	if (webview == NULL) {
+	if (host == NULL || host->webview == NULL) {
 		return false;
 	}
-	clear_script_id (webview);
-	if (g_handler_count == 0) {
+	webview = host->webview;
+	clear_script_id (host);
+	if (host->script_handler_count == 0) {
 		return true;
 	}
-	script_utf8 = build_inject_script ();
+	script_utf8 = build_inject_script (host);
 	if (script_utf8 == NULL) {
 		return false;
 	}
@@ -311,6 +326,7 @@ refresh_document_script (ICoreWebView2 *webview)
 	sh->vtbl.Release = add_script_release;
 	sh->vtbl.Invoke = add_script_invoke;
 	sh->ref_count = 1;
+	sh->host = host;
 	sh->script_utf8 = script_utf8; /* ownership → completion / idle */
 
 	hr = ICoreWebView2_AddScriptToExecuteOnDocumentCreated (
@@ -327,12 +343,15 @@ refresh_document_script (ICoreWebView2 *webview)
 }
 
 static int
-find_handler_index (const char *name)
+find_handler_index (WebView2Host *host, const char *name)
 {
 	size_t i;
 
-	for (i = 0; i < g_handler_count; i++) {
-		if (strcmp (g_handler_names[i], name) == 0) {
+	if (host == NULL) {
+		return -1;
+	}
+	for (i = 0; i < host->script_handler_count; i++) {
+		if (strcmp (host->script_handler_names[i], name) == 0) {
 			return (int) i;
 		}
 	}
@@ -341,11 +360,15 @@ find_handler_index (const char *name)
 
 void
 vala_webview2_host_set_script_message_handler (
+	WebView2Host *host,
 	WebView2GtkScriptMessageCb handler,
 	void *user_data)
 {
-	g_cb = handler;
-	g_cb_ctx = user_data;
+	if (host == NULL) {
+		return;
+	}
+	host->cb_script_msg = handler;
+	host->script_msg_ctx = user_data;
 }
 
 static bool
@@ -367,69 +390,70 @@ name_is_safe (const char *name)
 }
 
 bool
-vala_webview2_host_register_script_message_handler (const char *name)
+vala_webview2_host_register_script_message_handler (
+	WebView2Host *host,
+	const char *name)
 {
-	ICoreWebView2 *webview;
 	char *copy;
 
-	if (name == NULL || !name_is_safe (name)) {
+	if (host == NULL || name == NULL || !name_is_safe (name)) {
 		return false;
 	}
-	if (find_handler_index (name) >= 0) {
+	if (find_handler_index (host, name) >= 0) {
 		return false;
 	}
-	if (g_handler_count >= MAX_HANDLERS) {
+	if (host->script_handler_count >= WV2_MAX_SCRIPT_HANDLERS) {
 		return false;
 	}
 	copy = strdup (name);
 	if (copy == NULL) {
 		return false;
 	}
-	g_handler_names[g_handler_count++] = copy;
-	webview = vala_webview2_com_get_webview ();
-	if (webview != NULL) {
-		refresh_document_script (webview);
+	host->script_handler_names[host->script_handler_count++] = copy;
+	if (host->webview != NULL) {
+		refresh_document_script (host);
 	}
 	return true;
 }
 
 bool
-vala_webview2_host_unregister_script_message_handler (const char *name)
+vala_webview2_host_unregister_script_message_handler (
+	WebView2Host *host,
+	const char *name)
 {
-	ICoreWebView2 *webview;
 	int idx;
 	size_t i;
 
-	if (name == NULL || name[0] == '\0') {
+	if (host == NULL || name == NULL || name[0] == '\0') {
 		return false;
 	}
-	idx = find_handler_index (name);
+	idx = find_handler_index (host, name);
 	if (idx < 0) {
 		return false;
 	}
-	free (g_handler_names[idx]);
-	for (i = (size_t) idx; i + 1 < g_handler_count; i++) {
-		g_handler_names[i] = g_handler_names[i + 1];
+	free (host->script_handler_names[idx]);
+	for (i = (size_t) idx; i + 1 < host->script_handler_count; i++) {
+		host->script_handler_names[i] = host->script_handler_names[i + 1];
 	}
-	g_handler_count--;
-	g_handler_names[g_handler_count] = NULL;
-	webview = vala_webview2_com_get_webview ();
-	if (webview != NULL) {
-		char *ignored = NULL;
+	host->script_handler_count--;
+	host->script_handler_names[host->script_handler_count] = NULL;
+	if (host->webview != NULL) {
 		char *script;
 		size_t need = strlen (name) + 128;
+		uint16_t *wide;
 
-		refresh_document_script (webview);
+		refresh_document_script (host);
 		script = (char *) malloc (need);
 		if (script != NULL) {
 			snprintf (script, need,
 			          "try{if(window.webkit&&window.webkit.messageHandlers)"
 			          "delete window.webkit.messageHandlers[\"%s\"];}catch(e){}",
 			          name);
-			vala_webview2_host_execute_script_sync (script, &ignored);
+			wide = win32_ui_utf8_to_utf16 (script, NULL);
 			free (script);
-			if (ignored != NULL) {
-				free (ignored);
+			if (wide != NULL) {
+				ICoreWebView2_ExecuteScript (host->webview, (LPCWSTR) wide, NULL);
+				free (wide);
 			}
 		}
 	}
@@ -437,56 +461,72 @@ vala_webview2_host_unregister_script_message_handler (const char *name)
 }
 
 void
-vala_webview2_script_messages_register (ICoreWebView2 *webview)
+vala_webview2_script_messages_register_host (WebView2Host *host)
 {
+	ICoreWebView2 *webview;
 	HRESULT hr;
+	MessageHandler *handler;
 
-	if (webview == NULL || g_msg_registered) {
+	if (host == NULL || host->webview == NULL || host->script_msg_registered) {
 		return;
 	}
-	g_msg_handler = (MessageHandler *) CoTaskMemAlloc (sizeof (MessageHandler));
-	if (g_msg_handler == NULL) {
+	webview = host->webview;
+	handler = (MessageHandler *) CoTaskMemAlloc (sizeof (MessageHandler));
+	if (handler == NULL) {
 		return;
 	}
-	ZeroMemory (g_msg_handler, sizeof (*g_msg_handler));
-	g_msg_handler->iface.lpVtbl = &g_msg_handler->vtbl;
-	g_msg_handler->vtbl.QueryInterface = msg_qi;
-	g_msg_handler->vtbl.AddRef = msg_addref;
-	g_msg_handler->vtbl.Release = msg_release;
-	g_msg_handler->vtbl.Invoke = msg_invoke;
-	g_msg_handler->ref_count = 1;
+	ZeroMemory (handler, sizeof (*handler));
+	handler->iface.lpVtbl = &handler->vtbl;
+	handler->vtbl.QueryInterface = msg_qi;
+	handler->vtbl.AddRef = msg_addref;
+	handler->vtbl.Release = msg_release;
+	handler->vtbl.Invoke = msg_invoke;
+	handler->ref_count = 1;
+	handler->host = host;
 	hr = ICoreWebView2_add_WebMessageReceived (
-		webview, &g_msg_handler->iface, &g_msg_token);
+		webview, &handler->iface, &host->tok_script_msg);
 	if (FAILED (hr)) {
 		fprintf (stderr, "WebView2 add_WebMessageReceived failed: 0x%08lx\n",
 		         (unsigned long) hr);
-		ICoreWebView2WebMessageReceivedEventHandler_Release (&g_msg_handler->iface);
-		g_msg_handler = NULL;
+		ICoreWebView2WebMessageReceivedEventHandler_Release (&handler->iface);
 		return;
 	}
-	g_msg_registered = TRUE;
-	if (g_handler_count > 0) {
-		refresh_document_script (webview);
+	ICoreWebView2WebMessageReceivedEventHandler_Release (&handler->iface);
+	host->script_msg_registered = TRUE;
+	if (host->script_handler_count > 0) {
+		refresh_document_script (host);
 	}
+}
+
+void
+vala_webview2_script_messages_unregister_host (WebView2Host *host)
+{
+	size_t i;
+
+	if (host == NULL) {
+		return;
+	}
+	if (host->webview != NULL && host->script_msg_registered) {
+		ICoreWebView2_remove_WebMessageReceived (host->webview, host->tok_script_msg);
+		host->script_msg_registered = FALSE;
+	}
+	clear_script_id (host);
+	for (i = 0; i < host->script_handler_count; i++) {
+		free (host->script_handler_names[i]);
+		host->script_handler_names[i] = NULL;
+	}
+	host->script_handler_count = 0;
+}
+
+void
+vala_webview2_script_messages_register (ICoreWebView2 *webview)
+{
+	(void) webview;
+	fprintf (stderr, "WebView2: script_messages_register(webview) obsolete; use *_host\n");
 }
 
 void
 vala_webview2_script_messages_unregister (ICoreWebView2 *webview)
 {
-	size_t i;
-
-	if (webview != NULL && g_msg_registered) {
-		ICoreWebView2_remove_WebMessageReceived (webview, g_msg_token);
-		g_msg_registered = FALSE;
-	}
-	if (g_msg_handler != NULL) {
-		ICoreWebView2WebMessageReceivedEventHandler_Release (&g_msg_handler->iface);
-		g_msg_handler = NULL;
-	}
-	clear_script_id (webview);
-	for (i = 0; i < g_handler_count; i++) {
-		free (g_handler_names[i]);
-		g_handler_names[i] = NULL;
-	}
-	g_handler_count = 0;
+	(void) webview;
 }

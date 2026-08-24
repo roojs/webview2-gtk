@@ -1,4 +1,5 @@
-/* PermissionRequested honour + IsMuted + media stream/webrtc flags. */
+/* PermissionRequested honour + IsMuted + media stream/webrtc flags.
+ * Per WebView2Host (plan 4.3). */
 
 #define COBJMACROS
 #define WIN32_LEAN_AND_MEAN
@@ -8,25 +9,15 @@
 
 #include "webview2gtk-host-api.h"
 #include "win32-ui-webview2-permissions.h"
+#include "win32-ui-webview2-host-priv.h"
 #include "win32-ui-webview2-sdk.h"
 
 typedef struct {
 	ICoreWebView2PermissionRequestedEventHandler iface;
 	ICoreWebView2PermissionRequestedEventHandlerVtbl vtbl;
 	LONG ref_count;
+	WebView2Host *host;
 } PermissionHandler;
-
-static PermissionHandler *g_perm_handler;
-static EventRegistrationToken g_perm_token;
-static BOOL g_perm_registered;
-static ICoreWebView2 *g_webview;
-
-static BOOL g_enable_media_stream = TRUE;
-static BOOL g_enable_webrtc = TRUE;
-static BOOL g_is_muted = FALSE;
-
-static WebView2GtkPermissionDecideCb g_decide_cb;
-static void *g_decide_ctx;
 
 static HRESULT STDMETHODCALLTYPE
 perm_qi (ICoreWebView2PermissionRequestedEventHandler *This, REFIID riid, void **ppv)
@@ -84,22 +75,23 @@ perm_invoke (
 	ICoreWebView2 *sender,
 	ICoreWebView2PermissionRequestedEventArgs *args)
 {
+	PermissionHandler *self = (PermissionHandler *) This;
+	WebView2Host *host = self->host;
 	COREWEBVIEW2_PERMISSION_KIND kind = COREWEBVIEW2_PERMISSION_KIND_UNKNOWN_PERMISSION;
 	BOOL allow = FALSE;
 	int decided = 0;
 
-	(void) This;
 	(void) sender;
 
-	if (args == NULL) {
+	if (args == NULL || host == NULL) {
 		return S_OK;
 	}
 
 	ICoreWebView2PermissionRequestedEventArgs_get_PermissionKind (args, &kind);
 
-	if (g_decide_cb != NULL) {
+	if (host->cb_perm_decide != NULL) {
 		int allow_i = 0;
-		decided = g_decide_cb ((int) kind, &allow_i, g_decide_ctx);
+		decided = host->cb_perm_decide ((int) kind, &allow_i, host->perm_ctx);
 		allow = allow_i ? TRUE : FALSE;
 	}
 
@@ -107,7 +99,7 @@ perm_invoke (
 		allow = FALSE;
 		if (kind == COREWEBVIEW2_PERMISSION_KIND_MICROPHONE
 		    || kind == COREWEBVIEW2_PERMISSION_KIND_CAMERA) {
-			if (!g_enable_media_stream || !g_enable_webrtc) {
+			if (!host->enable_media_stream || !host->enable_webrtc) {
 				allow = FALSE;
 			}
 		}
@@ -118,123 +110,147 @@ perm_invoke (
 }
 
 static void
-apply_muted_to_webview (void)
+apply_muted_to_host (WebView2Host *host)
 {
 	ICoreWebView2_8 *wv8 = NULL;
 
-	if (g_webview == NULL) {
+	if (host == NULL || host->webview == NULL) {
 		return;
 	}
-	if (FAILED (ICoreWebView2_QueryInterface (g_webview, &IID_ICoreWebView2_8,
+	if (FAILED (ICoreWebView2_QueryInterface (host->webview, &IID_ICoreWebView2_8,
 	                                          (void **) &wv8))
 	    || wv8 == NULL) {
 		fprintf (stderr, "WebView2 ICoreWebView2_8 unavailable — mute ignored\n");
 		return;
 	}
-	ICoreWebView2_8_put_IsMuted (wv8, g_is_muted ? TRUE : FALSE);
+	ICoreWebView2_8_put_IsMuted (wv8, host->is_muted ? TRUE : FALSE);
 	ICoreWebView2_8_Release (wv8);
 }
 
 void
-vala_webview2_host_set_media_flags (bool enable_media_stream, bool enable_webrtc)
+vala_webview2_host_set_media_flags (
+	WebView2Host *host,
+	bool enable_media_stream,
+	bool enable_webrtc)
 {
-	g_enable_media_stream = enable_media_stream ? TRUE : FALSE;
-	g_enable_webrtc = enable_webrtc ? TRUE : FALSE;
+	if (host == NULL) {
+		return;
+	}
+	host->enable_media_stream = enable_media_stream ? TRUE : FALSE;
+	host->enable_webrtc = enable_webrtc ? TRUE : FALSE;
 }
 
 void
 vala_webview2_host_set_permission_handler (
+	WebView2Host *host,
 	WebView2GtkPermissionDecideCb decide,
 	void *user_data)
 {
-	g_decide_cb = decide;
-	g_decide_ctx = user_data;
+	if (host == NULL) {
+		return;
+	}
+	host->cb_perm_decide = decide;
+	host->perm_ctx = user_data;
 }
 
 bool
-vala_webview2_host_set_is_muted (bool muted)
+vala_webview2_host_set_is_muted (WebView2Host *host, bool muted)
 {
-	g_is_muted = muted ? TRUE : FALSE;
-	if (g_webview == NULL) {
-		return true;
+	if (host == NULL) {
+		return false;
 	}
-	apply_muted_to_webview ();
+	host->is_muted = muted ? TRUE : FALSE;
+	if (host->webview != NULL) {
+		apply_muted_to_host (host);
+	}
 	return true;
 }
 
 bool
-vala_webview2_host_get_is_muted (void)
+vala_webview2_host_get_is_muted (WebView2Host *host)
 {
 	ICoreWebView2_8 *wv8 = NULL;
 	BOOL value = FALSE;
 
-	if (g_webview == NULL) {
-		return g_is_muted ? true : false;
+	if (host == NULL) {
+		return false;
 	}
-	if (FAILED (ICoreWebView2_QueryInterface (g_webview, &IID_ICoreWebView2_8,
+	if (host->webview == NULL) {
+		return host->is_muted ? true : false;
+	}
+	if (FAILED (ICoreWebView2_QueryInterface (host->webview, &IID_ICoreWebView2_8,
 	                                          (void **) &wv8))
 	    || wv8 == NULL) {
-		return g_is_muted ? true : false;
+		return host->is_muted ? true : false;
 	}
 	if (SUCCEEDED (ICoreWebView2_8_get_IsMuted (wv8, &value))) {
-		g_is_muted = value ? TRUE : FALSE;
+		host->is_muted = value ? TRUE : FALSE;
 	}
 	ICoreWebView2_8_Release (wv8);
-	return g_is_muted ? true : false;
+	return host->is_muted ? true : false;
+}
+
+void
+vala_webview2_permissions_register_host (WebView2Host *host)
+{
+	ICoreWebView2 *webview;
+	PermissionHandler *handler;
+	HRESULT hr;
+
+	if (host == NULL || host->webview == NULL || host->perm_registered) {
+		return;
+	}
+	webview = host->webview;
+
+	handler = (PermissionHandler *) CoTaskMemAlloc (sizeof (PermissionHandler));
+	if (handler == NULL) {
+		return;
+	}
+	ZeroMemory (handler, sizeof (*handler));
+	handler->iface.lpVtbl = &handler->vtbl;
+	handler->vtbl.QueryInterface = perm_qi;
+	handler->vtbl.AddRef = perm_addref;
+	handler->vtbl.Release = perm_release;
+	handler->vtbl.Invoke = perm_invoke;
+	handler->ref_count = 1;
+	handler->host = host;
+
+	hr = ICoreWebView2_add_PermissionRequested (
+		webview, &handler->iface, &host->tok_perm);
+	if (FAILED (hr)) {
+		fprintf (stderr, "WebView2 add_PermissionRequested failed: 0x%08lx\n",
+		         (unsigned long) hr);
+		ICoreWebView2PermissionRequestedEventHandler_Release (&handler->iface);
+		return;
+	}
+	ICoreWebView2PermissionRequestedEventHandler_Release (&handler->iface);
+	host->perm_registered = TRUE;
+	apply_muted_to_host (host);
+}
+
+void
+vala_webview2_permissions_unregister_host (WebView2Host *host)
+{
+	if (host == NULL) {
+		return;
+	}
+	if (host->webview != NULL && host->perm_registered) {
+		ICoreWebView2_remove_PermissionRequested (host->webview, host->tok_perm);
+		host->perm_registered = FALSE;
+	}
+	host->cb_perm_decide = NULL;
+	host->perm_ctx = NULL;
 }
 
 void
 vala_webview2_permissions_register (ICoreWebView2 *webview)
 {
-	HRESULT hr;
-
-	if (webview == NULL || g_perm_registered) {
-		return;
-	}
-
-	g_webview = webview;
-	ICoreWebView2_AddRef (g_webview);
-
-	g_perm_handler = (PermissionHandler *) CoTaskMemAlloc (sizeof (PermissionHandler));
-	if (g_perm_handler == NULL) {
-		return;
-	}
-	ZeroMemory (g_perm_handler, sizeof (*g_perm_handler));
-	g_perm_handler->iface.lpVtbl = &g_perm_handler->vtbl;
-	g_perm_handler->vtbl.QueryInterface = perm_qi;
-	g_perm_handler->vtbl.AddRef = perm_addref;
-	g_perm_handler->vtbl.Release = perm_release;
-	g_perm_handler->vtbl.Invoke = perm_invoke;
-	g_perm_handler->ref_count = 1;
-
-	hr = ICoreWebView2_add_PermissionRequested (
-		webview, &g_perm_handler->iface, &g_perm_token);
-	if (FAILED (hr)) {
-		fprintf (stderr, "WebView2 add_PermissionRequested failed: 0x%08lx\n",
-		         (unsigned long) hr);
-		ICoreWebView2PermissionRequestedEventHandler_Release (&g_perm_handler->iface);
-		g_perm_handler = NULL;
-		return;
-	}
-	g_perm_registered = TRUE;
-	apply_muted_to_webview ();
+	(void) webview;
+	fprintf (stderr, "WebView2: permissions_register(webview) obsolete; use *_host\n");
 }
 
 void
 vala_webview2_permissions_unregister (ICoreWebView2 *webview)
 {
-	if (webview != NULL && g_perm_registered) {
-		ICoreWebView2_remove_PermissionRequested (webview, g_perm_token);
-		g_perm_registered = FALSE;
-	}
-	if (g_perm_handler != NULL) {
-		ICoreWebView2PermissionRequestedEventHandler_Release (&g_perm_handler->iface);
-		g_perm_handler = NULL;
-	}
-	if (g_webview != NULL) {
-		ICoreWebView2_Release (g_webview);
-		g_webview = NULL;
-	}
-	g_decide_cb = NULL;
-	g_decide_ctx = NULL;
+	(void) webview;
 }

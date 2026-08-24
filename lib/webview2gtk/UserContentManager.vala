@@ -6,16 +6,19 @@ namespace WebView2Gtk {
  * Register a named channel, then connect to the detailed
  * `script_message_received` signal. Page JS uses
  * `window.webkit.messageHandlers.<name>.postMessage(…)`.
+ *
+ * When bound to a WebView host, handler names are registered on that host.
+ * Shared managers may bind multiple hosts (one per attached WebView).
  */
 public class UserContentManager : Object {
 	private Gee.HashSet<string> handlers = new Gee.HashSet<string> ();
-	private bool host_bound = false;
+	private Gee.ArrayList<void*> bound_hosts = new Gee.ArrayList<void*> ();
 
 	[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_register_script_message_handler")]
-	private static extern bool wv2_host_register_script_message_handler(string name);
+	private static extern bool wv2_host_register_script_message_handler(void* host, string name);
 
 	[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_unregister_script_message_handler")]
-	private static extern bool wv2_host_unregister_script_message_handler(string name);
+	private static extern bool wv2_host_unregister_script_message_handler(void* host, string name);
 
 	/**
 	 * Emitted when page JS calls `window.webkit.messageHandlers.<name>.postMessage`.
@@ -39,9 +42,11 @@ public class UserContentManager : Object {
 			return false;
 		}
 		handlers.add(name);
-		if (host_bound && !wv2_host_register_script_message_handler(name)) {
-			handlers.remove(name);
-			return false;
+		foreach (var host in bound_hosts) {
+			if (!wv2_host_register_script_message_handler(host, name)) {
+				handlers.remove(name);
+				return false;
+			}
 		}
 		return true;
 	}
@@ -50,23 +55,37 @@ public class UserContentManager : Object {
 		if (!handlers.remove(name)) {
 			return;
 		}
-		if (host_bound) {
-			wv2_host_unregister_script_message_handler(name);
+		foreach (var host in bound_hosts) {
+			wv2_host_unregister_script_message_handler(host, name);
 		}
 	}
 
-	internal void bind_host() {
-		if (host_bound) {
+	internal void bind_host(void* host) {
+		if (host == null) {
 			return;
 		}
-		host_bound = true;
+		foreach (var h in bound_hosts) {
+			if (h == host) {
+				return;
+			}
+		}
+		bound_hosts.add(host);
 		foreach (var name in handlers) {
-			wv2_host_register_script_message_handler(name);
+			wv2_host_register_script_message_handler(host, name);
 		}
 	}
 
-	internal void unbind_host() {
-		host_bound = false;
+	internal void unbind_host(void* host) {
+		if (host == null) {
+			bound_hosts.clear();
+			return;
+		}
+		for (var i = 0; i < bound_hosts.size; i++) {
+			if (bound_hosts[i] == host) {
+				bound_hosts.remove_at(i);
+				return;
+			}
+		}
 	}
 
 	internal void emit_script_message(string name, string message_json) {

@@ -290,7 +290,8 @@ internal class Bridge : Object {
 
 	public static void rebuild() {
 		walk_accum = new GenericArray<WalkRow> ();
-		var ok = wv2_a11y_walk_foreach(walk_cb, null);
+		var host = Bridge.host != null ? Bridge.host.get_host_handle() : null;
+		var ok = host != null && wv2_a11y_walk_foreach(host, walk_cb, null);
 		var tree = walk_accum;
 		walk_accum = null;
 		if (!ok || tree == null) {

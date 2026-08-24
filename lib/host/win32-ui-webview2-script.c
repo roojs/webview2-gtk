@@ -59,7 +59,7 @@ static HRESULT STDMETHODCALLTYPE script_invoke (
 }
 
 bool
-vala_webview2_host_execute_script_sync (const char *script_utf8, char **result_json_out)
+vala_webview2_host_execute_script_sync (WebView2Host *host, const char *script_utf8, char **result_json_out)
 {
 	ICoreWebView2 *webview;
 	uint16_t *script_wide;
@@ -69,7 +69,7 @@ vala_webview2_host_execute_script_sync (const char *script_utf8, char **result_j
 	if (result_json_out != NULL) {
 		*result_json_out = NULL;
 	}
-	webview = vala_webview2_com_get_webview ();
+	webview = vala_webview2_com_get_webview_for (host);
 	if (webview == NULL || script_utf8 == NULL || script_utf8[0] == '\0') {
 		return false;
 	}

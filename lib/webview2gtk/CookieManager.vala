@@ -1,6 +1,12 @@
 namespace WebView2Gtk {
 
 public class CookieManager : Object {
+	private weak NetworkSession? session;
+
+	internal CookieManager(NetworkSession session) {
+		this.session = session;
+	}
+
 	public void set_accept_policy(CookieAcceptPolicy policy) {
 	}
 
@@ -11,8 +17,9 @@ public class CookieManager : Object {
 		string uri,
 		GLib.Cancellable? cancellable = null
 	) throws GLib.Error {
+		var host = this.session != null ? this.session.cookie_host_handle() : null;
 		string? raw = null;
-		if (!wv2_get_cookies_sync(uri, out raw)) {
+		if (host == null || !wv2_get_cookies_sync(host, uri, out raw)) {
 			throw new NetworkError.FAILED("get_cookies failed");
 		}
 		var list = new GLib.List<Soup.Cookie> ();
@@ -42,7 +49,8 @@ public class CookieManager : Object {
 		Soup.Cookie cookie,
 		GLib.Cancellable? cancellable = null
 	) throws GLib.Error {
-		if (!wv2_add_cookie_sync(cookie.get_name(), cookie.get_value(), cookie.get_domain(),
+		var host = this.session != null ? this.session.cookie_host_handle() : null;
+		if (host == null || !wv2_add_cookie_sync(host, cookie.get_name(), cookie.get_value(), cookie.get_domain(),
 			cookie.get_path(), cookie.get_http_only(), cookie.get_secure())) {
 			throw new NetworkError.FAILED("add_cookie failed");
 		}

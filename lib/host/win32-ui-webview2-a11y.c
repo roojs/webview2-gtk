@@ -321,13 +321,14 @@ find_document_under (IUIAutomation *uia, HWND hwnd)
 }
 
 static IUIAutomationElement *
-find_page_document (IUIAutomation *uia)
+find_page_document (IUIAutomation *uia, HWND parent)
 {
 	HwndList hl;
-	HWND parent;
 	int i;
 
-	parent = vala_webview2_com_get_parent_hwnd ();
+	if (parent == NULL) {
+		return NULL;
+	}
 	collect_descendants (parent, &hl);
 	/* Prefer Chrome_WidgetWin_1 (phase 1 finding). */
 	for (i = 0; i < hl.count; i++) {
@@ -492,13 +493,14 @@ walk_collect (
 }
 
 bool
-vala_webview2_host_a11y_walk (webview2gtk_a11y_node **nodes_out, size_t *count_out)
+vala_webview2_host_a11y_walk (WebView2Host *host, webview2gtk_a11y_node **nodes_out, size_t *count_out)
 {
 	IUIAutomation *uia = NULL;
 	IUIAutomationElement *doc = NULL;
 	IUIAutomationTreeWalker *walker = NULL;
 	NodeList nl;
 	HRESULT hr;
+	HWND parent;
 
 	if (nodes_out == NULL || count_out == NULL) {
 		return false;
@@ -506,9 +508,10 @@ vala_webview2_host_a11y_walk (webview2gtk_a11y_node **nodes_out, size_t *count_o
 	*nodes_out = NULL;
 	*count_out = 0;
 
-	if (vala_webview2_com_get_webview () == NULL) {
+	if (vala_webview2_com_get_webview_for (host) == NULL) {
 		return false;
 	}
+	parent = vala_webview2_com_get_parent_hwnd_for (host);
 
 	a11y_cache_clear ();
 	ZeroMemory (&nl, sizeof (nl));
@@ -517,7 +520,7 @@ vala_webview2_host_a11y_walk (webview2gtk_a11y_node **nodes_out, size_t *count_o
 	if (uia == NULL) {
 		return false;
 	}
-	doc = find_page_document (uia);
+	doc = find_page_document (uia, parent);
 	if (doc == NULL) {
 		IUIAutomation_Release (uia);
 		return false;
@@ -540,7 +543,7 @@ vala_webview2_host_a11y_walk (webview2gtk_a11y_node **nodes_out, size_t *count_o
 }
 
 bool
-vala_webview2_host_a11y_walk_foreach (WebView2GtkA11yForeachCb cb, void *user_data)
+vala_webview2_host_a11y_walk_foreach (WebView2Host *host, WebView2GtkA11yForeachCb cb, void *user_data)
 {
 	webview2gtk_a11y_node *nodes = NULL;
 	size_t count = 0;
@@ -549,7 +552,7 @@ vala_webview2_host_a11y_walk_foreach (WebView2GtkA11yForeachCb cb, void *user_da
 	if (cb == NULL) {
 		return false;
 	}
-	if (!vala_webview2_host_a11y_walk (&nodes, &count)) {
+	if (!vala_webview2_host_a11y_walk (host, &nodes, &count)) {
 		return false;
 	}
 	for (i = 0; i < count; i++) {

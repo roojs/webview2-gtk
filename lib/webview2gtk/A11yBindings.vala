@@ -33,4 +33,4 @@ public delegate void Wv2A11yForeachCb(
 );
 
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_a11y_walk_foreach")]
-extern bool wv2_a11y_walk_foreach(Wv2A11yForeachCb cb, void* user_data);
+extern bool wv2_a11y_walk_foreach(void* host, Wv2A11yForeachCb cb, void* user_data);

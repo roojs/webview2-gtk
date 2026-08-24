@@ -115,7 +115,7 @@ WebView2Gtk-only: `ready`. Accessibility: **`Win32Atspi`** (above), not on `WebV
 Not implemented yet: full settings surface, policy callbacks, `register_script_message_handler_with_reply`, mute/WebRTC/permission APIs, etc. (`load_failed` and `JavaScriptResult.to_string` are implemented.)  
 🚫 Public `WebView` click/type APIs are intentional omissions — fill stays with an **external** driver/CDP client ([automation.md](docs/automation.md)).
 
-**Limitation:** one WebView2 host per process today (shared COM singleton).
+**Limitation:** each GTK `WebView` owns its own WebView2 controller (shared Environment). Cookie profile and CDP/automation remain process-scoped by design.
 
 ---
 
@@ -128,6 +128,7 @@ vapi/               Bindings
 examples/hello/     Minimal demo
 examples/browser/   Browser chrome + Win32Atspi smoke
 examples/automation/  Automation setup smoke (plan 3.0)
+examples/paned-insert/  Login → first paned insert + load_uri (blank-pane repro)
 examples/consumer-meson.build
 docs/               Install / build / use / deploy / a11y / automation / Valadoc
 packaging/          NSIS + MSYS2 PKGBUILD

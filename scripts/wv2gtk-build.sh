@@ -3,16 +3,18 @@
 #
 # Usage:
 #   wv2gtk-build.sh lib      <builddir> <prefix> <stamp>
-#   wv2gtk-build.sh hello       <builddir> <out.exe> <lib-stage>
-#   wv2gtk-build.sh browser     <builddir> <out.exe> <lib-stage>
-#   wv2gtk-build.sh automation  <builddir> <out.exe> <lib-stage>
-#   wv2gtk-build.sh cdp-attach  <builddir> <out.exe>   # soup+json only
+#   wv2gtk-build.sh hello         <builddir> <out.exe> <lib-stage>
+#   wv2gtk-build.sh browser       <builddir> <out.exe> <lib-stage>
+#   wv2gtk-build.sh automation    <builddir> <out.exe> <lib-stage>
+#   wv2gtk-build.sh paned-insert  <builddir> <out.exe> <lib-stage>
+#   wv2gtk-build.sh multi-host-spike <builddir> <out.exe>   # raw WebView2 COM spike
+#   wv2gtk-build.sh cdp-attach    <builddir> <out.exe>   # soup+json only
 #
 # Examples link the staged static library from `lib` — they do not recompile
 # the widget/host tree (that was tripling CI compile time).
 set -euo pipefail
 
-MODE="${1:?mode: lib|hello|browser}"
+MODE="${1:?mode: lib|hello|browser|automation|paned-insert|multi-host-spike|cdp-attach}"
 BUILD_DIR="${2:?build directory}"
 OUT="${3:?output (prefix for lib, exe for examples)}"
 
@@ -139,7 +141,7 @@ host_c_files() {
 	echo \
 		"${valac_c[@]}" \
 		"${GEN}/win32-ui-webview2-com-sync.c" \
-		"${GEN}/win32-ui-webview2-events.c" \
+		"${HOST}/win32-ui-webview2-events.c" \
 		"${HOST}/win32-ui-webview2-loader.c" \
 		"${HOST}/win32-ui-webview2-com-glue.c" \
 		"${HOST}/win32-ui-webview2-automation.c" \
@@ -242,7 +244,7 @@ case "${MODE}" in
 		mkdir -p "$(dirname "${STAMP}")"
 		touch "${STAMP}"
 		;;
-	hello|browser|automation)
+	hello|browser|automation|paned-insert)
 		LIB_STAGE="${4:?lib-stage from meson (install-staging)}"
 		STAGED_A="${LIB_STAGE}/lib/libwebview2gtk-1.a"
 		STAGED_INC="${LIB_STAGE}/include/webview2gtk-1"
@@ -279,9 +281,9 @@ case "${MODE}" in
 			exit 1
 		fi
 		mkdir -p "$(dirname "${OUT}")"
-		# automation: console so automation-started / inspector lines show in SSH smoke.
+		# Console so smoke prints (TEST_PASS / TEST_FAIL) land in schtasks logs.
 		_subsys="${WINDOWS_SUBSYSTEM:--mwindows}"
-		if [[ "${MODE}" == "automation" && -z "${WINDOWS_SUBSYSTEM:-}" ]]; then
+		if [[ "${MODE}" == "automation" || "${MODE}" == "paned-insert" ]] && [[ -z "${WINDOWS_SUBSYSTEM:-}" ]]; then
 			_subsys="-mconsole"
 		fi
 		# shellcheck disable=SC2086
@@ -294,6 +296,17 @@ case "${MODE}" in
 			"${STAGED_A}" \
 			"${WEBVIEW2_LINK[@]}" \
 			${GTK_LIBS}
+		cp -f "${ROOT}/build/vendor/webview2/x64/WebView2Loader.dll" "$(dirname "${OUT}")/" 2>/dev/null || true
+		;;
+	multi-host-spike)
+		# Standalone Win32 + WebView2 COM — no GTK / no libwebview2gtk.
+		mkdir -p "$(dirname "${OUT}")"
+		# shellcheck disable=SC2086
+		${CC} "${CC_QUIET[@]}" -mconsole \
+			-I"${WEBVIEW2_INC}" \
+			-o "${OUT}" \
+			"${ROOT}/examples/multi-host-spike/main.c" \
+			"${WEBVIEW2_LINK[@]}"
 		cp -f "${ROOT}/build/vendor/webview2/x64/WebView2Loader.dll" "$(dirname "${OUT}")/" 2>/dev/null || true
 		;;
 	cdp-attach)

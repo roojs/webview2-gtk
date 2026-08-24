@@ -1,4 +1,5 @@
-/* Downloads: ICoreWebView2_4 DownloadStarting + WinHTTP for download_uri. */
+/* Downloads: ICoreWebView2_4 DownloadStarting + WinHTTP for download_uri.
+ * Per WebView2Host (plan 4.3); jobs keyed by id with host for callbacks. */
 
 #define COBJMACROS
 #define WIN32_LEAN_AND_MEAN
@@ -12,6 +13,7 @@
 
 #include "webview2gtk-host-api.h"
 #include "win32-ui-webview2-downloads.h"
+#include "win32-ui-webview2-host-priv.h"
 #include "win32-ui-webview2-com-glue.h"
 #include "win32-ui-webview2-sdk.h"
 
@@ -25,6 +27,7 @@ typedef struct {
 	ICoreWebView2DownloadStartingEventHandler iface;
 	ICoreWebView2DownloadStartingEventHandlerVtbl vtbl;
 	LONG ref_count;
+	WebView2Host *host;
 } StartingHandler;
 
 typedef struct {
@@ -43,6 +46,7 @@ typedef struct {
 
 struct DownloadJob {
 	int id;
+	WebView2Host *host;
 	int kind;
 	char *uri;
 	char *suggested;
@@ -66,15 +70,6 @@ struct DownloadJob {
 
 static DownloadJob *g_jobs[MAX_JOBS];
 static volatile LONG g_next_id = 1;
-static EventRegistrationToken g_start_token;
-static BOOL g_start_registered;
-static StartingHandler *g_start_handler;
-
-static WebView2GtkDownloadStartedCb g_started_cb;
-static WebView2GtkDownloadProgressCb g_progress_cb;
-static WebView2GtkDownloadFinishedCb g_finished_cb;
-static WebView2GtkDownloadFailedCb g_failed_cb;
-static void *g_cb_ctx;
 
 static DownloadJob *
 job_find (int id)
@@ -177,7 +172,7 @@ basename_from_path_utf8 (const char *path)
 }
 
 static char *
-cookie_header_from_jar (const char *uri)
+cookie_header_from_jar (WebView2Host *host, const char *uri)
 {
 	char *raw = NULL;
 	char *out = NULL;
@@ -186,7 +181,7 @@ cookie_header_from_jar (const char *uri)
 	char *p;
 	char *line_start;
 
-	if (!vala_webview2_host_get_cookies_sync (uri, &raw) || raw == NULL) {
+	if (!vala_webview2_host_get_cookies_sync (host, uri, &raw) || raw == NULL) {
 		return strdup ("");
 	}
 	p = raw;
@@ -240,8 +235,9 @@ emit_failed (DownloadJob *job, const char *message)
 	if (InterlockedExchange (&job->terminal, 1) != 0) {
 		return;
 	}
-	if (g_failed_cb != NULL) {
-		g_failed_cb (job->id, message != NULL ? message : "download failed", g_cb_ctx);
+	if (job->host != NULL && job->host->cb_dl_failed != NULL) {
+		job->host->cb_dl_failed (job->id, message != NULL ? message : "download failed",
+		                         job->host->dl_ctx);
 	}
 	job_remove (job->id);
 }
@@ -252,8 +248,8 @@ emit_finished (DownloadJob *job)
 	if (InterlockedExchange (&job->terminal, 1) != 0) {
 		return;
 	}
-	if (g_finished_cb != NULL) {
-		g_finished_cb (job->id, g_cb_ctx);
+	if (job->host != NULL && job->host->cb_dl_finished != NULL) {
+		job->host->cb_dl_finished (job->id, job->host->dl_ctx);
 	}
 	job_remove (job->id);
 }
@@ -264,8 +260,8 @@ emit_progress (DownloadJob *job, UINT64 received)
 	if (job->terminal) {
 		return;
 	}
-	if (g_progress_cb != NULL) {
-		g_progress_cb (job->id, (uint64_t) received, g_cb_ctx);
+	if (job->host != NULL && job->host->cb_dl_progress != NULL) {
+		job->host->cb_dl_progress (job->id, (uint64_t) received, job->host->dl_ctx);
 	}
 }
 
@@ -523,7 +519,7 @@ http_transfer_thread (LPVOID param)
 		goto out;
 	}
 
-	cookie_hdr = cookie_header_from_jar (job->uri);
+	cookie_hdr = cookie_header_from_jar (job->host, job->uri);
 	if (cookie_hdr != NULL && cookie_hdr[0] != '\0') {
 		cookie_wide = win32_ui_utf8_to_utf16 (cookie_hdr, NULL);
 		if (cookie_wide != NULL) {
@@ -610,13 +606,13 @@ out:
 }
 
 static DownloadJob *
-job_alloc_http (const char *uri, const char *suggested, const char *mime, INT64 content_length)
+job_alloc_http (WebView2Host *host, const char *uri, const char *suggested, const char *mime, INT64 content_length)
 {
 	int slot;
 	DownloadJob *job;
 
 	slot = job_slot ();
-	if (slot < 0 || uri == NULL || uri[0] == '\0') {
+	if (host == NULL || slot < 0 || uri == NULL || uri[0] == '\0') {
 		return NULL;
 	}
 	job = (DownloadJob *) calloc (1, sizeof (DownloadJob));
@@ -624,6 +620,7 @@ job_alloc_http (const char *uri, const char *suggested, const char *mime, INT64 
 		return NULL;
 	}
 	job->id = (int) InterlockedIncrement (&g_next_id);
+	job->host = host;
 	job->kind = JOB_HTTP;
 	job->uri = strdup (uri);
 	job->suggested = strdup (suggested != NULL && suggested[0] != '\0' ? suggested : "download");
@@ -676,6 +673,8 @@ start_invoke (
 	ICoreWebView2 *sender,
 	ICoreWebView2DownloadStartingEventArgs *args)
 {
+	StartingHandler *self = (StartingHandler *) This;
+	WebView2Host *host = self->host;
 	int slot;
 	DownloadJob *job;
 	ICoreWebView2Deferral *deferral = NULL;
@@ -688,10 +687,9 @@ start_invoke (
 	char *mime = NULL;
 	INT64 total = -1;
 
-	(void) This;
 	(void) sender;
 
-	if (args == NULL) {
+	if (args == NULL || host == NULL) {
 		return S_OK;
 	}
 	slot = job_slot ();
@@ -743,6 +741,7 @@ start_invoke (
 		return S_OK;
 	}
 	job->id = (int) InterlockedIncrement (&g_next_id);
+	job->host = host;
 	job->kind = JOB_NATIVE;
 	job->uri = uri;
 	job->suggested = suggested;
@@ -754,39 +753,43 @@ start_invoke (
 	job->op = op;
 	g_jobs[slot] = job;
 
-	if (g_started_cb != NULL) {
-		g_started_cb (job->id, job->uri, job->suggested, job->mime,
-		              job->content_length, g_cb_ctx);
+	if (host->cb_dl_started != NULL) {
+		host->cb_dl_started (job->id, job->uri, job->suggested, job->mime,
+		                     job->content_length, host->dl_ctx);
 	}
 	return S_OK;
 }
 
 void
 vala_webview2_host_set_download_handlers (
+	WebView2Host *host,
 	WebView2GtkDownloadStartedCb started,
 	WebView2GtkDownloadProgressCb progress,
 	WebView2GtkDownloadFinishedCb finished,
 	WebView2GtkDownloadFailedCb failed,
 	void *user_data)
 {
-	g_started_cb = started;
-	g_progress_cb = progress;
-	g_finished_cb = finished;
-	g_failed_cb = failed;
-	g_cb_ctx = user_data;
+	if (host == NULL) {
+		return;
+	}
+	host->cb_dl_started = started;
+	host->cb_dl_progress = progress;
+	host->cb_dl_finished = finished;
+	host->cb_dl_failed = failed;
+	host->dl_ctx = user_data;
 }
 
 int
-vala_webview2_host_download_create (const char *uri)
+vala_webview2_host_download_create (WebView2Host *host, const char *uri)
 {
 	DownloadJob *job;
 	char *suggested;
 
-	if (uri == NULL || uri[0] == '\0') {
+	if (host == NULL || uri == NULL || uri[0] == '\0') {
 		return 0;
 	}
 	suggested = basename_from_path_utf8 (uri);
-	job = job_alloc_http (uri, suggested, "", -1);
+	job = job_alloc_http (host, uri, suggested, "", -1);
 	free (suggested);
 	return job != NULL ? job->id : 0;
 }
@@ -874,66 +877,82 @@ vala_webview2_host_download_cancel (int id)
 }
 
 void
-vala_webview2_downloads_register (ICoreWebView2 *webview)
+vala_webview2_downloads_register_host (WebView2Host *host)
 {
+	ICoreWebView2 *webview;
 	ICoreWebView2_4 *webview4 = NULL;
+	StartingHandler *handler;
 	HRESULT hr;
 
-	if (webview == NULL || g_start_registered) {
+	if (host == NULL || host->webview == NULL || host->downloads_registered) {
 		return;
 	}
+	webview = host->webview;
 	if (FAILED (ICoreWebView2_QueryInterface (webview, &IID_ICoreWebView2_4,
 	                                          (void **) &webview4))
 	    || webview4 == NULL) {
 		fprintf (stderr, "WebView2 ICoreWebView2_4 unavailable — downloads disabled\n");
 		return;
 	}
-	g_start_handler = (StartingHandler *) CoTaskMemAlloc (sizeof (StartingHandler));
-	if (g_start_handler == NULL) {
+	handler = (StartingHandler *) CoTaskMemAlloc (sizeof (StartingHandler));
+	if (handler == NULL) {
 		ICoreWebView2_4_Release (webview4);
 		return;
 	}
-	ZeroMemory (g_start_handler, sizeof (*g_start_handler));
-	g_start_handler->iface.lpVtbl = &g_start_handler->vtbl;
-	g_start_handler->vtbl.QueryInterface = start_qi;
-	g_start_handler->vtbl.AddRef = start_addref;
-	g_start_handler->vtbl.Release = start_release;
-	g_start_handler->vtbl.Invoke = start_invoke;
-	g_start_handler->ref_count = 1;
+	ZeroMemory (handler, sizeof (*handler));
+	handler->iface.lpVtbl = &handler->vtbl;
+	handler->vtbl.QueryInterface = start_qi;
+	handler->vtbl.AddRef = start_addref;
+	handler->vtbl.Release = start_release;
+	handler->vtbl.Invoke = start_invoke;
+	handler->ref_count = 1;
+	handler->host = host;
 	hr = ICoreWebView2_4_add_DownloadStarting (
-		webview4, &g_start_handler->iface, &g_start_token);
+		webview4, &handler->iface, &host->tok_download_start);
 	ICoreWebView2_4_Release (webview4);
 	if (FAILED (hr)) {
 		fprintf (stderr, "WebView2 add_DownloadStarting failed: 0x%08lx\n",
 		         (unsigned long) hr);
-		ICoreWebView2DownloadStartingEventHandler_Release (&g_start_handler->iface);
-		g_start_handler = NULL;
+		ICoreWebView2DownloadStartingEventHandler_Release (&handler->iface);
 		return;
 	}
-	g_start_registered = TRUE;
+	ICoreWebView2DownloadStartingEventHandler_Release (&handler->iface);
+	host->downloads_registered = TRUE;
+}
+
+void
+vala_webview2_downloads_unregister_host (WebView2Host *host)
+{
+	ICoreWebView2_4 *webview4 = NULL;
+	int i;
+
+	if (host == NULL) {
+		return;
+	}
+	if (host->webview != NULL && host->downloads_registered
+	    && SUCCEEDED (ICoreWebView2_QueryInterface (host->webview, &IID_ICoreWebView2_4,
+	                                                (void **) &webview4))
+	    && webview4 != NULL) {
+		ICoreWebView2_4_remove_DownloadStarting (webview4, host->tok_download_start);
+		ICoreWebView2_4_Release (webview4);
+		host->downloads_registered = FALSE;
+	}
+	for (i = 0; i < MAX_JOBS; i++) {
+		if (g_jobs[i] != NULL && g_jobs[i]->host == host) {
+			vala_webview2_host_download_cancel (g_jobs[i]->id);
+		}
+	}
+}
+
+void
+vala_webview2_downloads_register (ICoreWebView2 *webview)
+{
+	(void) webview;
+	fprintf (stderr, "WebView2: downloads_register(webview) obsolete; use *_host\n");
 }
 
 void
 vala_webview2_downloads_unregister (ICoreWebView2 *webview)
 {
-	ICoreWebView2_4 *webview4 = NULL;
-	int i;
-
-	if (webview != NULL && g_start_registered
-	    && SUCCEEDED (ICoreWebView2_QueryInterface (webview, &IID_ICoreWebView2_4,
-	                                                (void **) &webview4))
-	    && webview4 != NULL) {
-		ICoreWebView2_4_remove_DownloadStarting (webview4, g_start_token);
-		ICoreWebView2_4_Release (webview4);
-		g_start_registered = FALSE;
-	}
-	if (g_start_handler != NULL) {
-		ICoreWebView2DownloadStartingEventHandler_Release (&g_start_handler->iface);
-		g_start_handler = NULL;
-	}
-	for (i = 0; i < MAX_JOBS; i++) {
-		if (g_jobs[i] != NULL) {
-			vala_webview2_host_download_cancel (g_jobs[i]->id);
-		}
-	}
+	(void) webview;
 }

@@ -60,7 +60,7 @@ static HRESULT STDMETHODCALLTYPE devtools_invoke (
 }
 
 bool
-vala_webview2_host_capture_screenshot_sync (bool full_document, char **devtools_json_out)
+vala_webview2_host_capture_screenshot_sync (WebView2Host *host, bool full_document, char **devtools_json_out)
 {
 	ICoreWebView2 *webview;
 	DevToolsHandler dh;
@@ -70,7 +70,7 @@ vala_webview2_host_capture_screenshot_sync (bool full_document, char **devtools_
 	if (devtools_json_out != NULL) {
 		*devtools_json_out = NULL;
 	}
-	webview = vala_webview2_com_get_webview ();
+	webview = vala_webview2_com_get_webview_for (host);
 	if (webview == NULL) {
 		return false;
 	}

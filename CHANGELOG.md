@@ -6,10 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.4.3] - Unreleased
+## [0.5.0] - Unreleased
+
+### Added
+
+- One WebView2 controller per GTK `WebView` (shared Environment): multi-view apps no longer share a process-wide COM singleton ([plan 4.0](docs/plans/4.0-multi-webview-host.md)).
+- `examples/paned-insert` smoke for two-WebView attach + primary `load_changed` after management already holds a host ([bug](docs/bugs/2026-08-24-pending-navigate-first-paned-insert.md)).
+- `examples/multi-host-spike` raw COM spike (two controllers, same toplevel HWND).
 
 ### Fixed
 
+- Second `WebView` attach overwrote the only host / stole events; primary `load_uri` after management attach now gets per-widget `load_changed`, URI, and title.
+- Nav/title, document-response, script messages, downloads, web resources, permissions/mute, and sync helpers (`execute_script`, cookies, capture, print, a11y walk) are host-keyed.
 - Installed `webview2gtk-1.vapi`: `Win32Atspi` now has `cheader_filename = "webview2gtk.h"`, so consumer `.vala` that only uses a11y emits `#include <webview2gtk.h>` and links without needing `WebView` in the same file ([bug](docs/bugs/2026-08-21-win32atspi-vapi-missing-cheader.md)).
 - Nested `WebView` stayed unattached (0×0 host `DrawingArea`) inside `ScrolledWindow` / overlays; the host now has a minimal content size, the box expands, and `map` retries attach + pending navigate ([bug](docs/bugs/2026-08-21-webview-nested-zero-size-attach.md)).
 - `webview2gtk-1.pc` `Version` now matches the project version (`pkg-config --modversion` was stuck at `0.2.0`).

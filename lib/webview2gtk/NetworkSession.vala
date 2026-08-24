@@ -2,23 +2,30 @@ namespace WebView2Gtk {
 
 /**
  * WebKitGTK-shaped network session — cookies + download_started.
+ *
+ * Download COM handlers are installed per WebView2Host when a WebView binds
+ * this session (shared session ⇒ same Vala callbacks on each host).
  */
 public class NetworkSession : Object {
-	private static bool handlers_installed = false;
 	private static weak NetworkSession? active_session = null;
 
-	private CookieManager cookie_manager = new CookieManager();
+	private CookieManager cookie_manager;
 	private GenericArray<Download> downloads = new GenericArray<Download> ();
+	private void* cookie_host = null;
 
 	public signal void download_started(Download download);
 
 	public NetworkSession() {
+		this.cookie_manager = new CookieManager(this);
 		NetworkSession.active_session = this;
-		NetworkSession.ensure_handlers();
 	}
 
 	public CookieManager get_cookie_manager() {
 		return this.cookie_manager;
+	}
+
+	internal void* cookie_host_handle() {
+		return this.cookie_host;
 	}
 
 	public void set_proxy_settings(
@@ -28,6 +35,27 @@ public class NetworkSession : Object {
 	}
 
 	public void set_tls_errors_policy(TLSErrorsPolicy policy) {
+	}
+
+	/** Wire this session's download callbacks onto a WebView host. */
+	internal void bind_download_host(void* host) {
+		if (host == null) {
+			return;
+		}
+		this.cookie_host = host;
+		wv2_host_set_download_handlers(host, NetworkSession.on_host_started,
+			NetworkSession.on_host_progress, NetworkSession.on_host_finished,
+			NetworkSession.on_host_failed, null);
+	}
+
+	internal void unbind_download_host(void* host) {
+		if (host == null) {
+			return;
+		}
+		wv2_host_set_download_handlers(host, null, null, null, null, null);
+		if (this.cookie_host == host) {
+			this.cookie_host = null;
+		}
 	}
 
 	internal void register_download(Download download, int host_id) {
@@ -55,15 +83,6 @@ public class NetworkSession : Object {
 	internal void emit_download_started(Download download) {
 		this.download_started(download);
 		download.schedule_decide_destination();
-	}
-
-	private static void ensure_handlers() {
-		if (NetworkSession.handlers_installed) {
-			return;
-		}
-		NetworkSession.handlers_installed = true;
-		wv2_host_set_download_handlers(NetworkSession.on_host_started, NetworkSession.on_host_progress,
-			NetworkSession.on_host_finished, NetworkSession.on_host_failed, null);
 	}
 
 	private static void on_host_started(
