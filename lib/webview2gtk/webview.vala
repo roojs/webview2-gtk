@@ -115,7 +115,7 @@ public enum LoadEvent {
  * **Limitation(v0.1):** one WebView2 host per process(shared COM singleton).
  */
 public class WebView : Gtk.Box {
-	private Gtk.Widget host;
+	private Gtk.DrawingArea host;
 	private void* parent_hwnd = null;
 	private bool attached = false;
 	private bool host_shown_on_screen = true;
