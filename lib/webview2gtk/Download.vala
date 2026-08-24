@@ -5,7 +5,7 @@ namespace WebView2Gtk {
  */
 public class Download : Object {
 	private weak NetworkSession session;
-	private int host_id;
+	internal int host_id;
 	private URIRequest request;
 	private string suggested_filename;
 	private string mime_type;
@@ -94,10 +94,6 @@ public class Download : Object {
 		this.emit_failed(new NetworkError.CANCELLED("Download cancelled"));
 	}
 
-	internal int host_id_internal() {
-		return this.host_id;
-	}
-
 	internal void schedule_decide_destination() {
 		if (this.decide_scheduled || this.terminal) {
 			return;
@@ -134,11 +130,7 @@ public class Download : Object {
 		this.finished();
 	}
 
-	internal void on_failed_message(string message) {
-		this.emit_failed(new NetworkError.FAILED("%s", message));
-	}
-
-	private void emit_failed(GLib.Error error) {
+	internal void emit_failed(GLib.Error error) {
 		if (this.terminal) {
 			return;
 		}

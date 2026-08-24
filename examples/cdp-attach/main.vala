@@ -49,9 +49,7 @@ async void run(int port, string fill_text) throws GLib.Error
 	if (ver_msg.status_code != 200) {
 		throw new GLib.IOError.FAILED(
 			"Cannot reach %s/json/version (HTTP %u) — is webview2gtk-automation.exe running?",
-			base_url,
-			ver_msg.status_code
-		);
+			base_url, ver_msg.status_code);
 	}
 	stderr.printf("  %s\n", bytes_to_string(ver_bytes));
 
@@ -70,13 +68,7 @@ async void run(int port, string fill_text) throws GLib.Error
 		.replace("wss://", "https://");
 	var ws_msg = new Soup.Message("GET", http_ws);
 	stderr.printf("WebSocket CDP attach ...\n");
-	var conn = yield session.websocket_connect_async(
-		ws_msg,
-		null,
-		null,
-		GLib.Priority.DEFAULT,
-		null
-	);
+	var conn = yield session.websocket_connect_async(ws_msg, null, null, GLib.Priority.DEFAULT, null);
 	stderr.printf("  attached\n");
 
 	var expr = (

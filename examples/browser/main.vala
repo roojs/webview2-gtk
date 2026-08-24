@@ -117,21 +117,14 @@ private void invoke_first_hyperlink(Gtk.Window parent) {
 		sync_url_entry();
 		var after = web.get_uri();
 		var moved = before != after;
-		show_text_window(
-			parent,
-			"Win32Atspi invoke",
-			("do_action → %s\n"
-			 + "name=%s\n"
-			 + "href=%s\n"
-			 + "uri before=%s\n"
-			 + "uri after =%s\n"
-			 + "navigated=%s\n").printf(
-				ok ? "OK" : "FAIL",
-				name,
-				href,
-				before,
-				after,
-				moved ? "YES" : "no"));
+		show_text_window(parent, "Win32Atspi invoke",
+			"""do_action → %s
+name=%s
+href=%s
+uri before=%s
+uri after =%s
+navigated=%s
+""".printf(ok ? "OK" : "FAIL", name, href, before, after, moved ? "YES" : "no"));
 		return Source.REMOVE;
 	});
 }
@@ -179,21 +172,14 @@ private void fill_search_combobox(Gtk.Window parent) {
 			}
 			return true;
 		});
-		show_text_window(
-			parent,
-			"Win32Atspi fill",
-			("set_text_contents → %s\n"
-			 + "role=%s name=%s\n"
-			 + "before=%s\n"
-			 + "want  =%s\n"
-			 + "after =%s\n"
-			 + "matched=%s\n").printf(
-				ok ? "OK" : "FAIL",
-				role,
-				name,
-				before,
-				want,
-				after,
+		show_text_window(parent, "Win32Atspi fill",
+			"""set_text_contents → %s
+role=%s name=%s
+before=%s
+want  =%s
+after =%s
+matched=%s
+""".printf(ok ? "OK" : "FAIL", role, name, before, want, after,
 				after == want ? "YES" : "no"));
 		return Source.REMOVE;
 	});

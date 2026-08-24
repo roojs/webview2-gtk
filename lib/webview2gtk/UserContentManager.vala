@@ -77,11 +77,7 @@ public class UserContentManager : Object {
 		var json = message_json;
 		Idle.add(() => {
 			var result = new JavaScriptResult(json);
-			GLib.Signal.emit_by_name(
-				this,
-				"script-message-received::%s".printf(handler),
-				result
-			);
+			GLib.Signal.emit_by_name(this, "script-message-received::%s".printf(handler), result);
 			return false;
 		});
 	}

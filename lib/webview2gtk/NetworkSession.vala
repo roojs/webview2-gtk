@@ -36,7 +36,7 @@ public class NetworkSession : Object {
 
 	internal void unregister_download(int host_id) {
 		for (var i = 0; i < this.downloads.length; i++) {
-			if (this.downloads[i].host_id_internal() == host_id) {
+			if (this.downloads[i].host_id == host_id) {
 				this.downloads.remove_index(i);
 				return;
 			}
@@ -45,7 +45,7 @@ public class NetworkSession : Object {
 
 	internal Download? lookup_download(int host_id) {
 		for (var i = 0; i < this.downloads.length; i++) {
-			if (this.downloads[i].host_id_internal() == host_id) {
+			if (this.downloads[i].host_id == host_id) {
 				return this.downloads[i];
 			}
 		}
@@ -62,13 +62,8 @@ public class NetworkSession : Object {
 			return;
 		}
 		NetworkSession.handlers_installed = true;
-		wv2_host_set_download_handlers(
-			NetworkSession.on_host_started,
-			NetworkSession.on_host_progress,
-			NetworkSession.on_host_finished,
-			NetworkSession.on_host_failed,
-			null
-		);
+		wv2_host_set_download_handlers(NetworkSession.on_host_started, NetworkSession.on_host_progress,
+			NetworkSession.on_host_finished, NetworkSession.on_host_failed, null);
 	}
 
 	private static void on_host_started(
@@ -85,14 +80,7 @@ public class NetworkSession : Object {
 				wv2_host_download_cancel(id);
 				return false;
 			}
-			var dl = new Download(
-				session,
-				id,
-				uri,
-				suggested_filename,
-				mime_type,
-				content_length
-			);
+			var dl = new Download(session, id, uri, suggested_filename, mime_type, content_length);
 			session.register_download(dl, id);
 			session.emit_download_started(dl);
 			return false;
@@ -135,7 +123,7 @@ public class NetworkSession : Object {
 			}
 			var dl = session.lookup_download(id);
 			if (dl != null) {
-				dl.on_failed_message(message);
+				dl.emit_failed(new NetworkError.FAILED("%s", message));
 			}
 			return false;
 		});

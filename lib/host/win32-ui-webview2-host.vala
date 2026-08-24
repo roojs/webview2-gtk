@@ -152,10 +152,7 @@ public void finish_setup(
 	g_host.parent = parent;
 	g_host.ready = true;
 	apply_bounds();
-	var vis = com_controller_put_is_visible(
-		host_controller_com(),
-		g_host.host_visible ? 1 : 0
-	);
+	var vis = com_controller_put_is_visible(host_controller_com(), g_host.host_visible ? 1 : 0);
 	if (!com_ok(vis)) {
 		stderr.printf("WebView2 put_is_visible failed: 0x%08x\n", (uint) vis);
 	}

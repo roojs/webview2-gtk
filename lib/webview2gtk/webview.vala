@@ -82,16 +82,10 @@ extern void wv2_host_set_event_handlers(
 );
 
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_document_response_handler")]
-extern void wv2_host_set_document_response_handler(
-	void* handler,
-	void* user_data
-);
+extern void wv2_host_set_document_response_handler(void* handler, void* user_data);
 
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_script_message_handler")]
-extern void wv2_host_set_script_message_handler(
-	void* handler,
-	void* user_data
-);
+extern void wv2_host_set_script_message_handler(void* handler, void* user_data);
 
 namespace WebView2Gtk {
 
@@ -218,10 +212,7 @@ public class WebView : Gtk.Box {
 	public signal void load_changed(LoadEvent load_event);
 
 	/** Main-frame document HTTP response(status + headers as Soup.MessageHeaders). */
-	public signal void main_document_response(
-		uint status,
-		Soup.MessageHeaders headers
-	);
+	public signal void main_document_response(uint status, Soup.MessageHeaders headers);
 
 	/**
 	 * WebKitGTK-shaped — a subresource load began.
@@ -229,17 +220,10 @@ public class WebView : Gtk.Box {
 	 * Connect to {@link WebResource.finished} / {@link WebResource.failed} on
 	 * ''resource'' to track in-flight loads.
 	 */
-	public signal void resource_load_started(
-		WebResource resource,
-		URIRequest request
-	);
+	public signal void resource_load_started(WebResource resource, URIRequest request);
 
 	/** WebKitGTK-shaped — emitted when navigation fails or is cancelled. */
-	public signal bool load_failed(
-		LoadEvent load_event,
-		string failing_uri,
-		GLib.Error error
-	);
+	public signal bool load_failed(LoadEvent load_event, string failing_uri, GLib.Error error);
 
 	/** WebKitGTK-shaped — permission prompt; return true if handled. */
 	public signal bool permission_request(PermissionRequest permission_request);
@@ -304,10 +288,7 @@ public class WebView : Gtk.Box {
 	public void load_html(string content, string? base_uri = null) {
 		var html = content;
 		if (base_uri != null && base_uri.length > 0) {
-			html = "<head><base href=\"%s\"></head>%s".printf(
-				Markup.escape_text(base_uri),
-				content
-			);
+			html = "<head><base href=\"%s\"></head>%s".printf(Markup.escape_text(base_uri), content);
 		}
 		uri = base_uri ?? "about:blank";
 		/* Prefer NavigateToString — deferred data: URIs are unreliable with WebView2. */
@@ -392,7 +373,7 @@ public class WebView : Gtk.Box {
 		if (id <= 0) {
 			var failed = new Download(this.network_session, 0, trimmed, "download", "", -1);
 			Idle.add(() => {
-				failed.on_failed_message("download create failed");
+				failed.emit_failed(new NetworkError.FAILED("download create failed"));
 				return false;
 			});
 			return failed;
@@ -427,13 +408,8 @@ public class WebView : Gtk.Box {
 		var png_bytes = devtools_json_to_png_bytes(devtools_json);
 		if (!capture_ok || png_bytes == null) {
 			if (devtools_json != null) {
-				GLib.warning(
-					"get_snapshot: DevTools response(truncated): %s",
-					devtools_json.substring(
-						0,
-						int.min(devtools_json.length, 200)
-					)
-				);
+				GLib.warning("get_snapshot: DevTools response(truncated): %s",
+					devtools_json.substring(0, int.min(devtools_json.length, 200)));
 			}
 			throw new GLib.IOError.FAILED("Screenshot capture failed");
 		}
@@ -477,10 +453,6 @@ public class WebView : Gtk.Box {
 		return null;
 	}
 
-	private Gtk.Window? toplevel_window() {
-		return host.get_root() as Gtk.Window;
-	}
-
 	private void* toplevel_hwnd() {
 		var native = host.get_native();
 		if (native == null) {
@@ -493,19 +465,12 @@ public class WebView : Gtk.Box {
 		return gdk_win32_surface_get_handle(surface);
 	}
 
-	private bool host_bounds(out int x, out int y, out int width, out int height) {
-		return widget_bounds_xywh(host, out x, out y, out width, out height);
-	}
-
 	private void push_bounds() {
 		if (!attached || parent_hwnd == null) {
 			return;
 		}
-		int x;
-		int y;
-		int width;
-		int height;
-		if (!host_bounds(out x, out y, out width, out height)) {
+		int x, y, width, height;
+		if (!widget_bounds_xywh(host, out x, out y, out width, out height)) {
 			return;
 		}
 		if (!host_shown_on_screen) {
@@ -560,8 +525,7 @@ public class WebView : Gtk.Box {
 		if (attached) {
 			return;
 		}
-		var window = toplevel_window();
-		if (window == null) {
+		if (host.get_root() as Gtk.Window == null) {
 			return;
 		}
 		parent_hwnd = toplevel_hwnd();
@@ -569,11 +533,8 @@ public class WebView : Gtk.Box {
 			return;
 		}
 
-		int x;
-		int y;
-		int width;
-		int height;
-		if (!host_bounds(out x, out y, out width, out height)) {
+		int x, y, width, height;
+		if (!widget_bounds_xywh(host, out x, out y, out width, out height)) {
 			return;
 		}
 
@@ -585,31 +546,14 @@ public class WebView : Gtk.Box {
 		Win32Atspi.register_webview(this);
 		this.push_media_settings(false);
 		wv2_host_set_is_muted(this.muted);
-		wv2_host_set_permission_handler(
-			(void*) on_permission_decide_cb,
-			this
-		);
-		wv2_host_set_document_response_handler(
-			(void*) on_document_response_cb,
-			this
-		);
-		wv2_host_set_resource_handlers(
-			on_resource_started_cb,
-			on_resource_finished_cb,
-			on_resource_failed_cb,
-			this
-		);
-		wv2_host_set_script_message_handler(
-			(void*) on_script_message_cb,
-			user_content_manager
-		);
+		wv2_host_set_permission_handler((void*) on_permission_decide_cb, this);
+		wv2_host_set_document_response_handler((void*) on_document_response_cb, this);
+		wv2_host_set_resource_handlers(on_resource_started_cb, on_resource_finished_cb,
+			on_resource_failed_cb, this);
+		wv2_host_set_script_message_handler((void*) on_script_message_cb, user_content_manager);
 		user_content_manager.bind_host();
-		wv2_host_set_event_handlers(
-			(void*) on_navigation_starting_cb,
-			(void*) on_navigation_completed_cb,
-			(void*) on_document_title_changed_cb,
-			this
-		);
+		wv2_host_set_event_handlers((void*) on_navigation_starting_cb,
+			(void*) on_navigation_completed_cb, (void*) on_document_title_changed_cb, this);
 		this.sync_host_visible();
 		try_navigate();
 	}
@@ -652,14 +596,6 @@ public class WebView : Gtk.Box {
 		this.estimated_load_progress = progress;
 	}
 
-	private void refresh_uri() {
-		get_uri();
-	}
-
-	private void refresh_title() {
-		get_title();
-	}
-
 	private void on_navigation_starting() {
 		set_loading(true, 0.1);
 		load_changed(LoadEvent.STARTED);
@@ -683,18 +619,10 @@ public class WebView : Gtk.Box {
 			return;
 		}
 		load_cancelled = false;
-		refresh_uri();
-		refresh_title();
+		get_uri();
+		get_title();
 		set_loading(false, 1.0);
 		load_changed(LoadEvent.FINISHED);
-	}
-
-	private void on_document_title_changed() {
-		refresh_title();
-	}
-
-	private void on_document_response(uint status, Soup.MessageHeaders headers) {
-		main_document_response(status, headers);
 	}
 
 	private void on_resource_started(int id, string uri) {
@@ -772,7 +700,7 @@ public class WebView : Gtk.Box {
 		for (var i = 0; i < (int) header_count; i++) {
 			headers.append(header_names[i], header_values[i]);
 		}
-		((WebView) user_data).on_document_response((uint) status, headers);
+		((WebView) user_data).main_document_response((uint) status, headers);
 	}
 
 	[CCode(has_target = false)]
@@ -802,7 +730,7 @@ public class WebView : Gtk.Box {
 
 	[CCode(has_target = false)]
 	private static void on_document_title_changed_cb(void* user_data) {
-		((WebView) user_data).on_document_title_changed();
+		((WebView) user_data).get_title();
 	}
 
 	[CCode(has_target = false)]

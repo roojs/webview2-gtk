@@ -31,16 +31,9 @@ public static int main(string[] args) {
 		gtk_args += args[i];
 	}
 
-	Environment.set_variable(
-		"WEBKIT_INSPECTOR_SERVER",
-		"127.0.0.1:%u".printf(insp),
-		true
-	);
+	Environment.set_variable("WEBKIT_INSPECTOR_SERVER", "127.0.0.1:%u".printf(insp), true);
 
-	var app = new Gtk.Application(
-		"com.webview2gtk.automation",
-		ApplicationFlags.DEFAULT_FLAGS
-	);
+	var app = new Gtk.Application("com.webview2gtk.automation", ApplicationFlags.DEFAULT_FLAGS);
 	app.activate.connect(() => {
 		var window = new Gtk.ApplicationWindow(app);
 		window.set_title("webview2-gtk automation");
@@ -81,10 +74,8 @@ body{font-family:sans-serif;margin:2rem}
 			null
 		);
 
-		GLib.message(
-			"inspector 127.0.0.1:%u — CDP --remote-debugging-port(WEBKIT_INSPECTOR_SERVER)",
-			insp
-		);
+		GLib.message("inspector 127.0.0.1:%u — CDP --remote-debugging-port(WEBKIT_INSPECTOR_SERVER)",
+			insp);
 		window.present();
 		if (smoke) {
 			/*

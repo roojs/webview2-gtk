@@ -44,17 +44,13 @@ public static int main(string[] args) {
 			print("script-message-received::ping %s\n", json);
 			var script = "document.getElementById('out').textContent = 'host saw: ' + JSON.stringify("
 				+ json + ");";
-			web.evaluate_javascript.begin(
-				script,
-				-1, null, null, null,
-				(obj, res) => {
+			web.evaluate_javascript.begin(script, -1, null, null, null, (obj, res) => {
 					try {
 						web.evaluate_javascript.end(res);
 					} catch (Error e) {
 						warning("evaluate_javascript: %s", e.message);
 					}
-				}
-			);
+				});
 		});
 		mgr.register_script_message_handler("ping", null);
 
