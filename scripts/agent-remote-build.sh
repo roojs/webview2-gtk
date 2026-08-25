@@ -7,6 +7,7 @@
 #   ./scripts/agent-remote-build.sh pull     # pull build/ back to Linux
 #   ./scripts/agent-remote-build.sh run      # run hello demo on Windows (3s smoke)
 #   ./scripts/agent-remote-build.sh paned-insert  # build + run first-insert blank-pane test
+#   ./scripts/agent-remote-build.sh add-cookie    # build + run add_cookie-before-attach test
 #   ./scripts/agent-remote-build.sh multi-host-spike  # 4.5 two-controller HWND spike
 #   ./scripts/agent-remote-build.sh automation        # build + automation --smoke
 #
