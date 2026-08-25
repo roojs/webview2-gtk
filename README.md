@@ -138,3 +138,13 @@ scripts/            Vendor SDK, build, package demos, sample consumer helpers
 ## Origin
 
 Host stack from **vala.win32** (WebView2). This repo is the GTK 4 widget layer, Win32Atspi facade, and packaging.
+
+## Artificial Intelligence Usage
+
+This project was developed with the assistance of artificial intelligence.
+
+- Product design and code design were done by the author
+- AI’s main role was writing implementation for review
+- Most of the coding was performed by AI
+- Vala application code was reviewed, revised, and approved by the author
+- The C / C++ host and binding code, and the build system, are mainly AI-generated and only lightly reviewed
