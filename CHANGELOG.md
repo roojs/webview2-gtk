@@ -6,7 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.5.1] - Unreleased
+## [0.5.2] - Unreleased
+
+### Fixed
+
+- `CookieManager.add_cookie` before COM attach now queues until the host is ready and applies those cookies before the first navigate, matching pending `load_uri` ([bug](docs/bugs/done/2026-08-25-add-cookie-before-attach.md)).
+
+### Added
+
+- `examples/add-cookie` smoke: `add_cookie` then `load_uri` before COM attach ([bug](docs/bugs/done/2026-08-25-add-cookie-before-attach.md)).
+
+## [0.5.1] - 2026-08-25
 
 ### Fixed
 
@@ -15,10 +25,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `examples/paned-insert` smoke now covers orphaned browser stack → `set_start_child` + `WebViewAuto`/`load_uri` (automation construct path).
-
-### Added
-
-- `examples/add-cookie` smoke: `add_cookie` then `load_uri` before COM attach ([bug](docs/bugs/2026-08-25-add-cookie-before-attach.md)).
 
 ## [0.5.0] - 2026-08-24
 

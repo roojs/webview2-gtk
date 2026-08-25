@@ -81,6 +81,10 @@ struct WebView2Host {
 	BOOL is_muted;
 	WebView2GtkPermissionDecideCb cb_perm_decide;
 	void *perm_ctx;
+
+	/* Apply queued cookies before first Navigate (add_cookie-before-attach). */
+	WebView2GtkCookieApplyCb cb_cookie_apply;
+	void *cookie_apply_ctx;
 };
 
 #endif /* WIN32_UI_WEBVIEW2_HOST_PRIV_H */

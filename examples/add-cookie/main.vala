@@ -6,7 +6,7 @@
  *   webview2gtk-add-cookie.exe [url]
  *   --smoke        inject + load, assert cookie in jar after FINISHED, quit
  *
- * See docs/bugs/2026-08-25-add-cookie-before-attach.md
+ * See docs/bugs/done/2026-08-25-add-cookie-before-attach.md
  */
 
 using Gtk;
@@ -21,7 +21,7 @@ private bool smoke = false;
 private int smoke_status = 1;
 private bool smoke_done = false;
 private bool add_ok = false;
-private string add_err = "";
+private string add_err;
 private bool load_finished = false;
 private bool cookie_found = false;
 
@@ -59,7 +59,7 @@ private string diag_line() {
 private void refresh_status() {
 	status.label = "%s\nadd_err=%s\nload_finished=%s".printf(
 		diag_line(),
-		add_err == "" ? "(none)" : add_err,
+		add_err == null || add_err == "" ? "(none)" : add_err,
 		load_finished ? "yes" : "no"
 	);
 }
@@ -125,7 +125,7 @@ private void finish_smoke() {
 	print("smoke %s\n", diag_line());
 	print("smoke add_ok=%s add_err=%s load_finished=%s cookie_found=%s\n",
 		add_ok ? "yes" : "no",
-		add_err == "" ? "(none)" : add_err,
+		add_err == null || add_err == "" ? "(none)" : add_err,
 		load_finished ? "yes" : "no",
 		cookie_found ? "yes" : "no");
 	if (ok) {
@@ -142,6 +142,7 @@ private void finish_smoke() {
 
 public static int main(string[] args) {
 	start_uri = "https://example.com/";
+	add_err = "";
 	string[] gtk_args = {};
 	gtk_args += args[0];
 	for (var i = 1; i < args.length; i++) {

@@ -23,6 +23,12 @@ bool vala_webview2_host_is_ready (WebView2Host *host);
 void vala_webview2_host_set_ready (WebView2Host *host, bool ready);
 void vala_webview2_host_set_visible_flag (WebView2Host *host, bool visible);
 void vala_webview2_host_flush_pending_navigate (WebView2Host *host);
+void vala_webview2_host_set_cookie_apply (
+	WebView2Host *host,
+	void (*cb) (void *user_data),
+	void *user_data
+);
+void vala_webview2_host_apply_pending_cookies (WebView2Host *host);
 
 BOOL vala_webview2_com_begin_host (WebView2Host *host, HWND parent, LPCWSTR url, const RECT *bounds);
 

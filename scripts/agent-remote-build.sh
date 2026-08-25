@@ -77,7 +77,7 @@ run_remote_paned_insert_smoke() {
 run_remote_add_cookie_build() {
 	echo "[agent-remote-build] add-cookie build on ${REMOTE_HOST}"
 	ssh -o BatchMode=yes "${REMOTE_HOST}" \
-		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup --reconfigure build && rm -f build/webview2gtk-add-cookie.exe && set -o pipefail && ninja -C build libwebview2gtk-1.stamp webview2gtk-add-cookie.exe 2>&1 | tee build/last-build.log && OUT_DIR=/c/msys64/tmp/webview2-gtk/portable-demos ./scripts/copy-exe-runtime-dlls.sh build/webview2gtk-add-cookie.exe /c/msys64/tmp/webview2-gtk/portable-demos build/vendor/webview2/x64/WebView2Loader.dll\""
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup --reconfigure build && rm -f build/webview2gtk-add-cookie.exe build/libwebview2gtk-1.stamp && set -o pipefail && ninja -C build libwebview2gtk-1.stamp webview2gtk-add-cookie.exe 2>&1 | tee build/last-build.log && OUT_DIR=/c/msys64/tmp/webview2-gtk/portable-demos ./scripts/copy-exe-runtime-dlls.sh build/webview2gtk-add-cookie.exe /c/msys64/tmp/webview2-gtk/portable-demos build/vendor/webview2/x64/WebView2Loader.dll\""
 }
 
 run_remote_add_cookie_smoke() {

@@ -12,6 +12,7 @@
 
 typedef struct {
 	volatile LONG done;
+	HRESULT error;
 	char *result;
 	ICoreWebView2GetCookiesCompletedHandler handler;
 	ICoreWebView2GetCookiesCompletedHandlerVtbl vtbl;
@@ -160,6 +161,7 @@ static HRESULT STDMETHODCALLTYPE cookies_invoke (
 	UINT i;
 
 	if (FAILED (error_code) || cookie_list == NULL) {
+		ch->error = FAILED (error_code) ? error_code : E_FAIL;
 		InterlockedExchange (&ch->done, 1);
 		return S_OK;
 	}
@@ -296,7 +298,6 @@ vala_webview2_host_get_cookies_sync (WebView2Host *host, const char *uri_utf8, c
 	uint16_t *uri_wide = NULL;
 	CookiesHandler ch;
 	HRESULT hr;
-	bool ok = false;
 
 	if (cookies_text_out != NULL) {
 		*cookies_text_out = NULL;
@@ -334,12 +335,14 @@ vala_webview2_host_get_cookies_sync (WebView2Host *host, const char *uri_utf8, c
 
 	vala_webview2_com_sync_await (&ch.done);
 
-	if (cookies_text_out != NULL && ch.result != NULL) {
-		*cookies_text_out = ch.result;
-		ok = true;
-	} else if (ch.result != NULL) {
+	if (FAILED (ch.error)) {
 		free (ch.result);
-		ok = true;
+		return false;
 	}
-	return ok;
+	if (cookies_text_out != NULL) {
+		*cookies_text_out = ch.result != NULL ? ch.result : strdup ("");
+	} else {
+		free (ch.result);
+	}
+	return true;
 }

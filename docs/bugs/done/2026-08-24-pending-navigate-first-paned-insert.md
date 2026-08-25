@@ -3,7 +3,7 @@
 **Status:** ✅ fixed in **0.5.1** (host DrawingArea created in `construct`, not only `WebView()`)  
 **Date:** 2026-08-24 (fixed 2026-08-25)  
 **Component:** `lib/webview2gtk/webview.vala`  
-**Repro / test:** [`examples/paned-insert`](../../examples/paned-insert/main.vala) — `--smoke`
+**Repro / test:** [`examples/paned-insert`](../../../examples/paned-insert/main.vala) — `--smoke`
 
 ## Symptom
 
@@ -37,5 +37,5 @@ Expect **`TEST_PASS`** (`ready=yes`, `load_changed` FINISHED).
 ## Related
 
 - Nested 0×0 attach: [2026-08-21-webview-nested-zero-size-attach.md](./2026-08-21-webview-nested-zero-size-attach.md)
-- Automation construct props: [plans/3.6-webview-construct-automation.md](../plans/3.6-webview-construct-automation.md)
-- Multi-controller: [plans/4.0-multi-webview-host.md](../plans/4.0-multi-webview-host.md)
+- Automation construct props: [plans/3.6-webview-construct-automation.md](../../plans/3.6-webview-construct-automation.md)
+- Multi-controller: [plans/4.0-multi-webview-host.md](../../plans/4.0-multi-webview-host.md)

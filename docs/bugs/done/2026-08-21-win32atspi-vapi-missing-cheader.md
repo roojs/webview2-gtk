@@ -7,7 +7,7 @@
 
 ## Problem
 
-Public docs treat `Win32Atspi.*` as the Windows drop-in for Linux `Atspi.*` ([README](../../README.md), [docs/a11y.md](../a11y.md), [docs/using-in-your-app.md](../using-in-your-app.md)). That path compiles in Vala and then **dies in gcc**.
+Public docs treat `Win32Atspi.*` as the Windows drop-in for Linux `Atspi.*` ([README](../../../README.md), [docs/a11y.md](../../a11y.md), [docs/using-in-your-app.md](../../using-in-your-app.md)). That path compiles in Vala and then **dies in gcc**.
 
 A consumer file that only talks to `Win32Atspi` (no `WebView2Gtk.WebView` in the same translation unit) produces C that uses `Win32AtspiAccessible` / `win32_atspi_*` with **no `#include` of `webview2gtk.h`**.
 

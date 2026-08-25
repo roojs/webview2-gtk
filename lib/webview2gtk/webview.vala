@@ -517,6 +517,7 @@ public class WebView : Gtk.Box {
 		if (!attached) {
 			return;
 		}
+		this.network_session.apply_pending_cookies();
 		if (pending_html.length > 0) {
 			if (!wv2_host_is_ready(host_handle)) {
 				return;

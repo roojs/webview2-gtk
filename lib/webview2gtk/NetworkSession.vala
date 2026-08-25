@@ -1,5 +1,16 @@
 namespace WebView2Gtk {
 
+internal class PendingCookie {
+	public string name;
+	public string value;
+	public string domain;
+	public string path;
+	public bool http_only;
+	public bool secure;
+	public bool done;
+	public bool ok;
+}
+
 /**
  * WebKitGTK-shaped network session — cookies + download_started.
  *
@@ -11,6 +22,7 @@ public class NetworkSession : Object {
 
 	private CookieManager cookie_manager;
 	private GenericArray<Download> downloads = new GenericArray<Download> ();
+	private GenericArray<PendingCookie> pending_cookies = new GenericArray<PendingCookie> ();
 	private void* cookie_host = null;
 
 	public signal void download_started(Download download);
@@ -28,6 +40,65 @@ public class NetworkSession : Object {
 		return this.cookie_host;
 	}
 
+	internal PendingCookie enqueue_cookie(
+		string name,
+		string value,
+		string domain,
+		string path,
+		bool http_only,
+		bool secure
+	) {
+		var pending = new PendingCookie();
+		pending.name = name;
+		pending.value = value;
+		pending.domain = domain;
+		pending.path = path;
+		pending.http_only = http_only;
+		pending.secure = secure;
+		this.pending_cookies.add(pending);
+		this.apply_pending_cookies();
+		return pending;
+	}
+
+	internal void apply_pending_cookies() {
+		if (this.cookie_host == null || !wv2_host_is_ready(this.cookie_host)) {
+			return;
+		}
+		for (var i = 0; i < this.pending_cookies.length; i++) {
+			var pending = this.pending_cookies[i];
+			if (pending.done) {
+				continue;
+			}
+			pending.ok = wv2_add_cookie_sync(
+				this.cookie_host,
+				pending.name,
+				pending.value,
+				pending.domain,
+				pending.path,
+				pending.http_only,
+				pending.secure
+			);
+			pending.done = true;
+		}
+		this.pending_cookies = new GenericArray<PendingCookie> ();
+	}
+
+	private void fail_pending_cookies() {
+		for (var i = 0; i < this.pending_cookies.length; i++) {
+			var pending = this.pending_cookies[i];
+			if (pending.done) {
+				continue;
+			}
+			pending.ok = false;
+			pending.done = true;
+		}
+		this.pending_cookies = new GenericArray<PendingCookie> ();
+	}
+
+	private static void on_apply_pending_cookies(void* user_data) {
+		((NetworkSession) user_data).apply_pending_cookies();
+	}
+
 	public void set_proxy_settings(
 		NetworkProxyMode mode,
 		NetworkProxySettings? settings
@@ -43,17 +114,21 @@ public class NetworkSession : Object {
 			return;
 		}
 		this.cookie_host = host;
+		wv2_host_set_cookie_apply(host, NetworkSession.on_apply_pending_cookies, this);
 		wv2_host_set_download_handlers(host, NetworkSession.on_host_started,
 			NetworkSession.on_host_progress, NetworkSession.on_host_finished,
 			NetworkSession.on_host_failed, null);
+		this.apply_pending_cookies();
 	}
 
 	internal void unbind_download_host(void* host) {
 		if (host == null) {
 			return;
 		}
+		wv2_host_set_cookie_apply(host, null, null);
 		wv2_host_set_download_handlers(host, null, null, null, null, null);
 		if (this.cookie_host == host) {
+			this.fail_pending_cookies();
 			this.cookie_host = null;
 		}
 	}
