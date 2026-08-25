@@ -37,6 +37,9 @@ extern void host_set_visible_flag(void* host, bool visible);
 [CCode(cheader_filename = "win32-ui-webview2-com-glue.h", cname = "vala_webview2_host_flush_pending_navigate")]
 extern void host_flush_pending_navigate(void* host);
 
+[CCode(cheader_filename = "win32-ui-webview2-com-glue.h", cname = "vala_webview2_host_apply_pending_cookies")]
+extern void host_apply_pending_cookies(void* host);
+
 [CCode(cheader_filename = "win32-ui-webview2-com-glue.h", cname = "vala_webview2_host_is_ready")]
 extern bool host_is_ready_c(void* host);
 
@@ -110,6 +113,8 @@ public void finish_setup(
 	if (parent != null) {
 		com_present_webview(parent);
 	}
+	/* Queued cookies must land in COM before the first Navigate. */
+	host_apply_pending_cookies(host);
 	host_flush_pending_navigate(host);
 	events_register(host);
 	document_response_register(host);

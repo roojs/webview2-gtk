@@ -1,7 +1,7 @@
 project(
   'webview2-gtk',
   ['c', 'vala'],
-  version: '0.5.1',
+  version: '0.5.2',
   meson_version: '>= 1.0.0',
   default_options: ['buildtype=debugoptimized', 'c_std=c11'],
 )
@@ -104,6 +104,17 @@ paned_insert_exe = custom_target(
   install_dir: get_option('bindir'),
 )
 
+add_cookie_exe = custom_target(
+  'webview2gtk-add-cookie',
+  output: 'webview2gtk-add-cookie.exe',
+  command: [_build_bash, wv2gtk_build_sh, 'add-cookie', build_root / 'add-cookie', '@OUTPUT@', lib_stage],
+  depends: lib_target,
+  depend_files: files('examples/add-cookie/main.vala'),
+  build_by_default: get_option('examples'),
+  install: get_option('examples'),
+  install_dir: get_option('bindir'),
+)
+
 multi_host_spike_exe = custom_target(
   'webview2gtk-multi-host-spike',
   output: 'webview2gtk-multi-host-spike.exe',
@@ -118,7 +129,7 @@ custom_target(
   'package-demos',
   output: 'package-demos.stamp',
   command: [_build_bash, package_demos_sh, '@OUTPUT@'],
-  depends: [hello_exe, browser_exe, automation_exe, cdp_attach_exe, paned_insert_exe],
+  depends: [hello_exe, browser_exe, automation_exe, cdp_attach_exe, paned_insert_exe, add_cookie_exe],
   build_by_default: get_option('examples'),
 )
 

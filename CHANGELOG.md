@@ -6,11 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.5.1] - Unreleased
+## [0.5.2] - Unreleased
 
 ### Fixed
 
-- `WebView` host `DrawingArea` lived only in `WebView()`; subclasses that chain `Object(web_context:…, is_controlled_by_automation:…)` never got a host, so `try_attach` never ran and splash/`load_uri` stayed blank with no `load_changed` ([bug](docs/bugs/2026-08-24-pending-navigate-first-paned-insert.md)).
+- `CookieManager.add_cookie` before COM attach now queues until the host is ready and applies those cookies before the first navigate, matching pending `load_uri` ([bug](docs/bugs/done/2026-08-25-add-cookie-before-attach.md)).
+
+### Added
+
+- `examples/add-cookie` smoke: `add_cookie` then `load_uri` before COM attach ([bug](docs/bugs/done/2026-08-25-add-cookie-before-attach.md)).
+
+## [0.5.1] - 2026-08-25
+
+### Fixed
+
+- `WebView` host `DrawingArea` lived only in `WebView()`; subclasses that chain `Object(web_context:…, is_controlled_by_automation:…)` never got a host, so `try_attach` never ran and splash/`load_uri` stayed blank with no `load_changed` ([bug](docs/bugs/done/2026-08-24-pending-navigate-first-paned-insert.md)).
 
 ### Changed
 
@@ -28,8 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Second `WebView` attach overwrote the only host / stole events; primary `load_uri` after management attach now gets per-widget `load_changed`, URI, and title.
 - Nav/title, document-response, script messages, downloads, web resources, permissions/mute, and sync helpers (`execute_script`, cookies, capture, print, a11y walk) are host-keyed.
-- Installed `webview2gtk-1.vapi`: `Win32Atspi` now has `cheader_filename = "webview2gtk.h"`, so consumer `.vala` that only uses a11y emits `#include <webview2gtk.h>` and links without needing `WebView` in the same file ([bug](docs/bugs/2026-08-21-win32atspi-vapi-missing-cheader.md)).
-- Nested `WebView` stayed unattached (0×0 host `DrawingArea`) inside `ScrolledWindow` / overlays; the host now has a minimal content size, the box expands, and `map` retries attach + pending navigate ([bug](docs/bugs/2026-08-21-webview-nested-zero-size-attach.md)).
+- Installed `webview2gtk-1.vapi`: `Win32Atspi` now has `cheader_filename = "webview2gtk.h"`, so consumer `.vala` that only uses a11y emits `#include <webview2gtk.h>` and links without needing `WebView` in the same file ([bug](docs/bugs/done/2026-08-21-win32atspi-vapi-missing-cheader.md)).
+- Nested `WebView` stayed unattached (0×0 host `DrawingArea`) inside `ScrolledWindow` / overlays; the host now has a minimal content size, the box expands, and `map` retries attach + pending navigate ([bug](docs/bugs/done/2026-08-21-webview-nested-zero-size-attach.md)).
 - `webview2gtk-1.pc` `Version` now matches the project version (`pkg-config --modversion` was stuck at `0.2.0`).
 
 ## [0.4.2] - 2026-08-21

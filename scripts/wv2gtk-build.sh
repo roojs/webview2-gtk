@@ -7,6 +7,7 @@
 #   wv2gtk-build.sh browser       <builddir> <out.exe> <lib-stage>
 #   wv2gtk-build.sh automation    <builddir> <out.exe> <lib-stage>
 #   wv2gtk-build.sh paned-insert  <builddir> <out.exe> <lib-stage>
+#   wv2gtk-build.sh add-cookie    <builddir> <out.exe> <lib-stage>
 #   wv2gtk-build.sh multi-host-spike <builddir> <out.exe>   # raw WebView2 COM spike
 #   wv2gtk-build.sh cdp-attach    <builddir> <out.exe>   # soup+json only
 #
@@ -14,7 +15,7 @@
 # the widget/host tree (that was tripling CI compile time).
 set -euo pipefail
 
-MODE="${1:?mode: lib|hello|browser|automation|paned-insert|multi-host-spike|cdp-attach}"
+MODE="${1:?mode: lib|hello|browser|automation|paned-insert|add-cookie|multi-host-spike|cdp-attach}"
 BUILD_DIR="${2:?build directory}"
 OUT="${3:?output (prefix for lib, exe for examples)}"
 
@@ -244,7 +245,7 @@ case "${MODE}" in
 		mkdir -p "$(dirname "${STAMP}")"
 		touch "${STAMP}"
 		;;
-	hello|browser|automation|paned-insert)
+	hello|browser|automation|paned-insert|add-cookie)
 		LIB_STAGE="${4:?lib-stage from meson (install-staging)}"
 		STAGED_A="${LIB_STAGE}/lib/libwebview2gtk-1.a"
 		STAGED_INC="${LIB_STAGE}/include/webview2gtk-1"
@@ -283,7 +284,7 @@ case "${MODE}" in
 		mkdir -p "$(dirname "${OUT}")"
 		# Console so smoke prints (TEST_PASS / TEST_FAIL) land in schtasks logs.
 		_subsys="${WINDOWS_SUBSYSTEM:--mwindows}"
-		if [[ "${MODE}" == "automation" || "${MODE}" == "paned-insert" ]] && [[ -z "${WINDOWS_SUBSYSTEM:-}" ]]; then
+		if [[ "${MODE}" == "automation" || "${MODE}" == "paned-insert" || "${MODE}" == "add-cookie" ]] && [[ -z "${WINDOWS_SUBSYSTEM:-}" ]]; then
 			_subsys="-mconsole"
 		fi
 		# shellcheck disable=SC2086

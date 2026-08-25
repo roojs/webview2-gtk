@@ -455,6 +455,27 @@ vala_webview2_host_flush_pending_navigate (WebView2Host *host)
 	host->pending_url[0] = L'\0';
 }
 
+void
+vala_webview2_host_set_cookie_apply (
+	WebView2Host *host,
+	void (*cb) (void *user_data),
+	void *user_data)
+{
+	if (host == NULL) {
+		return;
+	}
+	host->cb_cookie_apply = cb;
+	host->cookie_apply_ctx = user_data;
+}
+
+void
+vala_webview2_host_apply_pending_cookies (WebView2Host *host)
+{
+	if (host != NULL && host->cb_cookie_apply != NULL) {
+		host->cb_cookie_apply (host->cookie_apply_ctx);
+	}
+}
+
 ICoreWebView2 *
 vala_webview2_com_get_webview_for (WebView2Host *host)
 {

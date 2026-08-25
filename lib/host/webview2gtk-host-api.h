@@ -135,6 +135,14 @@ bool vala_webview2_host_add_cookie_sync (
 	bool secure
 );
 
+typedef void (*WebView2GtkCookieApplyCb) (void *user_data);
+void vala_webview2_host_set_cookie_apply (
+	WebView2Host *host,
+	WebView2GtkCookieApplyCb cb,
+	void *user_data
+);
+void vala_webview2_host_apply_pending_cookies (WebView2Host *host);
+
 /* Structured ControlView walk from page Document.
  * Coordinates are screen pixels. Call from the GTK/UI thread.
  * Node ids are valid until the next a11y_walk (element cache is replaced).

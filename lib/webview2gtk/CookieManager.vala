@@ -17,7 +17,24 @@ public class CookieManager : Object {
 		string uri,
 		GLib.Cancellable? cancellable = null
 	) throws GLib.Error {
-		var host = this.session != null ? this.session.cookie_host_handle() : null;
+		if (this.session == null) {
+			throw new NetworkError.FAILED("get_cookies failed");
+		}
+		this.session.apply_pending_cookies();
+		while (this.session == null
+			|| this.session.cookie_host_handle() == null
+			|| !wv2_host_is_ready(this.session.cookie_host_handle())) {
+			if (this.session == null) {
+				throw new NetworkError.FAILED("get_cookies failed");
+			}
+			if (cancellable != null && cancellable.is_cancelled()) {
+				throw new IOError.CANCELLED("get_cookies cancelled");
+			}
+			Idle.add(get_cookies.callback);
+			yield;
+			this.session.apply_pending_cookies();
+		}
+		var host = this.session.cookie_host_handle();
 		string? raw = null;
 		if (host == null || !wv2_get_cookies_sync(host, uri, out raw)) {
 			throw new NetworkError.FAILED("get_cookies failed");
@@ -49,9 +66,26 @@ public class CookieManager : Object {
 		Soup.Cookie cookie,
 		GLib.Cancellable? cancellable = null
 	) throws GLib.Error {
-		var host = this.session != null ? this.session.cookie_host_handle() : null;
-		if (host == null || !wv2_add_cookie_sync(host, cookie.get_name(), cookie.get_value(), cookie.get_domain(),
-			cookie.get_path(), cookie.get_http_only(), cookie.get_secure())) {
+		if (this.session == null) {
+			throw new NetworkError.FAILED("add_cookie failed");
+		}
+		var pending = this.session.enqueue_cookie(
+			cookie.get_name(),
+			cookie.get_value() ?? "",
+			cookie.get_domain() ?? "",
+			cookie.get_path() ?? "/",
+			cookie.get_http_only(),
+			cookie.get_secure()
+		);
+		while (!pending.done) {
+			if (cancellable != null && cancellable.is_cancelled()) {
+				throw new IOError.CANCELLED("add_cookie cancelled");
+			}
+			Idle.add(add_cookie.callback);
+			yield;
+			this.session.apply_pending_cookies();
+		}
+		if (!pending.ok) {
 			throw new NetworkError.FAILED("add_cookie failed");
 		}
 		return true;

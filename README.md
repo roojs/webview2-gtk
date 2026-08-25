@@ -129,6 +129,7 @@ examples/hello/     Minimal demo
 examples/browser/   Browser chrome + Win32Atspi smoke
 examples/automation/  Automation setup smoke (plan 3.0)
 examples/paned-insert/  Login → first paned insert + load_uri (blank-pane repro)
+examples/add-cookie/    add_cookie then load_uri before COM attach
 examples/consumer-meson.build
 docs/               Install / build / use / deploy / a11y / automation / Valadoc
 packaging/          NSIS + MSYS2 PKGBUILD

@@ -20,6 +20,12 @@ extern bool wv2_add_cookie_sync(
 );
 
 [CCode(cheader_filename = "webview2gtk-host-api.h", has_target = false)]
+public delegate void Wv2CookieApplyCb(void* user_data);
+
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_cookie_apply")]
+extern void wv2_host_set_cookie_apply(void* host, Wv2CookieApplyCb? cb, void* user_data);
+
+[CCode(cheader_filename = "webview2gtk-host-api.h", has_target = false)]
 public delegate void Wv2DownloadStartedCb(
 	int id,
 	string uri,

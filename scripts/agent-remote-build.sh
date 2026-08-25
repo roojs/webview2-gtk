@@ -7,6 +7,7 @@
 #   ./scripts/agent-remote-build.sh pull     # pull build/ back to Linux
 #   ./scripts/agent-remote-build.sh run      # run hello demo on Windows (3s smoke)
 #   ./scripts/agent-remote-build.sh paned-insert  # build + run first-insert blank-pane test
+#   ./scripts/agent-remote-build.sh add-cookie    # build + run add_cookie-before-attach test
 #   ./scripts/agent-remote-build.sh multi-host-spike  # 4.5 two-controller HWND spike
 #   ./scripts/agent-remote-build.sh automation        # build + automation --smoke
 #
@@ -44,7 +45,7 @@ run_remote_build() {
 	echo "[agent-remote-build] build on ${REMOTE_HOST} (C: mirror)"
 	# Prefer ninja targets; package-demos often fails if dist-demos is locked.
 	ssh -o BatchMode=yes "${REMOTE_HOST}" \
-		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup --reconfigure build && ninja -C build libwebview2gtk-1.stamp webview2gtk-hello.exe webview2gtk-browser.exe webview2gtk-automation.exe webview2gtk-cdp-attach.exe webview2gtk-paned-insert.exe 2>&1 | tee build/last-build.log && (OUT_DIR=/c/msys64/tmp/webview2-gtk/portable-demos ./scripts/package-demos.sh || true)\""
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup --reconfigure build && ninja -C build libwebview2gtk-1.stamp webview2gtk-hello.exe webview2gtk-browser.exe webview2gtk-automation.exe webview2gtk-cdp-attach.exe webview2gtk-paned-insert.exe webview2gtk-add-cookie.exe 2>&1 | tee build/last-build.log && (OUT_DIR=/c/msys64/tmp/webview2-gtk/portable-demos ./scripts/package-demos.sh || true)\""
 }
 
 run_remote_smoke() {
@@ -71,6 +72,18 @@ run_remote_paned_insert_smoke() {
 	echo "[agent-remote-build] paned-insert --smoke (interactive RDP session) on ${REMOTE_HOST}"
 	ssh -o BatchMode=yes "${REMOTE_HOST}" \
 		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"bash /c/msys64/tmp/webview2-gtk/scripts/run-paned-insert-smoke-interactive.sh\""
+}
+
+run_remote_add_cookie_build() {
+	echo "[agent-remote-build] add-cookie build on ${REMOTE_HOST}"
+	ssh -o BatchMode=yes "${REMOTE_HOST}" \
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup --reconfigure build && rm -f build/webview2gtk-add-cookie.exe build/libwebview2gtk-1.stamp && set -o pipefail && ninja -C build libwebview2gtk-1.stamp webview2gtk-add-cookie.exe 2>&1 | tee build/last-build.log && OUT_DIR=/c/msys64/tmp/webview2-gtk/portable-demos ./scripts/copy-exe-runtime-dlls.sh build/webview2gtk-add-cookie.exe /c/msys64/tmp/webview2-gtk/portable-demos build/vendor/webview2/x64/WebView2Loader.dll\""
+}
+
+run_remote_add_cookie_smoke() {
+	echo "[agent-remote-build] add-cookie --smoke (interactive RDP session) on ${REMOTE_HOST}"
+	ssh -o BatchMode=yes "${REMOTE_HOST}" \
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"bash /c/msys64/tmp/webview2-gtk/scripts/run-add-cookie-smoke-interactive.sh\""
 }
 
 run_remote_multi_host_spike_build() {
@@ -124,6 +137,10 @@ print_hint() {
 	if [[ -f "${ROOT}/build-remote/paned-insert-smoke.log" ]]; then
 		echo "--- paned-insert-smoke.log ---"
 		cat "${ROOT}/build-remote/paned-insert-smoke.log"
+	fi
+	if [[ -f "${ROOT}/build-remote/add-cookie-smoke.log" ]]; then
+		echo "--- add-cookie-smoke.log ---"
+		cat "${ROOT}/build-remote/add-cookie-smoke.log"
 	fi
 }
 
@@ -182,6 +199,20 @@ case "${cmd}" in
 		print_hint
 		exit "${build_rc}"
 		;;
+	add-cookie)
+		sync_to_windows
+		build_rc=0
+		run_remote_add_cookie_build || build_rc=$?
+		if [[ "${build_rc}" -eq 0 ]]; then
+			run_remote_add_cookie_smoke || build_rc=$?
+		fi
+		ssh -o BatchMode=yes "${REMOTE_HOST}" \
+			"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cp -f /c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-smoke.log /c/msys64/tmp/webview2-gtk/build/add-cookie-smoke.log 2>/dev/null || true\"" \
+			|| true
+		pull_artifacts || true
+		print_hint
+		exit "${build_rc}"
+		;;
 	multi-host-spike)
 		sync_to_windows
 		build_rc=0
@@ -197,7 +228,7 @@ case "${cmd}" in
 		exit "${build_rc}"
 		;;
 	*)
-		echo "usage: $0 [build|sync|remote-build|pull|run|automation|paned-insert|multi-host-spike]" >&2
+		echo "usage: $0 [build|sync|remote-build|pull|run|automation|paned-insert|add-cookie|multi-host-spike]" >&2
 		exit 1
 		;;
 esac
