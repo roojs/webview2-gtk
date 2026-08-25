@@ -138,6 +138,10 @@ print_hint() {
 		echo "--- paned-insert-smoke.log ---"
 		cat "${ROOT}/build-remote/paned-insert-smoke.log"
 	fi
+	if [[ -f "${ROOT}/build-remote/add-cookie-smoke.log" ]]; then
+		echo "--- add-cookie-smoke.log ---"
+		cat "${ROOT}/build-remote/add-cookie-smoke.log"
+	fi
 }
 
 cmd="${1:-build}"
@@ -195,6 +199,20 @@ case "${cmd}" in
 		print_hint
 		exit "${build_rc}"
 		;;
+	add-cookie)
+		sync_to_windows
+		build_rc=0
+		run_remote_add_cookie_build || build_rc=$?
+		if [[ "${build_rc}" -eq 0 ]]; then
+			run_remote_add_cookie_smoke || build_rc=$?
+		fi
+		ssh -o BatchMode=yes "${REMOTE_HOST}" \
+			"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cp -f /c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-smoke.log /c/msys64/tmp/webview2-gtk/build/add-cookie-smoke.log 2>/dev/null || true\"" \
+			|| true
+		pull_artifacts || true
+		print_hint
+		exit "${build_rc}"
+		;;
 	multi-host-spike)
 		sync_to_windows
 		build_rc=0
@@ -210,7 +228,7 @@ case "${cmd}" in
 		exit "${build_rc}"
 		;;
 	*)
-		echo "usage: $0 [build|sync|remote-build|pull|run|automation|paned-insert|multi-host-spike]" >&2
+		echo "usage: $0 [build|sync|remote-build|pull|run|automation|paned-insert|add-cookie|multi-host-spike]" >&2
 		exit 1
 		;;
 esac
