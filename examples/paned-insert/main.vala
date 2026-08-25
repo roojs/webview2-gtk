@@ -12,7 +12,7 @@
  *   --workaround   Idle after set_start_child before load_uri
  *   --smoke        auto-signin, assert FINISHED + size, quit
  *
- * See docs/bugs/2026-08-24-pending-navigate-first-paned-insert.md
+ * See docs/bugs/done/2026-08-24-pending-navigate-first-paned-insert.md
  */
 
 using Gtk;
