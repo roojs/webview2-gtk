@@ -1,13 +1,18 @@
-/* Repro: management WebView claims the single COM host first; primary stays blank.
+/* Repro: orphaned browser stack + automation WebViews (consumer sign-in path).
  *
- * Library limit: one WebView2 host per process. If a second WebView widget is
- * already attached (management), primary set_start_child + load_uri in the same
- * turn can leave the splash pane blank with no load_changed.
+ * Login: paned start = login panel; browser Stack (primary+mgmt) constructed orphaned.
+ * Sign-in: set_start_child(browser_stack) + load_uri (often 0×0), then end-child
+ * churn like session-loading, then second load_uri at real size.
+ * Both WebViews use WebViewAuto + WEBKIT_INSPECTOR_SERVER (CDP env options).
+ *
+ * Expect primary load_changed FINISHED. Fail = blank / never finished.
  *
  *   webview2gtk-paned-insert.exe [url]
  *   --auto-signin
- *   --workaround   Idle after show before primary load_uri
- *   --smoke        exit 1 unless primary FINISHED
+ *   --workaround   Idle after set_start_child before load_uri
+ *   --smoke        auto-signin, assert FINISHED + size, quit
+ *
+ * See docs/bugs/2026-08-24-pending-navigate-first-paned-insert.md
  */
 
 using Gtk;
@@ -21,13 +26,16 @@ private int smoke_status = 1;
 private bool smoke_done = false;
 private bool primary_finished = false;
 private bool signed_in = false;
+private int load_uri_count = 0;
 
 private WebView? primary = null;
 private WebView? management = null;
 private Gtk.Label status;
-private Gtk.Stack stack;
 private Gtk.Stack browser_stack;
 private Gtk.Paned paned;
+private Gtk.Box? login_panel = null;
+private Gtk.Box? session_loading = null;
+private Gtk.Box? sidebar = null;
 private Gtk.ApplicationWindow? window = null;
 
 private Gtk.Widget wrap_webview(WebView view) {
@@ -65,22 +73,25 @@ private string diag_line(WebView? view, string name) {
 	if (view == null) {
 		return "%s: (null)".printf(name);
 	}
-	return "%s ready=%s mapped=%s size=%dx%d uri=%s title=%s".printf(
+	return "%s ready=%s mapped=%s size=%dx%d opacity=%.2f uri=%s title=%s".printf(
 		name,
 		view.ready ? "yes" : "no",
 		view.get_mapped() ? "yes" : "no",
 		view.get_width(),
 		view.get_height(),
+		view.get_opacity(),
 		view.get_uri(),
 		view.get_title()
 	);
 }
 
 private void refresh_status() {
-	status.label = "%s\n%s\nprimary_finished=%s".printf(
+	status.label = "%s\n%s\nprimary_finished=%s loads=%d\npaned_start=%s".printf(
 		diag_line(primary, "primary"),
 		diag_line(management, "mgmt"),
-		primary_finished ? "yes" : "no"
+		primary_finished ? "yes" : "no",
+		load_uri_count,
+		paned.get_start_child() == browser_stack ? "browser_stack" : "login_panel"
 	);
 }
 
@@ -101,38 +112,50 @@ private void on_mgmt_load_changed(LoadEvent load_event) {
 	print("mgmt load_changed %d %s\n", (int) load_event, diag_line(management, "mgmt"));
 }
 
-private void sign_in() {
-	if (signed_in) {
-		return;
-	}
-	signed_in = true;
-
-	print("sign-in: show primary + load_uri (mgmt already holds COM host)\n");
-	print("  before primary %s\n", diag_line(primary, "primary"));
-	print("  before mgmt    %s\n", diag_line(management, "mgmt"));
-
-	browser_stack.set_visible_child_name("primary");
-	stack.set_visible_child_name("app");
-
-	if (use_workaround) {
+private void do_load_uri(string reason) {
+	load_uri_count++;
+	print("load_uri #%d (%s) %s\n", load_uri_count, reason, diag_line(primary, "primary"));
+	if (use_workaround && load_uri_count == 1) {
 		Idle.add(() => {
 			print("workaround Idle: primary load_uri %s\n", start_uri);
 			primary.load_uri(start_uri);
 			refresh_status();
 			return Source.REMOVE;
 		});
-	} else {
-		primary.load_uri(start_uri);
+		return;
 	}
-	print("  after primary %s\n", diag_line(primary, "primary"));
+	primary.load_uri(start_uri);
 	refresh_status();
 }
 
-private void show_management() {
-	browser_stack.set_visible_child_name("management");
-	Idle.add(() => {
-		print("management Idle load_uri https://example.org/\n");
-		management.load_uri("https://example.org/");
+private void sign_in() {
+	if (signed_in) {
+		return;
+	}
+	signed_in = true;
+
+	print("sign-in: set_start_child(browser_stack) + load_uri (stack was orphaned)\n");
+	print("  before %s\n", diag_line(primary, "primary"));
+
+	browser_stack.set_visible_child_name("primary");
+	paned.set_start_child(browser_stack);
+	paned.set_end_child(session_loading);
+
+	print("  after reparent %s\n", diag_line(primary, "primary"));
+	do_load_uri("first-signed-in-often-0x0");
+
+	/* Match consumer: leave SIGNED_IN for session-loading, then return with real size. */
+	Timeout.add(100, () => {
+		print("session-loading tick %s\n", diag_line(primary, "primary"));
+		refresh_status();
+		return Source.REMOVE;
+	});
+
+	Timeout.add(200, () => {
+		print("second-signed-in: end=sidebar + load_uri again\n");
+		paned.set_end_child(sidebar);
+		print("  %s\n", diag_line(primary, "primary"));
+		do_load_uri("second-signed-in-expect-real-size");
 		refresh_status();
 		return Source.REMOVE;
 	});
@@ -149,10 +172,11 @@ private void finish_smoke() {
 	var ok = attached_ok && size_ok && primary_finished;
 	print("smoke %s\n", diag_line(primary, "primary"));
 	print("smoke mgmt %s\n", diag_line(management, "mgmt"));
-	print("smoke attached=%s size_ok=%s load_finished=%s\n",
+	print("smoke attached=%s size_ok=%s load_finished=%s load_uri_count=%d\n",
 		attached_ok ? "yes" : "no",
 		size_ok ? "yes" : "no",
-		primary_finished ? "yes" : "no");
+		primary_finished ? "yes" : "no",
+		load_uri_count);
 	if (ok) {
 		print("TEST_PASS\n");
 		smoke_status = 0;
@@ -162,6 +186,21 @@ private void finish_smoke() {
 	}
 	if (window != null) {
 		window.close();
+	}
+}
+
+private uint16 prepare_inspector_port() {
+	try {
+		var probe = new Socket(SocketFamily.IPV4, SocketType.STREAM, SocketProtocol.TCP);
+		probe.bind(new InetSocketAddress(new InetAddress.loopback(SocketFamily.IPV4), 0), true);
+		var port = (uint16) ((InetSocketAddress) probe.get_local_address()).port;
+		probe.close();
+		Environment.set_variable("WEBKIT_INSPECTOR_SERVER", "127.0.0.1:%u".printf(port), true);
+		print("inspector 127.0.0.1:%u (WEBKIT_INSPECTOR_SERVER)\n", port);
+		return port;
+	} catch (Error e) {
+		warning("inspector port probe failed: %s", e.message);
+		return 0;
 	}
 }
 
@@ -190,98 +229,99 @@ public static int main(string[] args) {
 		start_uri = args[i];
 	}
 
+	var insp = prepare_inspector_port();
+
 	var app = new Gtk.Application("com.webview2gtk.paned-insert", ApplicationFlags.FLAGS_NONE);
 	app.activate.connect(() => {
 		window = new Gtk.ApplicationWindow(app);
 		window.set_title("webview2-gtk paned-insert");
 		window.set_default_size(960, 640);
 
-		primary = new WebView();
+		var context = WebContext.get_default();
+		context.set_automation_allowed(true);
+		var ns = context.get_network_session_for_automation();
+
+		primary = new DemoWebViewAuto(context, ns);
 		primary.load_changed.connect(on_primary_load_changed);
-		management = new WebView();
+		management = new DemoWebViewAuto(context, ns);
 		management.load_changed.connect(on_mgmt_load_changed);
 
-		stack = new Gtk.Stack();
+		context.automation_started.connect((session) => {
+			session.set_application_info(new ApplicationInfo());
+			session.create_web_view.connect(() => {
+				return primary;
+			});
+			print("automation-started session=%s\n", session.id);
+		});
 
-		var login = new Gtk.Box(Gtk.Orientation.VERTICAL, 12);
-		login.set_valign(Gtk.Align.CENTER);
-		login.set_halign(Gtk.Align.CENTER);
-		var login_label = new Gtk.Label(
-			"Sign in.\nManagement WebView is already mapped (claims COM host)."
-		);
-		login_label.set_justify(Gtk.Justification.CENTER);
-		var signin_btn = new Gtk.Button.with_label("Sign in");
-		signin_btn.clicked.connect(sign_in);
-		login.append(login_label);
-		login.append(signin_btn);
-
-		paned = new Gtk.Paned(Gtk.Orientation.HORIZONTAL);
-		paned.set_hexpand(true);
-		paned.set_vexpand(true);
-		paned.set_wide_handle(true);
-		paned.set_position(640);
+		/* Early CDP connect attempt (consumer does this before first attach). */
+		if (insp > 0) {
+			Idle.add(() => {
+				print("early CDP probe 127.0.0.1:%u (expect refuse until env create)\n", insp);
+				return Source.REMOVE;
+			});
+		}
 
 		browser_stack = new Gtk.Stack();
 		browser_stack.set_hexpand(true);
 		browser_stack.set_vexpand(true);
 		browser_stack.add_named(wrap_webview(primary), "primary");
 		browser_stack.add_named(wrap_webview(management), "management");
-		/* Management visible first so it can attach before sign-in. */
-		browser_stack.set_visible_child_name("management");
-		paned.set_start_child(browser_stack);
+		browser_stack.set_visible_child_name("primary");
 
-		var side = new Gtk.Box(Gtk.Orientation.VERTICAL, 8);
-		side.set_margin_start(8);
-		side.set_margin_end(8);
-		side.set_margin_top(8);
-		side.set_margin_bottom(8);
-		side.set_size_request(260, -1);
+		login_panel = new Gtk.Box(Gtk.Orientation.VERTICAL, 12);
+		login_panel.set_hexpand(true);
+		login_panel.set_vexpand(true);
+		login_panel.set_valign(Gtk.Align.CENTER);
+		login_panel.set_halign(Gtk.Align.CENTER);
+		var login_label = new Gtk.Label(
+			"Login panel is paned start child.\nBrowser stack orphaned until sign-in."
+		);
+		login_label.set_justify(Gtk.Justification.CENTER);
+		var signin_btn = new Gtk.Button.with_label("Sign in");
+		signin_btn.clicked.connect(sign_in);
+		login_panel.append(login_label);
+		login_panel.append(signin_btn);
 
+		session_loading = new Gtk.Box(Gtk.Orientation.VERTICAL, 8);
+		session_loading.set_size_request(260, -1);
+		session_loading.append(new Gtk.Label("Loading session…"));
+
+		sidebar = new Gtk.Box(Gtk.Orientation.VERTICAL, 8);
+		sidebar.set_margin_start(8);
+		sidebar.set_margin_end(8);
+		sidebar.set_margin_top(8);
+		sidebar.set_margin_bottom(8);
+		sidebar.set_size_request(260, -1);
 		status = new Gtk.Label("waiting for sign-in");
 		status.set_wrap(true);
 		status.set_xalign(0);
 		status.set_selectable(true);
-
 		var hint = new Gtk.Label(
-			"Want primary blank after sign-in (mgmt already attached).\n"
-			+ "“Show management” Idle path often still works."
+			"Repro: WebViewAuto + CDP env + orphaned stack → set_start_child + load_uri\n"
+			+ "then session-loading churn + second load_uri at real size."
 		);
 		hint.set_wrap(true);
 		hint.set_xalign(0);
+		sidebar.append(hint);
+		sidebar.append(status);
 
-		var mgmt_btn = new Gtk.Button.with_label("Show management (Idle load)");
-		mgmt_btn.clicked.connect(show_management);
-
-		side.append(hint);
-		side.append(status);
-		side.append(mgmt_btn);
-		paned.set_end_child(side);
+		paned = new Gtk.Paned(Gtk.Orientation.HORIZONTAL);
+		paned.set_hexpand(true);
+		paned.set_vexpand(true);
+		paned.set_wide_handle(true);
+		paned.set_position(640);
+		paned.set_start_child(login_panel);
+		paned.set_end_child(sidebar);
 		paned.set_resize_end_child(false);
 		paned.set_shrink_end_child(false);
 
-		/* App page is built but login is shown — paned still maps under Stack? */
-		stack.add_named(login, "login");
-		stack.add_named(paned, "app");
-		stack.set_visible_child_name("app");
-		/* Force management on-screen briefly so COM attach happens, then login. */
-		Timeout.add(600, () => {
-			print("pre-login mgmt attach probe %s\n", diag_line(management, "mgmt"));
-			management.load_uri("about:blank");
-			stack.set_visible_child_name("login");
-			refresh_status();
-			if (auto_signin) {
-				Timeout.add(400, () => {
-					sign_in();
-					return Source.REMOVE;
-				});
-			}
-			return Source.REMOVE;
-		});
-
-		window.set_child(stack);
+		window.set_child(paned);
 		window.present();
 
-		print("startup: show app/management first so COM attaches, then login\n");
+		print("startup: login_panel in paned; browser_stack orphaned (WebViewAuto x2)\n");
+		print("  %s\n", diag_line(primary, "primary"));
+		print("  %s\n", diag_line(management, "mgmt"));
 		refresh_status();
 
 		Timeout.add(400, () => {
@@ -289,8 +329,15 @@ public static int main(string[] args) {
 			return Source.CONTINUE;
 		});
 
+		if (auto_signin) {
+			Timeout.add(800, () => {
+				sign_in();
+				return Source.REMOVE;
+			});
+		}
+
 		if (smoke) {
-			Timeout.add(10000, () => {
+			Timeout.add(12000, () => {
 				finish_smoke();
 				return Source.REMOVE;
 			});
@@ -298,4 +345,37 @@ public static int main(string[] args) {
 	});
 	app.run(gtk_args);
 	return smoke ? smoke_status : 0;
+}
+
+class DemoWebViewAuto : WebView {
+	public DemoWebViewAuto(WebContext context, NetworkSession session) {
+		Object(
+			orientation: Gtk.Orientation.VERTICAL,
+			spacing: 0,
+			hexpand: true,
+			vexpand: true,
+			web_context: context,
+			is_controlled_by_automation: true,
+			network_session: session,
+			website_policies: (WebsitePolicies) Object.new(
+				typeof(WebsitePolicies),
+				"autoplay", AutoplayPolicy.DENY
+			)
+		);
+		this.get_settings().enable_developer_extras = true;
+		this.get_settings().enable_media_stream = false;
+		this.get_settings().enable_webrtc = false;
+		this.get_settings().media_playback_requires_user_gesture = true;
+		this.get_settings().user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+			+ "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36";
+		this.is_muted = true;
+		this.permission_request.connect((request) => {
+			request.deny();
+			return true;
+		});
+		this.query_permission_state.connect((query) => {
+			query.finish(PermissionState.DENIED);
+			return true;
+		});
+	}
 }

@@ -6,12 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.5.0] - Unreleased
+## [0.5.1] - Unreleased
+
+### Fixed
+
+- `WebView` host `DrawingArea` lived only in `WebView()`; subclasses that chain `Object(web_context:…, is_controlled_by_automation:…)` never got a host, so `try_attach` never ran and splash/`load_uri` stayed blank with no `load_changed` ([bug](docs/bugs/2026-08-24-pending-navigate-first-paned-insert.md)).
+
+### Changed
+
+- `examples/paned-insert` smoke now covers orphaned browser stack → `set_start_child` + `WebViewAuto`/`load_uri` (automation construct path).
+
+## [0.5.0] - 2026-08-24
 
 ### Added
 
 - One WebView2 controller per GTK `WebView` (shared Environment): multi-view apps no longer share a process-wide COM singleton ([plan 4.0](docs/plans/4.0-multi-webview-host.md)).
-- `examples/paned-insert` smoke for two-WebView attach + primary `load_changed` after management already holds a host ([bug](docs/bugs/2026-08-24-pending-navigate-first-paned-insert.md)).
+- `examples/paned-insert` smoke for two-WebView attach + primary `load_changed` after management already holds a host.
 - `examples/multi-host-spike` raw COM spike (two controllers, same toplevel HWND).
 
 ### Fixed

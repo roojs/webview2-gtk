@@ -170,20 +170,12 @@ public class WebView : Gtk.Box {
 		if (this.is_controlled_by_automation) {
 			this.web_context.register_controlled_webview(this);
 		}
-	}
 
-	public bool is_loading { get; private set; }
-
-	public double estimated_load_progress { get; private set; }
-
-	/** WebView2Gtk-specific: host COM object is attached and ready. */
-	public bool ready {
-		get { return attached && wv2_host_is_ready(host_handle); }
-	}
-
-	public WebView() {
-		Object(orientation: Gtk.Orientation.VERTICAL, spacing: 0);
-
+		/*
+		 * Host DrawingArea must be created here — not only in WebView().
+		 * Subclasses that chain with Object(web_context:…, is_controlled_by_automation:…)
+		 * never run WebView(); without this, try_attach has no host and stays blank forever.
+		 */
 		this.set_hexpand(true);
 		this.set_vexpand(true);
 
@@ -211,6 +203,19 @@ public class WebView : Gtk.Box {
 
 		this.capture_settings.notify.connect(on_settings_notify);
 		this.push_media_settings(false);
+	}
+
+	public bool is_loading { get; private set; }
+
+	public double estimated_load_progress { get; private set; }
+
+	/** WebView2Gtk-specific: host COM object is attached and ready. */
+	public bool ready {
+		get { return attached && wv2_host_is_ready(host_handle); }
+	}
+
+	public WebView() {
+		Object(orientation: Gtk.Orientation.VERTICAL, spacing: 0);
 	}
 
 	public signal void load_changed(LoadEvent load_event);

@@ -8,6 +8,7 @@
 #   ./scripts/agent-remote-build.sh run      # run hello demo on Windows (3s smoke)
 #   ./scripts/agent-remote-build.sh paned-insert  # build + run first-insert blank-pane test
 #   ./scripts/agent-remote-build.sh multi-host-spike  # 4.5 two-controller HWND spike
+#   ./scripts/agent-remote-build.sh automation        # build + automation --smoke
 #
 # Requires: AGENT_WIN_HOST (SSH Host), MSYS2 rsync on Windows (see vala.win32 docs/windows-build.md § Rsync).
 set -euo pipefail
