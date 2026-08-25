@@ -3,6 +3,7 @@
 **Status:** ⏳ open  
 **Date:** 2026-08-25  
 **Component:** `lib/webview2gtk/CookieManager.vala` + `NetworkSession.cookie_host` / `bind_download_host`  
+**Repro / test:** [`examples/add-cookie`](../../examples/add-cookie/main.vala) — `--smoke`  
 **Seen in:** webview2-gtk **0.5.1** — cookie inject on a second WebView before attach
 
 ## Symptom
@@ -33,6 +34,18 @@ Pending **navigate** already queues until attach; **cookies do not**.
 ## Ask
 
 Queue `add_cookie` (name/value/domain/path/flags) until the session’s host is bound, then flush — same contract as pending `load_uri`. Apps should be able to `add_cookie` then `load_uri` without racing attach.
+
+## How to run
+
+```powershell
+& 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-add-cookie.exe' --smoke
+```
+
+```bash
+AGENT_WIN_HOST=… ./scripts/agent-remote-build.sh add-cookie
+```
+
+Expect **`TEST_PASS`** (`add_cookie` succeeds before attach; `wv2gtk_probe=before_attach` in the jar after `load_changed` FINISHED). Today this is **`TEST_FAIL`** (`add_cookie failed`).
 
 ## App workaround (temporary — not the product fix)
 

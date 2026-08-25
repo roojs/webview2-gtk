@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `examples/paned-insert` smoke now covers orphaned browser stack → `set_start_child` + `WebViewAuto`/`load_uri` (automation construct path).
 
+### Added
+
+- `examples/add-cookie` smoke: `add_cookie` then `load_uri` before COM attach ([bug](docs/bugs/2026-08-25-add-cookie-before-attach.md)).
+
 ## [0.5.0] - 2026-08-24
 
 ### Added
