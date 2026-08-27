@@ -61,7 +61,7 @@ Win32Atspi.init ();
 var desktop = Win32Atspi.get_desktop (0);
 var app = desktop.get_child_at_index (i);   // match your pid
 var frame = app.get_child_at_index (0);
-var doc = frame.get_child_at_index (0);     // "document frame"
+var doc = frame.get_child_at_index (0);     // "document frame" (further children if several WebViews)
 
 acc.get_role_name ();
 acc.get_name ();

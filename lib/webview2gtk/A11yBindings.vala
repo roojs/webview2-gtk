@@ -32,5 +32,8 @@ public delegate void Wv2A11yForeachCb(
 	void* user_data
 );
 
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_a11y_cache_reset")]
+extern void wv2_a11y_cache_reset();
+
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_a11y_walk_foreach")]
 extern bool wv2_a11y_walk_foreach(void* host, Wv2A11yForeachCb cb, void* user_data);

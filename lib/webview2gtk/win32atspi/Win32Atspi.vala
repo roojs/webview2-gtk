@@ -76,6 +76,7 @@ public class Accessible : Object {
 	internal int y = 0;
 	internal int w = 0;
 	internal int h = 0;
+	internal unowned Accessible? parent;
 	internal string value_text = "";
 	internal string uri = "";
 	internal bool can_invoke = false;
@@ -87,6 +88,7 @@ public class Accessible : Object {
 	private Gee.ArrayList<string> ifaces = new Gee.ArrayList<string> ();
 
 	internal void add_child(Accessible child) {
+		child.parent = this;
 		this.children.add(child);
 	}
 
@@ -156,10 +158,6 @@ public class Accessible : Object {
 		if (index < 0 || index >= this.action_names.size) {
 			return false;
 		}
-		var web = Bridge.host;
-		if (web == null) {
-			return this.action_names.get(index) == "default.activate";
-		}
 		if (this.walk_id < 0) {
 			return true;
 		}
@@ -194,10 +192,36 @@ public class Accessible : Object {
 		return ok;
 	}
 
+	/**
+	 * Bounding box for this node.
+	 *
+	 * Walk values are screen pixels (UIA ''BoundingRectangle''). ''coord_type''
+	 * selects the origin, matching AT-SPI ''Atspi.Component.get_extents'':
+	 *
+	 * ''SCREEN'' — absolute screen pixels.
+	 * ''WINDOW'' — relative to the containing document (page client origin).
+	 * ''PARENT'' — relative to the parent accessible.
+	 */
 	public ComponentExtents get_extents(CoordType coord_type) {
+		var ox = 0;
+		var oy = 0;
+		if (coord_type == CoordType.PARENT && this.parent != null) {
+			ox = this.parent.x;
+			oy = this.parent.y;
+		} else if (coord_type == CoordType.WINDOW) {
+			var doc = this;
+			while (doc != null && doc.role_name != "document frame"
+			    && doc.role_name != "document text") {
+				doc = doc.parent;
+			}
+			if (doc != null) {
+				ox = doc.x;
+				oy = doc.y;
+			}
+		}
 		var e = new ComponentExtents();
-		e.x = this.x;
-		e.y = this.y;
+		e.x = this.x - ox;
+		e.y = this.y - oy;
 		e.width = this.w;
 		e.height = this.h;
 		return e;
@@ -221,9 +245,10 @@ public class Accessible : Object {
 }
 
 internal class Bridge : Object {
-	public static WebView2Gtk.WebView? host;
 	public static Accessible? desktop;
 	public static bool ready;
+	private static Gee.ArrayList<unowned WebView2Gtk.WebView> hosts =
+		new Gee.ArrayList<unowned WebView2Gtk.WebView> ();
 
 	private class WalkRow {
 		public int id;
@@ -277,24 +302,40 @@ internal class Bridge : Object {
 	}
 
 	public static void register(WebView2Gtk.WebView web) {
-		Bridge.host = web;
-		Bridge.desktop = null;
+		if (!hosts.contains(web)) {
+			hosts.add(web);
+		}
+		desktop = null;
+	}
+
+	public static void unregister(WebView2Gtk.WebView web) {
+		hosts.remove(web);
+		desktop = null;
 	}
 
 	public static void ensure_tree() throws Error {
-		if (Bridge.host == null || !Bridge.host.ready) {
+		if (hosts.size == 0) {
 			throw new IOError.FAILED("Win32Atspi: no WebView registered(host not ready)");
 		}
-		Bridge.rebuild();
+		rebuild();
 	}
 
 	public static void rebuild() {
 		walk_accum = new GenericArray<WalkRow> ();
-		var host = Bridge.host != null ? Bridge.host.get_host_handle() : null;
-		var ok = host != null && wv2_a11y_walk_foreach(host, walk_cb, null);
+		wv2_a11y_cache_reset();
+		foreach (var web in hosts) {
+			if (!web.ready) {
+				continue;
+			}
+			var handle = web.get_host_handle();
+			if (handle == null) {
+				continue;
+			}
+			wv2_a11y_walk_foreach(handle, walk_cb, null);
+		}
 		var tree = walk_accum;
 		walk_accum = null;
-		if (!ok || tree == null) {
+		if (tree == null) {
 			tree = new GenericArray<WalkRow> ();
 		}
 
@@ -319,37 +360,31 @@ internal class Bridge : Object {
 		app.add_child(frame);
 
 		var by_id = new Gee.HashMap<int, Accessible> ();
-		Accessible? doc = null;
+		var docs = new Gee.ArrayList<Accessible> ();
 
 		for (var i = 0; i < tree.length; i++) {
 			var n = tree.get(i);
 			var acc = accessible_from_tree_node(n, pid);
 			by_id.set(n.id, acc);
-			if (n.role == "Document") {
-				doc = acc;
-			} else if (doc == null && n.parent_id < 0) {
-				doc = acc;
+			if (n.parent_id < 0) {
+				docs.add(acc);
 			}
 		}
 
 		for (var i = 0; i < tree.length; i++) {
 			var n = tree.get(i);
-			if (!by_id.has_key(n.id)) {
-				continue;
-			}
-			var acc = by_id.get(n.id);
-			if (n.parent_id < 0) {
+			if (!by_id.has_key(n.id) || n.parent_id < 0) {
 				continue;
 			}
 			if (by_id.has_key(n.parent_id)) {
-				by_id.get(n.parent_id).add_child(acc);
+				by_id.get(n.parent_id).add_child(by_id.get(n.id));
 			}
 		}
 
-		if (doc == null && tree.length > 0 && by_id.has_key(tree.get(0).id)) {
-			doc = by_id.get(tree.get(0).id);
+		if (docs.size == 0 && tree.length > 0 && by_id.has_key(tree.get(0).id)) {
+			docs.add(by_id.get(tree.get(0).id));
 		}
-		if (doc != null) {
+		foreach (var doc in docs) {
 			/* Prefer AT-SPI document role names used by tree walkers. */
 			if (doc.role_name != "document text" && doc.role_name != "document frame") {
 				doc.role_name = "document frame";
@@ -460,8 +495,11 @@ public Accessible get_desktop(int index) {
 }
 
 /**
- * Register the WebView that backs this process's AT-SPI tree.
- * Called automatically when {@link WebView2Gtk.WebView} becomes ready.
+ * Include ''web'' in this process's AT-SPI tree.
+ *
+ * Called automatically when {@link WebView2Gtk.WebView} attaches. Each live
+ * view appears as a ''document frame'' under the application; walkers match
+ * by {@link Accessible.get_name} and URI ({@link Accessible.get_hyperlink}).
  */
 public void register_webview(WebView2Gtk.WebView web) {
 	Bridge.register(web);

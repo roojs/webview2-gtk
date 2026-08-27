@@ -1,6 +1,6 @@
 # Bug — no way to set Accept-Language on requests
 
-**Status:** ✅ fixed in **0.5.3** (pending release)  
+**Status:** ✅ fixed in **0.5.3**  
 **Platform:** Windows (WebView2 host)  
 **Area:** `lib/host/win32-ui-webview2-web-resources.c`, `WebContext`  
 **Seen:** 2026-08-26

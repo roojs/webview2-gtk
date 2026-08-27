@@ -321,26 +321,80 @@ find_document_under (IUIAutomation *uia, HWND hwnd)
 }
 
 static IUIAutomationElement *
-find_page_document (IUIAutomation *uia, HWND parent)
+find_page_document (IUIAutomation *uia, WebView2Host *host)
 {
+	HWND parent;
+	ICoreWebView2Controller *ctl;
 	HwndList hl;
+	RECT want;
+	RECT wr;
+	RECT bounds;
+	POINT tl;
+	POINT br;
+	bool have_want = false;
+	IUIAutomationElement *best = NULL;
+	int best_overlap = -1;
 	int i;
 
+	parent = vala_webview2_com_get_parent_hwnd_for (host);
 	if (parent == NULL) {
 		return NULL;
 	}
+	ctl = (ICoreWebView2Controller *) vala_webview2_com_get_controller_for (host);
+	ZeroMemory (&bounds, sizeof (bounds));
+	if (ctl != NULL && SUCCEEDED (ICoreWebView2Controller_get_Bounds (ctl, &bounds))) {
+		tl.x = bounds.left;
+		tl.y = bounds.top;
+		br.x = bounds.right;
+		br.y = bounds.bottom;
+		if (ClientToScreen (parent, &tl) && ClientToScreen (parent, &br)) {
+			want.left = tl.x;
+			want.top = tl.y;
+			want.right = br.x;
+			want.bottom = br.y;
+			have_want = true;
+		}
+	}
 	collect_descendants (parent, &hl);
-	/* Prefer Chrome_WidgetWin_1 (phase 1 finding). */
 	for (i = 0; i < hl.count; i++) {
 		wchar_t cls[128];
+		IUIAutomationElement *doc;
+		int overlap = 0;
+		LONG l;
+		LONG t;
+		LONG r;
+		LONG b;
+
 		cls[0] = L'\0';
 		GetClassNameW (hl.list[i], cls, 128);
-		if (wcscmp (cls, L"Chrome_WidgetWin_1") == 0) {
-			IUIAutomationElement *doc = find_document_under (uia, hl.list[i]);
-			if (doc != NULL) {
-				return doc;
+		if (wcscmp (cls, L"Chrome_WidgetWin_1") != 0) {
+			continue;
+		}
+		doc = find_document_under (uia, hl.list[i]);
+		if (doc == NULL) {
+			continue;
+		}
+		if (have_want && GetWindowRect (hl.list[i], &wr)) {
+			l = wr.left > want.left ? wr.left : want.left;
+			t = wr.top > want.top ? wr.top : want.top;
+			r = wr.right < want.right ? wr.right : want.right;
+			b = wr.bottom < want.bottom ? wr.bottom : want.bottom;
+			if (r > l && b > t) {
+				overlap = (int) ((r - l) * (b - t));
 			}
 		}
+		if (best == NULL || overlap > best_overlap) {
+			if (best != NULL) {
+				IUIAutomationElement_Release (best);
+			}
+			best = doc;
+			best_overlap = overlap;
+		} else {
+			IUIAutomationElement_Release (doc);
+		}
+	}
+	if (best != NULL) {
+		return best;
 	}
 	for (i = 0; i < hl.count; i++) {
 		wchar_t cls[128];
@@ -444,8 +498,8 @@ nodelist_push (
 		nl->nodes = nn;
 		nl->cap = ncap;
 	}
-	id = (int) nl->count;
-	n = &nl->nodes[id];
+	id = (int) g_a11y_cache.count;
+	n = &nl->nodes[nl->count];
 	fill_node (n, el, id, parent_id);
 	if (!a11y_cache_add (el)) {
 		node_clear (n);
@@ -492,35 +546,26 @@ walk_collect (
 	}
 }
 
-bool
-vala_webview2_host_a11y_walk (WebView2Host *host, webview2gtk_a11y_node **nodes_out, size_t *count_out)
+static bool
+a11y_walk_into (WebView2Host *host, NodeList *nl)
 {
 	IUIAutomation *uia = NULL;
 	IUIAutomationElement *doc = NULL;
 	IUIAutomationTreeWalker *walker = NULL;
-	NodeList nl;
 	HRESULT hr;
-	HWND parent;
 
-	if (nodes_out == NULL || count_out == NULL) {
+	if (host == NULL || nl == NULL) {
 		return false;
 	}
-	*nodes_out = NULL;
-	*count_out = 0;
-
 	if (vala_webview2_com_get_webview_for (host) == NULL) {
 		return false;
 	}
-	parent = vala_webview2_com_get_parent_hwnd_for (host);
-
-	a11y_cache_clear ();
-	ZeroMemory (&nl, sizeof (nl));
 
 	uia = create_uia ();
 	if (uia == NULL) {
 		return false;
 	}
-	doc = find_page_document (uia, parent);
+	doc = find_page_document (uia, host);
 	if (doc == NULL) {
 		IUIAutomation_Release (uia);
 		return false;
@@ -532,31 +577,55 @@ vala_webview2_host_a11y_walk (WebView2Host *host, webview2gtk_a11y_node **nodes_
 		return false;
 	}
 
-	walk_collect (walker, doc, -1, 0, &nl);
+	walk_collect (walker, doc, -1, 0, nl);
 	IUIAutomationTreeWalker_Release (walker);
 	IUIAutomationElement_Release (doc);
 	IUIAutomation_Release (uia);
+	return nl->count > 0;
+}
 
+void
+vala_webview2_host_a11y_cache_reset (void)
+{
+	a11y_cache_clear ();
+}
+
+bool
+vala_webview2_host_a11y_walk (WebView2Host *host, webview2gtk_a11y_node **nodes_out, size_t *count_out)
+{
+	NodeList nl;
+
+	if (nodes_out == NULL || count_out == NULL) {
+		return false;
+	}
+	*nodes_out = NULL;
+	*count_out = 0;
+
+	a11y_cache_clear ();
+	ZeroMemory (&nl, sizeof (nl));
+	if (!a11y_walk_into (host, &nl)) {
+		return false;
+	}
 	*nodes_out = nl.nodes;
 	*count_out = nl.count;
-	return nl.count > 0;
+	return true;
 }
 
 bool
 vala_webview2_host_a11y_walk_foreach (WebView2Host *host, WebView2GtkA11yForeachCb cb, void *user_data)
 {
-	webview2gtk_a11y_node *nodes = NULL;
-	size_t count = 0;
+	NodeList nl;
 	size_t i;
 
 	if (cb == NULL) {
 		return false;
 	}
-	if (!vala_webview2_host_a11y_walk (host, &nodes, &count)) {
+	ZeroMemory (&nl, sizeof (nl));
+	if (!a11y_walk_into (host, &nl)) {
 		return false;
 	}
-	for (i = 0; i < count; i++) {
-		webview2gtk_a11y_node *n = &nodes[i];
+	for (i = 0; i < nl.count; i++) {
+		webview2gtk_a11y_node *n = &nl.nodes[i];
 		cb (
 			n->id,
 			n->parent_id,
@@ -572,7 +641,7 @@ vala_webview2_host_a11y_walk_foreach (WebView2Host *host, WebView2GtkA11yForeach
 			n->can_set_value,
 			user_data);
 	}
-	vala_webview2_host_a11y_nodes_free (nodes, count);
+	vala_webview2_host_a11y_nodes_free (nl.nodes, nl.count);
 	return true;
 }
 

@@ -147,7 +147,8 @@ void vala_webview2_host_apply_pending_cookies (WebView2Host *host);
 
 /* Structured ControlView walk from page Document.
  * Coordinates are screen pixels. Call from the GTK/UI thread.
- * Node ids are valid until the next a11y_walk (element cache is replaced).
+ * Node ids are valid until vala_webview2_host_a11y_cache_reset (a11y_walk also
+ * resets). walk_foreach appends so a multi-host rebuild can walk every view.
  */
 typedef struct webview2gtk_a11y_node {
 	int id;
@@ -166,6 +167,7 @@ typedef struct webview2gtk_a11y_node {
 
 bool vala_webview2_host_a11y_walk (WebView2Host *host, webview2gtk_a11y_node **nodes_out, size_t *count_out);
 void vala_webview2_host_a11y_nodes_free (webview2gtk_a11y_node *nodes, size_t count);
+void vala_webview2_host_a11y_cache_reset (void);
 
 typedef void (*WebView2GtkA11yForeachCb) (
 	int id,

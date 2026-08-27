@@ -6,7 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.5.3] - Unreleased
+## [0.5.4] - Unreleased
+
+### Fixed
+
+- `Win32Atspi.get_desktop` now walks every live registered `WebView` and exposes one `document frame` per host, so walkers can match by name / URI. `register_webview` no longer last-wins ([bug](docs/bugs/done/2026-08-27-win32atspi-single-host.md)).
+- `Win32Atspi.Accessible.get_extents(WINDOW)` is relative to the document origin (AT-SPI `WINDOW`); `SCREEN` stays absolute pixels ([bug](docs/bugs/done/2026-08-27-win32atspi-window-extents.md)).
+
+## [0.5.3] - 2026-08-27
 
 ### Added
 

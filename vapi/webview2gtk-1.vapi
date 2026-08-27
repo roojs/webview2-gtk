@@ -300,6 +300,7 @@ namespace Win32Atspi {
 
 	public static void init();
 	public static Accessible get_desktop(int index);
+	/** Include this WebView's Document in the process tree (one document frame per live view). */
 	public static void register_webview(WebView2Gtk.WebView web);
 	public static void generate_keyboard_event(long keyval, string? keystring, KeySynthType synth);
 }
