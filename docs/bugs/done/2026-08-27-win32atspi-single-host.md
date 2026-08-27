@@ -1,6 +1,6 @@
 # Bug — Win32Atspi only walks the last registered WebView
 
-**Status:** ✅ fixed in **0.5.4** (pending release)  
+**Status:** ✅ fixed in **0.5.4**  
 **Platform:** Windows  
 **Area:** `lib/webview2gtk/win32atspi/Win32Atspi.vala` (`Bridge`), `win32-ui-webview2-a11y.c`  
 **Seen:** 2026-08-27

@@ -74,7 +74,7 @@ Built demos(after `package-demos` on the Windows build machine):
 & 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-automation.exe' --smoke --inspector-port 19222
 ```
 
-Pass: console shows `automation-started session=…`.  
+Pass: console shows `a11y_documents=2` and `TEST_PASS` (two WebViews, AT-SPI walk — **does not fill** the form).
 Chromium may print `Failed to unregister class Chrome_WidgetWin_0` on quit — known WebView2 teardown noise.
 
 ### Attach + fill via CDP (3.3)

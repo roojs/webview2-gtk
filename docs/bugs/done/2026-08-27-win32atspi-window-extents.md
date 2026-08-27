@@ -1,6 +1,6 @@
 # Bug — `get_extents(WINDOW)` returns screen pixels
 
-**Status:** ✅ fixed in **0.5.4** (pending release)  
+**Status:** ✅ fixed in **0.5.4**  
 **Platform:** Windows  
 **Area:** `Win32Atspi.Accessible.get_extents`  
 **Seen:** 2026-08-27

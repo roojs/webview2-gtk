@@ -247,8 +247,7 @@ public class Accessible : Object {
 internal class Bridge : Object {
 	public static Accessible? desktop;
 	public static bool ready;
-	private static Gee.ArrayList<unowned WebView2Gtk.WebView> hosts =
-		new Gee.ArrayList<unowned WebView2Gtk.WebView> ();
+	private static Gee.ArrayList<unowned WebView2Gtk.WebView>? hosts;
 
 	private class WalkRow {
 		public int id;
@@ -302,6 +301,9 @@ internal class Bridge : Object {
 	}
 
 	public static void register(WebView2Gtk.WebView web) {
+		if (hosts == null) {
+			hosts = new Gee.ArrayList<unowned WebView2Gtk.WebView> ();
+		}
 		if (!hosts.contains(web)) {
 			hosts.add(web);
 		}
@@ -314,7 +316,7 @@ internal class Bridge : Object {
 	}
 
 	public static void ensure_tree() throws Error {
-		if (hosts.size == 0) {
+		if (hosts == null || hosts.size == 0) {
 			throw new IOError.FAILED("Win32Atspi: no WebView registered(host not ready)");
 		}
 		rebuild();

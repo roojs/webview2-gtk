@@ -54,6 +54,14 @@ run_remote_smoke() {
 		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk/build && cp -f vendor/webview2/x64/WebView2Loader.dll . 2>/dev/null || cp -f ../build/vendor/webview2/x64/WebView2Loader.dll .; timeout 3 ./webview2gtk-hello.exe 2>&1 | tee smoke-run.log || true\""
 }
 
+run_remote_automation_build() {
+	echo "[agent-remote-build] automation build on ${REMOTE_HOST}"
+	# Drop the lib stamp so ninja cannot relink automation against a stale .a.
+	# Copy into portable-demos even if full package-demos fails (dir locked).
+	ssh -o BatchMode=yes "${REMOTE_HOST}" \
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup --reconfigure build && rm -f build/webview2gtk-automation.exe build/libwebview2gtk-1.stamp && set -o pipefail && ninja -C build libwebview2gtk-1.stamp webview2gtk-automation.exe 2>&1 | tee build/last-build.log && OUT_DIR=/c/msys64/tmp/webview2-gtk/portable-demos ./scripts/copy-exe-runtime-dlls.sh build/webview2gtk-automation.exe /c/msys64/tmp/webview2-gtk/portable-demos build/vendor/webview2/x64/WebView2Loader.dll\""
+}
+
 run_remote_automation_smoke() {
 	echo "[agent-remote-build] automation --smoke (interactive RDP session) on ${REMOTE_HOST}"
 	# SSH session 0 has no Win32 desktop — GUI exes segfault there.
@@ -179,8 +187,13 @@ case "${cmd}" in
 	automation)
 		sync_to_windows
 		build_rc=0
-		run_remote_build || build_rc=$?
-		run_remote_automation_smoke || build_rc=$?
+		run_remote_automation_build || build_rc=$?
+		if [[ "${build_rc}" -eq 0 ]]; then
+			run_remote_automation_smoke || build_rc=$?
+		fi
+		ssh -o BatchMode=yes "${REMOTE_HOST}" \
+			"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cp -f /c/Users/Alan/AppData/Local/Temp/webview2gtk-automation-smoke.log /c/msys64/tmp/webview2-gtk/build/automation-smoke.log 2>/dev/null || true\"" \
+			|| true
 		pull_artifacts || true
 		print_hint
 		exit "${build_rc}"

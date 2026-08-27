@@ -250,8 +250,8 @@ public class WebView : Gtk.Box {
 	}
 
 	~WebView() {
-		Win32Atspi.Bridge.unregister(this);
 		if (attached) {
+			Win32Atspi.Bridge.unregister(this);
 			wv2_host_set_permission_handler(host_handle, null, null);
 			wv2_host_set_script_message_handler(host_handle, null, null);
 			user_content_manager.unbind_host(host_handle);

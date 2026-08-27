@@ -6,7 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.5.4] - Unreleased
+## [0.5.5] - Unreleased
+
+### Fixed
+
+- `Win32Atspi.register_webview` lazy-inits the host list. Vala static `Gee.ArrayList` field `new` was null at first use, so register was a no-op (Gee `self != NULL`) and multi-document walks never recorded hosts ([bug](docs/bugs/done/2026-08-27-win32atspi-hosts-null.md)).
+- Meson `libwebview2gtk-1.stamp` lists Vala/C `depend_files`, so ninja rebuilds the staged library when sources change instead of relinking examples against a stale `.a`.
+
+### Changed
+
+- `webview2gtk-automation.exe --smoke` walks two WebViews, requires `a11y_documents>=2` and `get_extents(WINDOW)` origin `(0,0)`, then holds ~2.5s. Form fill stays `webview2gtk-cdp-attach.exe` against a window without `--smoke`.
+
+## [0.5.4] - 2026-08-27
 
 ### Fixed
 

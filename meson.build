@@ -1,7 +1,7 @@
 project(
   'webview2-gtk',
   ['c', 'vala'],
-  version: '0.5.4',
+  version: '0.5.5',
   meson_version: '>= 1.0.0',
   default_options: ['buildtype=debugoptimized', 'c_std=c11'],
 )
@@ -46,10 +46,63 @@ endif
 prefix = get_option('prefix')
 lib_stage = build_root / 'install-staging'
 
+# custom_target output is only the stamp — without depend_files, ninja never
+# rebuilds the staged .a when Vala/C sources change (examples then relink stale).
+lib_depend_files = files(
+  'scripts/wv2gtk-build.sh',
+  'lib/webview2gtk/webview.vala',
+  'lib/webview2gtk/webview2gtk-gdk-win32.c',
+  'lib/webview2gtk/CaptureBindings.vala',
+  'lib/webview2gtk/A11yBindings.vala',
+  'lib/webview2gtk/win32atspi/Win32Atspi.vala',
+  'lib/webview2gtk/win32atspi/Win32AtspiWin.vala',
+  'lib/webview2gtk/Enums.vala',
+  'lib/webview2gtk/NetworkProxySettings.vala',
+  'lib/webview2gtk/CookieManager.vala',
+  'lib/webview2gtk/URIRequest.vala',
+  'lib/webview2gtk/WebResource.vala',
+  'lib/webview2gtk/Download.vala',
+  'lib/webview2gtk/NetworkSession.vala',
+  'lib/webview2gtk/ApplicationInfo.vala',
+  'lib/webview2gtk/AutomationSession.vala',
+  'lib/webview2gtk/WebContext.vala',
+  'lib/webview2gtk/WebsitePolicies.vala',
+  'lib/webview2gtk/Settings.vala',
+  'lib/webview2gtk/PermissionRequest.vala',
+  'lib/webview2gtk/JavaScriptResult.vala',
+  'lib/webview2gtk/UserContentManager.vala',
+  'lib/webview2gtk/PrintOperation.vala',
+  'lib/webview2gtk/WebInspector.vala',
+  'lib/host/win32-ui-webview2-host.vala',
+  'lib/host/webview2gtk-host-listeners.vala',
+  'lib/host/win32-ui-webview2-events.c',
+  'lib/host/win32-ui-webview2-loader.c',
+  'lib/host/win32-ui-webview2-com-glue.c',
+  'lib/host/win32-ui-webview2-automation.c',
+  'lib/host/win32-ui-webview2-script.c',
+  'lib/host/win32-ui-webview2-capture.c',
+  'lib/host/win32-ui-webview2-print.c',
+  'lib/host/win32-ui-webview2-cookies.c',
+  'lib/host/win32-ui-webview2-document-response.c',
+  'lib/host/win32-ui-webview2-script-messages.c',
+  'lib/host/win32-ui-webview2-downloads.c',
+  'lib/host/win32-ui-webview2-web-resources.c',
+  'lib/host/win32-ui-webview2-permissions.c',
+  'lib/host/win32-ui-webview2-a11y.c',
+  'lib/host/win32-ui-webview2-a11y-diag.c',
+  'lib/host/webview2gtk-host-api.h',
+  'generated/win32-ui-webview2-host-glue.vala',
+  'generated/win32-ui-webview2-com-sync.vala',
+  'generated/win32-wide-strings.vala',
+  'generated/win32-ui-webview2-com-sync.c',
+  'vapi/webview2gtk-1.vapi',
+)
+
 lib_target = custom_target(
   'webview2gtk-lib',
   output: 'libwebview2gtk-1.stamp',
   command: [_build_bash, wv2gtk_build_sh, 'lib', build_root, lib_stage, '@OUTPUT@'],
+  depend_files: lib_depend_files,
   build_by_default: true,
 )
 
@@ -79,6 +132,7 @@ automation_exe = custom_target(
   output: 'webview2gtk-automation.exe',
   command: [_build_bash, wv2gtk_build_sh, 'automation', build_root / 'automation', '@OUTPUT@', lib_stage],
   depends: lib_target,
+  depend_files: files('examples/automation/main.vala'),
   build_by_default: get_option('examples'),
   install: get_option('examples'),
   install_dir: get_option('bindir'),

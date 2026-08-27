@@ -40,7 +40,7 @@ schtasks //Create //TN WebView2GtkAutomationSmoke \
 schtasks //Run //TN WebView2GtkAutomationSmoke
 echo "task started — waiting for ${LOG}"
 for _ in $(seq 1 45); do
-	if [[ -f "${LOG}" ]] && grep -qE 'automation-started|^exit=' "${LOG}" 2>/dev/null; then
+	if [[ -f "${LOG}" ]] && grep -qE 'TEST_PASS|TEST_FAIL|^exit=|gee_abstract_collection' "${LOG}" 2>/dev/null; then
 		break
 	fi
 	sleep 1
@@ -49,7 +49,11 @@ schtasks //Delete //TN WebView2GtkAutomationSmoke //F >/dev/null 2>&1 || true
 
 echo "--- log ---"
 cat "${LOG}" 2>&1 || echo NO_LOG
-if grep -q automation-started "${LOG}" 2>/dev/null; then
+if grep -q "gee_abstract_collection" "${LOG}" 2>/dev/null; then
+	echo SMOKE_FAIL
+	exit 1
+fi
+if grep -q TEST_PASS "${LOG}" 2>/dev/null && grep -qE 'a11y_documents=[2-9]' "${LOG}" 2>/dev/null; then
 	echo SMOKE_PASS
 	exit 0
 fi
