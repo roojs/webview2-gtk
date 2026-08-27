@@ -1,6 +1,9 @@
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_automation_allowed")]
 extern void wv2_host_set_automation_allowed(bool allowed);
 
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_accept_language")]
+extern void wv2_host_set_accept_language(string accept_language);
+
 namespace WebView2Gtk {
 
 /**
@@ -41,6 +44,40 @@ public class WebContext : Object {
 
 	public bool is_automation_allowed() {
 		return this.automation_allowed;
+	}
+
+	public void set_preferred_languages(string[]? languages) {
+		if (languages == null || languages.length == 0) {
+			return;
+		}
+		var normalized = new Gee.ArrayList<string>();
+		foreach (var lang in languages) {
+			if (lang == "") {
+				continue;
+			}
+			var folded = lang.casefold();
+			if (folded == "c" || folded == "posix") {
+				normalized.add("en-US");
+			} else {
+				normalized.add(lang.replace("_", "-"));
+			}
+		}
+		if (normalized.is_empty) {
+			wv2_host_set_accept_language("en");
+			return;
+		}
+		var delta = normalized.size < 10 ? 10 : (normalized.size < 20 ? 5 : 1);
+		var parts = new Gee.ArrayList<string>();
+		for (var i = 0; i < normalized.size; i++) {
+			var part = normalized[i];
+			var quality = 100 - i * delta;
+			if (quality > 0 && quality < 100) {
+				parts.add("%s;q=%.2f".printf(part, quality / 100.0));
+			} else {
+				parts.add(part);
+			}
+		}
+		wv2_host_set_accept_language(string.join(",", parts.to_array()));
 	}
 
 	/**

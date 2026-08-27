@@ -104,6 +104,7 @@ namespace WebView2Gtk {
 		public static unowned WebContext get_default();
 		public void set_automation_allowed(bool allowed);
 		public bool is_automation_allowed();
+		public void set_preferred_languages(string[]? languages);
 		public NetworkSession? get_network_session_for_automation();
 		public signal void automation_started(AutomationSession session);
 	}

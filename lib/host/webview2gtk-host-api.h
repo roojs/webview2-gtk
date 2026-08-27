@@ -121,6 +121,8 @@ void vala_webview2_host_set_resource_handlers (
 	void *user_data
 );
 
+void vala_webview2_host_set_accept_language (const char *accept_language_utf8);
+
 bool vala_webview2_host_execute_script_sync (WebView2Host *host, const char *script_utf8, char **result_json_out);
 bool vala_webview2_host_capture_screenshot_sync (WebView2Host *host, bool full_document, char **devtools_json_out);
 bool vala_webview2_host_print_to_pdf_sync (WebView2Host *host, const char *output_path_utf8);

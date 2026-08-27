@@ -16,6 +16,8 @@
 #include "win32-ui-webview2-com-glue.h"
 #include "win32-ui-webview2-sdk.h"
 
+static wchar_t *g_accept_language = NULL;
+
 typedef struct {
 	ICoreWebView2WebResourceRequestedEventHandler iface;
 	ICoreWebView2WebResourceRequestedEventHandlerVtbl vtbl;
@@ -38,6 +40,23 @@ typedef struct {
 } ResourceIdle;
 
 static volatile LONG g_next_id = 1;
+
+static void
+apply_accept_language (ICoreWebView2WebResourceRequest *request)
+{
+	ICoreWebView2HttpRequestHeaders *headers = NULL;
+
+	if (request == NULL || g_accept_language == NULL || g_accept_language[0] == L'\0') {
+		return;
+	}
+	if (FAILED (ICoreWebView2WebResourceRequest_get_Headers (request, &headers))
+	    || headers == NULL) {
+		return;
+	}
+	ICoreWebView2HttpRequestHeaders_SetHeader (
+		headers, L"Accept-Language", g_accept_language);
+	ICoreWebView2HttpRequestHeaders_Release (headers);
+}
 
 static char *
 request_uri_utf8 (ICoreWebView2WebResourceRequest *request)
@@ -127,12 +146,17 @@ static HRESULT STDMETHODCALLTYPE requested_invoke (
 	int id;
 
 	(void) sender;
-	if (args == NULL || host == NULL || host->cb_res_started == NULL) {
+	if (args == NULL || host == NULL) {
 		return S_OK;
 	}
 	if (FAILED (ICoreWebView2WebResourceRequestedEventArgs_get_Request (
 		            args, &request))
 	    || request == NULL) {
+		return S_OK;
+	}
+	apply_accept_language (request);
+	if (host->cb_res_started == NULL) {
+		ICoreWebView2WebResourceRequest_Release (request);
 		return S_OK;
 	}
 	uri = request_uri_utf8 (request);
@@ -260,6 +284,19 @@ vala_webview2_host_set_resource_handlers (
 	host->cb_res_finished = finished;
 	host->cb_res_failed = failed;
 	host->res_ctx = user_data;
+}
+
+void
+vala_webview2_host_set_accept_language (const char *accept_language_utf8)
+{
+	if (g_accept_language != NULL) {
+		CoTaskMemFree (g_accept_language);
+		g_accept_language = NULL;
+	}
+	if (accept_language_utf8 == NULL || accept_language_utf8[0] == '\0') {
+		return;
+	}
+	g_accept_language = (wchar_t *) win32_ui_utf8_to_utf16 (accept_language_utf8, NULL);
 }
 
 void
