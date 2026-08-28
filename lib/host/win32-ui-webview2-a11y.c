@@ -4,6 +4,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <oleauto.h>
+#include <objbase.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +14,7 @@
 #include "webview2gtk-host-api.h"
 #include "win32-ui-webview2-a11y-diag.h"
 #include "win32-ui-webview2-com-glue.h"
+#include "win32-ui-webview2-host-priv.h"
 #include "win32-ui-webview2-sdk.h"
 
 #define A11Y_MAX_DEPTH 20
@@ -320,50 +322,231 @@ find_document_under (IUIAutomation *uia, HWND hwnd)
 	return doc;
 }
 
-static IUIAutomationElement *
-find_page_document (IUIAutomation *uia, WebView2Host *host)
+static char *
+lpwstr_to_utf8 (LPCWSTR wide)
 {
-	HWND parent;
-	ICoreWebView2Controller *ctl;
-	HwndList hl;
-	RECT want;
-	RECT wr;
-	RECT bounds;
-	POINT tl;
-	POINT br;
-	bool have_want = false;
-	IUIAutomationElement *best = NULL;
-	int best_overlap = -1;
-	int i;
+	int wlen;
+	int nbytes;
+	char *utf8;
 
-	parent = vala_webview2_com_get_parent_hwnd_for (host);
-	if (parent == NULL) {
+	if (wide == NULL || wide[0] == L'\0') {
+		return strdup ("");
+	}
+	wlen = (int) wcslen (wide);
+	nbytes = WideCharToMultiByte (CP_UTF8, 0, wide, wlen, NULL, 0, NULL, NULL);
+	if (nbytes <= 0) {
+		return strdup ("");
+	}
+	utf8 = malloc ((size_t) nbytes + 1);
+	if (utf8 == NULL) {
 		return NULL;
 	}
-	ctl = (ICoreWebView2Controller *) vala_webview2_com_get_controller_for (host);
-	ZeroMemory (&bounds, sizeof (bounds));
-	if (ctl != NULL && SUCCEEDED (ICoreWebView2Controller_get_Bounds (ctl, &bounds))) {
-		tl.x = bounds.left;
-		tl.y = bounds.top;
-		br.x = bounds.right;
-		br.y = bounds.bottom;
-		if (ClientToScreen (parent, &tl) && ClientToScreen (parent, &br)) {
-			want.left = tl.x;
-			want.top = tl.y;
-			want.right = br.x;
-			want.bottom = br.y;
-			have_want = true;
-		}
+	WideCharToMultiByte (CP_UTF8, 0, wide, wlen, utf8, nbytes, NULL, NULL);
+	utf8[nbytes] = '\0';
+	return utf8;
+}
+
+static char *
+host_document_title_utf8 (WebView2Host *host)
+{
+	ICoreWebView2 *wv;
+	LPWSTR title = NULL;
+	char *out;
+
+	wv = vala_webview2_com_get_webview_for (host);
+	if (wv == NULL) {
+		return strdup ("");
 	}
+	if (FAILED (ICoreWebView2_get_DocumentTitle (wv, &title)) || title == NULL) {
+		return strdup ("");
+	}
+	out = lpwstr_to_utf8 (title);
+	CoTaskMemFree (title);
+	return out != NULL ? out : strdup ("");
+}
+
+static char *
+host_source_utf8 (WebView2Host *host)
+{
+	ICoreWebView2 *wv;
+	LPWSTR uri = NULL;
+	char *out;
+
+	wv = vala_webview2_com_get_webview_for (host);
+	if (wv == NULL) {
+		return strdup ("");
+	}
+	if (FAILED (ICoreWebView2_get_Source (wv, &uri)) || uri == NULL) {
+		return strdup ("");
+	}
+	out = lpwstr_to_utf8 (uri);
+	CoTaskMemFree (uri);
+	return out != NULL ? out : strdup ("");
+}
+
+static int
+str_match_score (const char *got, const char *want)
+{
+	if (got == NULL || want == NULL || got[0] == '\0' || want[0] == '\0') {
+		return 0;
+	}
+	if (strcmp (got, want) == 0) {
+		return 2;
+	}
+	if (strstr (got, want) != NULL || strstr (want, got) != NULL) {
+		return 1;
+	}
+	return 0;
+}
+
+static int
+rect_overlap_area (const RECT *a, const RECT *b)
+{
+	LONG l;
+	LONG t;
+	LONG r;
+	LONG bot;
+
+	l = a->left > b->left ? a->left : b->left;
+	t = a->top > b->top ? a->top : b->top;
+	r = a->right < b->right ? a->right : b->right;
+	bot = a->bottom < b->bottom ? a->bottom : b->bottom;
+	if (r > l && bot > t) {
+		return (int) ((r - l) * (bot - t));
+	}
+	return 0;
+}
+
+static long long
+rect_center_dist2 (const RECT *a, const RECT *b)
+{
+	long long ax = ((long long) a->left + (long long) a->right) / 2;
+	long long ay = ((long long) a->top + (long long) a->bottom) / 2;
+	long long bx = ((long long) b->left + (long long) b->right) / 2;
+	long long by = ((long long) b->top + (long long) b->bottom) / 2;
+	long long dx = ax - bx;
+	long long dy = ay - by;
+	return dx * dx + dy * dy;
+}
+
+static bool
+bounds_look_parked (const RECT *b)
+{
+	LONG w;
+	LONG h;
+
+	if (b == NULL) {
+		return false;
+	}
+	w = b->right - b->left;
+	h = b->bottom - b->top;
+	return b->left <= -10000 || b->top <= -10000 || w <= 2 || h <= 2;
+}
+
+static long long
+score_document (
+	IUIAutomationElement *doc,
+	const RECT *want,
+	bool have_want,
+	const char *title,
+	const char *uri,
+	const RECT *hwnd_rect)
+{
+	char *name;
+	char *value;
+	RECT wr;
+	int overlap = 0;
+	long long dist2 = 0;
+	int ts;
+	int us;
+
+	name = element_name_utf8 (doc);
+	value = element_value_utf8 (doc);
+	ts = str_match_score (name, title);
+	us = str_match_score (value, uri);
+	if (us == 0 && uri != NULL && uri[0] != '\0' && name != NULL) {
+		us = str_match_score (name, uri);
+	}
+	if (hwnd_rect != NULL) {
+		wr = *hwnd_rect;
+	} else {
+		int x = 0;
+		int y = 0;
+		int w = 0;
+		int h = 0;
+		element_bounds_screen (doc, &x, &y, &w, &h);
+		wr.left = x;
+		wr.top = y;
+		wr.right = x + w;
+		wr.bottom = y + h;
+	}
+	if (have_want) {
+		overlap = rect_overlap_area (&wr, want);
+		dist2 = rect_center_dist2 (&wr, want);
+	}
+	free (name);
+	free (value);
+	/* Identity (title / URI) outranks geometry: parked -30000 bounds have zero overlap. */
+	return (long long) ts * 1000000000000LL
+		+ (long long) us * 10000000000LL
+		+ (long long) overlap * 1000LL
+		- dist2;
+}
+
+static bool
+consider_document (
+	IUIAutomationElement *doc,
+	const RECT *want,
+	bool have_want,
+	const char *title,
+	const char *uri,
+	const RECT *hwnd_rect,
+	HWND hwnd,
+	IUIAutomationElement **best,
+	long long *best_score,
+	HWND *best_hwnd)
+{
+	long long sc;
+
+	if (doc == NULL) {
+		return false;
+	}
+	sc = score_document (doc, want, have_want, title, uri, hwnd_rect);
+	if (*best == NULL || sc > *best_score) {
+		if (*best != NULL) {
+			IUIAutomationElement_Release (*best);
+		}
+		*best = doc;
+		*best_score = sc;
+		if (best_hwnd != NULL) {
+			*best_hwnd = hwnd;
+		}
+		return true;
+	}
+	IUIAutomationElement_Release (doc);
+	return false;
+}
+
+static void
+search_chrome_hwnds (
+	IUIAutomation *uia,
+	HWND parent,
+	const RECT *want,
+	bool have_want,
+	const char *title,
+	const char *uri,
+	IUIAutomationElement **best,
+	long long *best_score,
+	HWND *best_hwnd)
+{
+	HwndList hl;
+	int i;
+
 	collect_descendants (parent, &hl);
 	for (i = 0; i < hl.count; i++) {
 		wchar_t cls[128];
 		IUIAutomationElement *doc;
-		int overlap = 0;
-		LONG l;
-		LONG t;
-		LONG r;
-		LONG b;
+		RECT wr;
 
 		cls[0] = L'\0';
 		GetClassNameW (hl.list[i], cls, 128);
@@ -374,42 +557,192 @@ find_page_document (IUIAutomation *uia, WebView2Host *host)
 		if (doc == NULL) {
 			continue;
 		}
-		if (have_want && GetWindowRect (hl.list[i], &wr)) {
-			l = wr.left > want.left ? wr.left : want.left;
-			t = wr.top > want.top ? wr.top : want.top;
-			r = wr.right < want.right ? wr.right : want.right;
-			b = wr.bottom < want.bottom ? wr.bottom : want.bottom;
-			if (r > l && b > t) {
-				overlap = (int) ((r - l) * (b - t));
-			}
-		}
-		if (best == NULL || overlap > best_overlap) {
-			if (best != NULL) {
-				IUIAutomationElement_Release (best);
-			}
-			best = doc;
-			best_overlap = overlap;
-		} else {
-			IUIAutomationElement_Release (doc);
+		ZeroMemory (&wr, sizeof (wr));
+		GetWindowRect (hl.list[i], &wr);
+		if (!consider_document (
+			    doc, want, have_want, title, uri, &wr, hl.list[i],
+			    best, best_score, best_hwnd)) {
+			/* released inside consider_document */
 		}
 	}
-	if (best != NULL) {
-		return best;
+}
+
+static void
+search_findall_under (
+	IUIAutomation *uia,
+	HWND root_hwnd,
+	const RECT *want,
+	bool have_want,
+	const char *title,
+	const char *uri,
+	IUIAutomationElement **best,
+	long long *best_score)
+{
+	IUIAutomationElement *root = NULL;
+	IUIAutomationCondition *cond;
+	IUIAutomationElementArray *arr = NULL;
+	int n = 0;
+	int i;
+
+	if (root_hwnd == NULL) {
+		return;
 	}
-	for (i = 0; i < hl.count; i++) {
-		wchar_t cls[128];
-		IUIAutomationElement *doc;
-		cls[0] = L'\0';
-		GetClassNameW (hl.list[i], cls, 128);
-		if (!interesting_hwnd (cls)) {
+	if (FAILED (IUIAutomation_ElementFromHandle (uia, root_hwnd, &root)) || root == NULL) {
+		return;
+	}
+	cond = make_control_type_condition (uia, UIA_DocumentControlTypeId);
+	if (cond == NULL) {
+		IUIAutomationElement_Release (root);
+		return;
+	}
+	IUIAutomationElement_FindAll (root, TreeScope_Descendants, cond, &arr);
+	IUIAutomationCondition_Release (cond);
+	IUIAutomationElement_Release (root);
+	if (arr == NULL) {
+		return;
+	}
+	IUIAutomationElementArray_get_Length (arr, &n);
+	for (i = 0; i < n; i++) {
+		IUIAutomationElement *doc = NULL;
+		IUIAutomationElementArray_GetElement (arr, i, &doc);
+		if (doc == NULL) {
 			continue;
 		}
-		doc = find_document_under (uia, hl.list[i]);
-		if (doc != NULL) {
-			return doc;
+		consider_document (
+			doc, want, have_want, title, uri, NULL, NULL,
+			best, best_score, NULL);
+	}
+	IUIAutomationElementArray_Release (arr);
+}
+
+static bool
+controller_bounds_screen (
+	HWND parent,
+	ICoreWebView2Controller *ctl,
+	RECT *want)
+{
+	RECT bounds;
+	POINT tl;
+	POINT br;
+
+	ZeroMemory (&bounds, sizeof (bounds));
+	if (ctl == NULL || FAILED (ICoreWebView2Controller_get_Bounds (ctl, &bounds))) {
+		return false;
+	}
+	tl.x = bounds.left;
+	tl.y = bounds.top;
+	br.x = bounds.right;
+	br.y = bounds.bottom;
+	if (!ClientToScreen (parent, &tl) || !ClientToScreen (parent, &br)) {
+		return false;
+	}
+	want->left = tl.x;
+	want->top = tl.y;
+	want->right = br.x;
+	want->bottom = br.y;
+	return true;
+}
+
+static IUIAutomationElement *
+find_page_document (IUIAutomation *uia, WebView2Host *host)
+{
+	HWND parent;
+	ICoreWebView2Controller *ctl;
+	RECT want;
+	RECT ctl_bounds;
+	bool have_want = false;
+	IUIAutomationElement *best = NULL;
+	long long best_score = 0;
+	HWND best_hwnd = NULL;
+	char *title;
+	char *uri;
+	HwndList hl;
+	int i;
+
+	parent = vala_webview2_com_get_parent_hwnd_for (host);
+	if (parent == NULL) {
+		return NULL;
+	}
+	ctl = (ICoreWebView2Controller *) vala_webview2_com_get_controller_for (host);
+	ZeroMemory (&want, sizeof (want));
+	ZeroMemory (&ctl_bounds, sizeof (ctl_bounds));
+	if (ctl != NULL) {
+		ICoreWebView2Controller_get_Bounds (ctl, &ctl_bounds);
+	}
+	have_want = controller_bounds_screen (parent, ctl, &want);
+	title = host_document_title_utf8 (host);
+	uri = host_source_utf8 (host);
+
+	if (host->a11y_hwnd != NULL && IsWindow (host->a11y_hwnd)) {
+		IUIAutomationElement *cached = find_document_under (uia, host->a11y_hwnd);
+		RECT wr;
+		ZeroMemory (&wr, sizeof (wr));
+		GetWindowRect (host->a11y_hwnd, &wr);
+		if (cached != NULL) {
+			consider_document (
+				cached, &want, have_want, title, uri, &wr, host->a11y_hwnd,
+				&best, &best_score, &best_hwnd);
 		}
 	}
-	return NULL;
+
+	search_chrome_hwnds (
+		uia, parent, &want, have_want, title, uri, &best, &best_score, &best_hwnd);
+	search_findall_under (
+		uia, parent, &want, have_want, title, uri, &best, &best_score);
+
+	/* Parked 1×1 / -30000 bounds: UIA may omit the Document until the HWND has a real size. */
+	if (ctl != NULL && bounds_look_parked (&ctl_bounds)
+	    && (title[0] != '\0' || uri[0] != '\0')
+	    && (best == NULL || score_document (best, &want, have_want, title, uri, NULL) < 10000000000LL)) {
+		RECT probe;
+		RECT restore = ctl_bounds;
+		LONG pw = ctl_bounds.right - ctl_bounds.left;
+		LONG ph = ctl_bounds.bottom - ctl_bounds.top;
+		if (pw < 400) {
+			pw = 800;
+		}
+		if (ph < 300) {
+			ph = 600;
+		}
+		probe.left = -30000;
+		probe.top = -30000;
+		probe.right = -30000 + pw;
+		probe.bottom = -30000 + ph;
+		ICoreWebView2Controller_put_Bounds (ctl, probe);
+		have_want = controller_bounds_screen (parent, ctl, &want);
+		search_chrome_hwnds (
+			uia, parent, &want, have_want, title, uri, &best, &best_score, &best_hwnd);
+		search_findall_under (
+			uia, parent, &want, have_want, title, uri, &best, &best_score);
+		ICoreWebView2Controller_put_Bounds (ctl, restore);
+	}
+
+	if (best == NULL) {
+		collect_descendants (parent, &hl);
+		for (i = 0; i < hl.count; i++) {
+			wchar_t cls[128];
+			IUIAutomationElement *doc;
+			cls[0] = L'\0';
+			GetClassNameW (hl.list[i], cls, 128);
+			if (!interesting_hwnd (cls)) {
+				continue;
+			}
+			doc = find_document_under (uia, hl.list[i]);
+			if (doc != NULL) {
+				best = doc;
+				best_hwnd = hl.list[i];
+				break;
+			}
+		}
+	}
+
+	if (best_hwnd != NULL && best != NULL) {
+		host->a11y_hwnd = best_hwnd;
+	}
+
+	free (title);
+	free (uri);
+	return best;
 }
 
 static IUIAutomation *

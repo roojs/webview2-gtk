@@ -85,6 +85,9 @@ struct WebView2Host {
 	/* Apply queued cookies before first Navigate (add_cookie-before-attach). */
 	WebView2GtkCookieApplyCb cb_cookie_apply;
 	void *cookie_apply_ctx;
+
+	/* Chrome_WidgetWin_1 last matched to this controller (stable when parked). */
+	HWND a11y_hwnd;
 };
 
 #endif /* WIN32_UI_WEBVIEW2_HOST_PRIV_H */

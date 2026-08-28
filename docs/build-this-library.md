@@ -66,6 +66,7 @@ Use **`dist-demos\`** (from `meson compile` or `./scripts/package-demos.sh`):
 & 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-add-cookie.exe' --smoke
 & 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-multi-host-spike.exe' --smoke
 & 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-automation.exe' --smoke --inspector-port 19222
+& 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-automation.exe' --smoke-stack
 ```
 
 | Step | Demo location | GTK DLLs bundled? |

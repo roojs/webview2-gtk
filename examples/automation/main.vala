@@ -3,17 +3,264 @@
  * Setup only: no WebDriver, no click/type.
  *
  *   --inspector-port <n>   (default 19222; also WV2GTK_INSPECTOR_PORT)
- *   --smoke               two WebViews + Win32Atspi walk; holds ~2.5s then quits
+ *   --smoke               two WebViews side-by-side + Win32Atspi walk; holds ~2.5s then quits
+ *   --smoke-stack         Gtk.Stack (one unmapped) + two-phase Win32Atspi walk
  */
 
 using Gtk;
 using WebView2Gtk;
 using Win32Atspi;
 
+const string STACK_PRIMARY_TITLE = "stack primary document";
+const string STACK_SECONDARY_TITLE = "stack secondary document";
+
+private int smoke_status = 1;
+private bool smoke = false;
+private bool smoke_stack = false;
+
+private Gtk.Widget wrap_webview(WebView view) {
+	var browser = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
+	browser.set_hexpand(true);
+	browser.set_vexpand(true);
+	var overlay = new Gtk.Overlay();
+	overlay.set_hexpand(true);
+	overlay.set_vexpand(true);
+	var scrolled = new Gtk.ScrolledWindow();
+	scrolled.set_hexpand(true);
+	scrolled.set_vexpand(true);
+	view.set_hexpand(true);
+	view.set_vexpand(true);
+	scrolled.set_child(view);
+	overlay.set_child(scrolled);
+	browser.append(overlay);
+	return browser;
+}
+
+private bool doc_name_hit(string doc_name, string want) {
+	if (doc_name == "" || want == "") {
+		return false;
+	}
+	return doc_name == want || doc_name.contains(want) || want.contains(doc_name);
+}
+
+private void walk_print_docs(out int n, out bool primary_hit, out bool secondary_hit) {
+	n = 0;
+	primary_hit = false;
+	secondary_hit = false;
+	Win32Atspi.init();
+	var desktop = Win32Atspi.get_desktop(0);
+	for (var i = 0; i < desktop.get_child_count(); i++) {
+		var app_acc = desktop.get_child_at_index(i);
+		for (var j = 0; j < app_acc.get_child_count(); j++) {
+			var frame = app_acc.get_child_at_index(j);
+			for (var k = 0; k < frame.get_child_count(); k++) {
+				var doc = frame.get_child_at_index(k);
+				var role = doc.get_role_name();
+				if (role != "document frame" && role != "document text") {
+					continue;
+				}
+				n++;
+				var doc_name = doc.get_name() != null ? doc.get_name() : "";
+				var doc_uri = "";
+				var hl = doc.get_hyperlink();
+				if (hl != null && hl.get_n_anchors() > 0) {
+					doc_uri = hl.get_uri(0);
+				}
+				var title_hit = doc_name_hit(doc_name, STACK_PRIMARY_TITLE);
+				print("a11y_doc name=%s uri=%s title_hit=%s\n",
+					doc_name, doc_uri, title_hit ? "yes" : "no");
+				if (title_hit) {
+					primary_hit = true;
+				}
+				if (doc_name_hit(doc_name, STACK_SECONDARY_TITLE)) {
+					secondary_hit = true;
+				}
+			}
+		}
+	}
+	print("a11y_documents=%d\n", n);
+}
+
+private void print_webview_state(string label, WebView primary, WebView secondary) {
+	var p_uri = primary.get_uri() != null ? primary.get_uri() : "";
+	var s_uri = secondary.get_uri() != null ? secondary.get_uri() : "";
+	var p_title = primary.get_title() != null ? primary.get_title() : "";
+	var s_title = secondary.get_title() != null ? secondary.get_title() : "";
+	print("%s primary_mapped=%s secondary_mapped=%s\n",
+		label,
+		primary.get_mapped() ? "yes" : "no",
+		secondary.get_mapped() ? "yes" : "no");
+	print("webview primary uri=%s title=%s\n", p_uri, p_title);
+	print("webview secondary uri=%s title=%s\n", s_uri, s_title);
+}
+
+private void pick_primary(string want_url, string want_title) {
+	print("PICK primary title=%s url=%s\n", want_title, want_url);
+	Win32Atspi.init();
+	var desktop = Win32Atspi.get_desktop(0);
+	for (var i = 0; i < desktop.get_child_count(); i++) {
+		var app_acc = desktop.get_child_at_index(i);
+		for (var j = 0; j < app_acc.get_child_count(); j++) {
+			var frame = app_acc.get_child_at_index(j);
+			for (var k = 0; k < frame.get_child_count(); k++) {
+				var doc = frame.get_child_at_index(k);
+				var role = doc.get_role_name();
+				if (role != "document frame" && role != "document text") {
+					continue;
+				}
+				var doc_name = doc.get_name() != null ? doc.get_name() : "";
+				if (doc_name_hit(doc_name, want_title)) {
+					print("PICK primary → OK\n");
+					return;
+				}
+			}
+		}
+	}
+	print("PICK primary title=%s → FAIL (not in tree)\n", want_title);
+}
+
+private void finish_quit(Gtk.ApplicationWindow window, Gtk.Application app) {
+	Timeout.add(400, () => {
+		window.close();
+		Idle.add(() => {
+			app.quit();
+			return false;
+		});
+		return Source.REMOVE;
+	});
+}
+
+private void run_smoke_stack(Gtk.ApplicationWindow window, Gtk.Application app) {
+	var context = WebContext.get_default();
+	context.set_automation_allowed(true);
+	var ns = context.get_network_session_for_automation();
+	if (ns == null) {
+		error("get_network_session_for_automation returned null");
+	}
+
+	var primary = new WebViewAuto(context, ns);
+	var secondary = new WebViewAuto(context, ns);
+	var stack = new Gtk.Stack();
+	stack.set_hexpand(true);
+	stack.set_vexpand(true);
+	stack.add_named(wrap_webview(primary), "primary");
+	stack.add_named(wrap_webview(secondary), "secondary");
+	stack.set_visible_child_name("primary");
+	window.set_child(stack);
+	window.present();
+
+	var tries = 0;
+	Timeout.add(250, () => {
+		tries++;
+		if (!primary.ready || !primary.get_mapped()) {
+			if (tries < 120) {
+				return Source.CONTINUE;
+			}
+			print("STACK_SMOKE_FAIL primary_attach tries=%d\n", tries);
+			smoke_status = 1;
+			finish_quit(window, app);
+			return Source.REMOVE;
+		}
+		stack.set_visible_child_name("secondary");
+		tries = 0;
+		Timeout.add(250, () => {
+			tries++;
+			if (!secondary.ready || !secondary.get_mapped()) {
+				if (tries < 120) {
+					return Source.CONTINUE;
+				}
+				print("STACK_SMOKE_FAIL secondary_attach tries=%d\n", tries);
+				smoke_status = 1;
+				finish_quit(window, app);
+				return Source.REMOVE;
+			}
+			secondary.load_html(
+				"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>""" + STACK_SECONDARY_TITLE + """</title>
+</head><body><p>Secondary WebView</p></body></html>""",
+				null
+			);
+			primary.load_html(
+				"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>""" + STACK_PRIMARY_TITLE + """</title>
+</head><body><p>Primary WebView hidden</p></body></html>""",
+				null
+			);
+			tries = 0;
+			Timeout.add(250, () => {
+				tries++;
+				var p_title = primary.get_title() != null ? primary.get_title() : "";
+				var s_title = secondary.get_title() != null ? secondary.get_title() : "";
+				var titles_ok = doc_name_hit(p_title, STACK_PRIMARY_TITLE)
+					&& doc_name_hit(s_title, STACK_SECONDARY_TITLE);
+				if ((!primary.ready || !secondary.ready || !titles_ok) && tries < 120) {
+					return Source.CONTINUE;
+				}
+				if (!titles_ok) {
+					print("STACK_SMOKE_FAIL titles_not_ready primary=%s secondary=%s\n",
+						p_title, s_title);
+					smoke_status = 1;
+					finish_quit(window, app);
+					return Source.REMOVE;
+				}
+				Timeout.add(500, () => {
+					print_webview_state("--- Phase A (hidden primary) ---", primary, secondary);
+					int n_a;
+					bool primary_a;
+					bool secondary_a;
+					walk_print_docs(out n_a, out primary_a, out secondary_a);
+					var want_url = primary.get_uri() != null ? primary.get_uri() : "";
+					var want_title = primary.get_title() != null ? primary.get_title() : "";
+					pick_primary(want_url, want_title);
+					var phase_a_ok = primary_a && secondary_a && n_a >= 2;
+					if (!phase_a_ok) {
+						print("STACK_SMOKE_FAIL hidden_missing_primary\n");
+					}
+
+					stack.set_visible_child_name("primary");
+					tries = 0;
+					Timeout.add(250, () => {
+						tries++;
+						if (!primary.get_mapped() && tries < 40) {
+							return Source.CONTINUE;
+						}
+						Timeout.add(500, () => {
+							print_webview_state("--- Phase B (visible primary) ---", primary, secondary);
+							int n_b;
+							bool primary_b;
+							bool secondary_b;
+							walk_print_docs(out n_b, out primary_b, out secondary_b);
+							if (primary_b) {
+								print("STACK_SMOKE_NOTE visible_primary_workaround_ok\n");
+							}
+							var phase_b_ok = primary_b;
+							var ok = phase_a_ok && phase_b_ok;
+							if (ok) {
+								print("STACK_SMOKE_PASS\n");
+								smoke_status = 0;
+							} else if (phase_a_ok && !phase_b_ok) {
+								print("STACK_SMOKE_FAIL visible_primary_missing\n");
+								smoke_status = 1;
+							} else {
+								smoke_status = 1;
+							}
+							finish_quit(window, app);
+							return Source.REMOVE;
+						});
+						return Source.REMOVE;
+					});
+					return Source.REMOVE;
+				});
+				return Source.REMOVE;
+			});
+			return Source.REMOVE;
+		});
+		return Source.REMOVE;
+	});
+}
+
 public static int main(string[] args) {
 	var insp = (uint16) 19222;
-	var smoke = false;
-	var smoke_status = 1;
 	var env_port = Environment.get_variable("WV2GTK_INSPECTOR_PORT");
 	if (env_port != null && env_port != "") {
 		insp = (uint16) int.parse(env_port);
@@ -30,6 +277,10 @@ public static int main(string[] args) {
 			smoke = true;
 			continue;
 		}
+		if (args[i] == "--smoke-stack") {
+			smoke_stack = true;
+			continue;
+		}
 		gtk_args += args[i];
 	}
 
@@ -40,6 +291,11 @@ public static int main(string[] args) {
 		var window = new Gtk.ApplicationWindow(app);
 		window.set_title("webview2-gtk automation");
 		window.set_default_size(900, 700);
+
+		if (smoke_stack) {
+			run_smoke_stack(window, app);
+			return;
+		}
 
 		var context = WebContext.get_default();
 		context.set_automation_allowed(true);
@@ -185,7 +441,7 @@ body{font-family:sans-serif;margin:2rem}
 	});
 
 	var code = app.run(gtk_args);
-	return smoke ? smoke_status : code;
+	return (smoke || smoke_stack) ? smoke_status : code;
 }
 
 class WebViewAuto : WebView

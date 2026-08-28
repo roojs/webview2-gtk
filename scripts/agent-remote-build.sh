@@ -10,6 +10,7 @@
 #   ./scripts/agent-remote-build.sh add-cookie    # build + run add_cookie-before-attach test
 #   ./scripts/agent-remote-build.sh multi-host-spike  # 4.5 two-controller HWND spike
 #   ./scripts/agent-remote-build.sh automation        # build + automation --smoke
+#   ./scripts/agent-remote-build.sh automation-stack  # build + automation --smoke-stack
 #
 # Requires: AGENT_WIN_HOST (SSH Host), MSYS2 rsync on Windows (see vala.win32 docs/windows-build.md § Rsync).
 set -euo pipefail
@@ -68,6 +69,12 @@ run_remote_automation_smoke() {
 	# Run via schtasks /IT into the logged-on session; DLL-complete portable-demos.
 	ssh -o BatchMode=yes "${REMOTE_HOST}" \
 		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"bash /c/msys64/tmp/webview2-gtk/scripts/run-automation-smoke-interactive.sh\""
+}
+
+run_remote_automation_stack_smoke() {
+	echo "[agent-remote-build] automation --smoke-stack (interactive RDP session) on ${REMOTE_HOST}"
+	ssh -o BatchMode=yes "${REMOTE_HOST}" \
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"bash /c/msys64/tmp/webview2-gtk/scripts/run-automation-smoke-stack-interactive.sh\""
 }
 
 run_remote_paned_insert_build() {
@@ -142,6 +149,10 @@ print_hint() {
 		echo "--- smoke-run.log ---"
 		cat "${ROOT}/build-remote/smoke-run.log"
 	fi
+	if [[ -f "${ROOT}/build-remote/automation-stack-smoke.log" ]]; then
+		echo "--- automation-stack-smoke.log ---"
+		cat "${ROOT}/build-remote/automation-stack-smoke.log"
+	fi
 	if [[ -f "${ROOT}/build-remote/paned-insert-smoke.log" ]]; then
 		echo "--- paned-insert-smoke.log ---"
 		cat "${ROOT}/build-remote/paned-insert-smoke.log"
@@ -198,6 +209,20 @@ case "${cmd}" in
 		print_hint
 		exit "${build_rc}"
 		;;
+	automation-stack)
+		sync_to_windows
+		build_rc=0
+		run_remote_automation_build || build_rc=$?
+		if [[ "${build_rc}" -eq 0 ]]; then
+			run_remote_automation_stack_smoke || build_rc=$?
+		fi
+		ssh -o BatchMode=yes "${REMOTE_HOST}" \
+			"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cp -f /c/Users/Alan/AppData/Local/Temp/webview2gtk-automation-stack-smoke.log /c/msys64/tmp/webview2-gtk/build/automation-stack-smoke.log 2>/dev/null || true\"" \
+			|| true
+		pull_artifacts || true
+		print_hint
+		exit "${build_rc}"
+		;;
 	paned-insert)
 		sync_to_windows
 		build_rc=0
@@ -241,7 +266,7 @@ case "${cmd}" in
 		exit "${build_rc}"
 		;;
 	*)
-		echo "usage: $0 [build|sync|remote-build|pull|run|automation|paned-insert|add-cookie|multi-host-spike]" >&2
+		echo "usage: $0 [build|sync|remote-build|pull|run|automation|automation-stack|paned-insert|add-cookie|multi-host-spike]" >&2
 		exit 1
 		;;
 esac

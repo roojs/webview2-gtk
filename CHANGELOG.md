@@ -6,7 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.5.5] - Unreleased
+## [0.5.6] - Unreleased
+
+### Fixed
+
+- `Win32Atspi` walks every registered host’s UIA Document even when the GTK child is unmapped (`Gtk.Stack`) and the controller is parked at `-30000`. Lookup matches by page title/URI and HWND distance instead of screen-overlap first-wins ([bug](docs/bugs/done/2026-08-28-win32atspi-hidden-stack-host-missing-document.md)).
+
+### Changed
+
+- `webview2gtk-automation.exe --smoke-stack` places two WebViews in a `Gtk.Stack`, loads the hidden child, and requires both document names in Phase A (`scripts/run-automation-smoke-stack-interactive.sh`).
+
+## [0.5.5] - 2026-08-27
 
 ### Fixed
 
