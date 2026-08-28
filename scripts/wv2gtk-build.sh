@@ -15,7 +15,7 @@
 # the widget/host tree (that was tripling CI compile time).
 set -euo pipefail
 
-MODE="${1:?mode: lib|hello|browser|automation|paned-insert|add-cookie|multi-host-spike|cdp-attach}"
+MODE="${1:?mode: lib|hello|browser|automation|paned-insert|add-cookie|multi-host-spike|cdp-attach|hidden-stack}"
 BUILD_DIR="${2:?build directory}"
 OUT="${3:?output (prefix for lib, exe for examples)}"
 
@@ -245,7 +245,7 @@ case "${MODE}" in
 		mkdir -p "$(dirname "${STAMP}")"
 		touch "${STAMP}"
 		;;
-	hello|browser|automation|paned-insert|add-cookie)
+	hello|browser|automation|paned-insert|add-cookie|hidden-stack)
 		LIB_STAGE="${4:?lib-stage from meson (install-staging)}"
 		STAGED_A="${LIB_STAGE}/lib/libwebview2gtk-1.a"
 		STAGED_INC="${LIB_STAGE}/include/webview2gtk-1"
@@ -261,6 +261,11 @@ case "${MODE}" in
 		GTK_DIR="${BUILD_DIR}/gtk-${MODE}"
 		rm -rf "${GTK_DIR}"
 		mkdir -p "${GTK_DIR}"
+		if [[ "${MODE}" == "hidden-stack" ]]; then
+			VALA_SRC="docs/bugs/2026-08-28-win32atspi-hidden-stack-host-missing-document/smoke-hidden-stack.vala"
+		else
+			VALA_SRC="examples/${MODE}/main.vala"
+		fi
 		(
 			cd "${ROOT}"
 			# Example only — link against staged libwebview2gtk-1.a
@@ -269,12 +274,15 @@ case "${MODE}" in
 				--vapidir "${VAPI}" \
 				--pkg webview2gtk-1 \
 				-C -d "${GTK_DIR}" \
-				"examples/${MODE}/main.vala"
+				"${VALA_SRC}"
 		)
 		MAIN_C="${GTK_DIR}/examples/${MODE}/main.c"
 		if [[ ! -f "${MAIN_C}" ]]; then
 			# flat -d layout
 			MAIN_C="${GTK_DIR}/main.c"
+		fi
+		if [[ ! -f "${MAIN_C}" ]]; then
+			MAIN_C="$(find "${GTK_DIR}" -name '*.c' | head -1)"
 		fi
 		if [[ ! -f "${MAIN_C}" ]]; then
 			echo "wv2gtk-build: valac did not emit main.c under ${GTK_DIR}" >&2
@@ -284,7 +292,7 @@ case "${MODE}" in
 		mkdir -p "$(dirname "${OUT}")"
 		# Console so smoke prints (TEST_PASS / TEST_FAIL) land in schtasks logs.
 		_subsys="${WINDOWS_SUBSYSTEM:--mwindows}"
-		if [[ "${MODE}" == "automation" || "${MODE}" == "paned-insert" || "${MODE}" == "add-cookie" ]] && [[ -z "${WINDOWS_SUBSYSTEM:-}" ]]; then
+		if [[ "${MODE}" == "automation" || "${MODE}" == "paned-insert" || "${MODE}" == "add-cookie" || "${MODE}" == "hidden-stack" ]] && [[ -z "${WINDOWS_SUBSYSTEM:-}" ]]; then
 			_subsys="-mconsole"
 		fi
 		# shellcheck disable=SC2086

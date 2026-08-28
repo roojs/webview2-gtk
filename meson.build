@@ -1,7 +1,7 @@
 project(
   'webview2-gtk',
   ['c', 'vala'],
-  version: '0.5.6',
+  version: '0.5.7',
   meson_version: '>= 1.0.0',
   default_options: ['buildtype=debugoptimized', 'c_std=c11'],
 )
@@ -174,6 +174,18 @@ multi_host_spike_exe = custom_target(
   output: 'webview2gtk-multi-host-spike.exe',
   command: [_build_bash, wv2gtk_build_sh, 'multi-host-spike', build_root / 'multi-host-spike', '@OUTPUT@'],
   depend_files: files('examples/multi-host-spike/main.c'),
+  build_by_default: get_option('examples'),
+  install: false,
+)
+
+hidden_stack_exe = custom_target(
+  'webview2gtk-smoke-hidden-stack',
+  output: 'webview2gtk-smoke-hidden-stack.exe',
+  command: [_build_bash, wv2gtk_build_sh, 'hidden-stack', build_root / 'hidden-stack', '@OUTPUT@', lib_stage],
+  depends: lib_target,
+  depend_files: files(
+    'docs/bugs/2026-08-28-win32atspi-hidden-stack-host-missing-document/smoke-hidden-stack.vala',
+  ),
   build_by_default: get_option('examples'),
   install: false,
 )

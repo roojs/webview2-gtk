@@ -18,6 +18,7 @@ extern "C" {
 WebView2Host *vala_webview2_host_create_with_xywh (
 	void *parent_hwnd, int x, int y, int width, int height, uint16_t *url);
 void vala_webview2_host_set_bounds_xywh (WebView2Host *host, int x, int y, int width, int height);
+void vala_webview2_host_note_visible_hwnd (WebView2Host *host);
 bool vala_webview2_host_navigate (WebView2Host *host, const char *url_utf8);
 bool vala_webview2_host_is_ready (WebView2Host *host);
 void vala_webview2_host_set_ready (WebView2Host *host, bool ready);

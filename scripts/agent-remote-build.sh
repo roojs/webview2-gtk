@@ -11,6 +11,7 @@
 #   ./scripts/agent-remote-build.sh multi-host-spike  # 4.5 two-controller HWND spike
 #   ./scripts/agent-remote-build.sh automation        # build + automation --smoke
 #   ./scripts/agent-remote-build.sh automation-stack  # build + automation --smoke-stack
+#   ./scripts/agent-remote-build.sh hidden-stack      # build + smoke-hidden-stack --google
 #
 # Requires: AGENT_WIN_HOST (SSH Host), MSYS2 rsync on Windows (see vala.win32 docs/windows-build.md § Rsync).
 set -euo pipefail
@@ -75,6 +76,18 @@ run_remote_automation_stack_smoke() {
 	echo "[agent-remote-build] automation --smoke-stack (interactive RDP session) on ${REMOTE_HOST}"
 	ssh -o BatchMode=yes "${REMOTE_HOST}" \
 		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"bash /c/msys64/tmp/webview2-gtk/scripts/run-automation-smoke-stack-interactive.sh\""
+}
+
+run_remote_hidden_stack_build() {
+	echo "[agent-remote-build] hidden-stack smoke build on ${REMOTE_HOST}"
+	ssh -o BatchMode=yes "${REMOTE_HOST}" \
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup --reconfigure build && rm -f build/webview2gtk-smoke-hidden-stack.exe build/libwebview2gtk-1.stamp && set -o pipefail && ninja -C build libwebview2gtk-1.stamp webview2gtk-smoke-hidden-stack.exe 2>&1 | tee build/last-build.log && OUT_DIR=/c/msys64/tmp/webview2-gtk/portable-demos ./scripts/copy-exe-runtime-dlls.sh build/webview2gtk-smoke-hidden-stack.exe /c/msys64/tmp/webview2-gtk/portable-demos build/vendor/webview2/x64/WebView2Loader.dll\""
+}
+
+run_remote_hidden_stack_smoke() {
+	echo "[agent-remote-build] smoke-hidden-stack --google (interactive RDP session) on ${REMOTE_HOST}"
+	ssh -o BatchMode=yes "${REMOTE_HOST}" \
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"bash /c/msys64/tmp/webview2-gtk/scripts/run-hidden-stack-smoke-interactive.sh\""
 }
 
 run_remote_paned_insert_build() {
@@ -160,6 +173,10 @@ print_hint() {
 	if [[ -f "${ROOT}/build-remote/add-cookie-smoke.log" ]]; then
 		echo "--- add-cookie-smoke.log ---"
 		cat "${ROOT}/build-remote/add-cookie-smoke.log"
+	fi
+	if [[ -f "${ROOT}/build-remote/hidden-stack-smoke.log" ]]; then
+		echo "--- hidden-stack-smoke.log ---"
+		cat "${ROOT}/build-remote/hidden-stack-smoke.log"
 	fi
 }
 
@@ -265,8 +282,22 @@ case "${cmd}" in
 		print_hint
 		exit "${build_rc}"
 		;;
+	hidden-stack)
+		sync_to_windows
+		build_rc=0
+		run_remote_hidden_stack_build || build_rc=$?
+		if [[ "${build_rc}" -eq 0 ]]; then
+			run_remote_hidden_stack_smoke || build_rc=$?
+		fi
+		ssh -o BatchMode=yes "${REMOTE_HOST}" \
+			"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cp -f /c/Users/Alan/AppData/Local/Temp/webview2gtk-hidden-stack-smoke.log /c/msys64/tmp/webview2-gtk/build/hidden-stack-smoke.log 2>/dev/null || true\"" \
+			|| true
+		pull_artifacts || true
+		print_hint
+		exit "${build_rc}"
+		;;
 	*)
-		echo "usage: $0 [build|sync|remote-build|pull|run|automation|automation-stack|paned-insert|add-cookie|multi-host-spike]" >&2
+		echo "usage: $0 [build|sync|remote-build|pull|run|automation|automation-stack|hidden-stack|paned-insert|add-cookie|multi-host-spike]" >&2
 		exit 1
 		;;
 esac

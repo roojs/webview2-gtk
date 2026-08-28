@@ -389,6 +389,7 @@ vala_webview2_host_set_bounds_xywh (WebView2Host *host, int x, int y, int width,
 		if (host->host_visible) {
 			vala_webview2_com_present_webview (host->parent);
 		}
+		vala_webview2_host_note_visible_hwnd (host);
 	}
 }
 

@@ -115,6 +115,9 @@ public class WebView : Gtk.Box {
 	private void* host_handle = null;
 	private bool attached = false;
 	private bool host_shown_on_screen = true;
+	/* Last on-screen size — parked hosts keep this (never 1×1) so UIA still has a Document. */
+	private int park_width = 800;
+	private int park_height = 600;
 	private string pending_uri = "";
 	private string pending_html = "";
 
@@ -487,13 +490,26 @@ public class WebView : Gtk.Box {
 			return;
 		}
 		int x, y, width, height;
-		if (!widget_bounds_xywh(host, out x, out y, out width, out height)) {
+		if (widget_bounds_xywh(host, out x, out y, out width, out height)
+		    && width > 2 && height > 2) {
+			park_width = width;
+			park_height = height;
+		} else if (!host_shown_on_screen) {
+			width = park_width;
+			height = park_height;
+			x = -30000;
+			y = -30000;
+			wv2_host_set_bounds_xywh(host_handle, x, y, width, height);
+			return;
+		} else {
 			return;
 		}
 		if (!host_shown_on_screen) {
 			/* Off-screen while GTK opacity is 0 — DevTools capture still needs IsVisible. */
 			x = -30000;
 			y = -30000;
+			width = park_width;
+			height = park_height;
 		}
 		wv2_host_set_bounds_xywh(host_handle, x, y, width, height);
 	}
@@ -508,7 +524,7 @@ public class WebView : Gtk.Box {
 		/* Keep IsVisible for DevTools capture; park off-screen when not shown. */
 		wv2_host_put_is_visible(host_handle, true);
 		if (!host_shown_on_screen) {
-			wv2_host_set_bounds_xywh(host_handle, -30000, -30000, 1, 1);
+			wv2_host_set_bounds_xywh(host_handle, -30000, -30000, park_width, park_height);
 			return;
 		}
 		push_bounds();

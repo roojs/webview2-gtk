@@ -6,7 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.5.6] - Unreleased
+## [0.5.7] - Unreleased
+
+### Fixed
+
+- Parked hosts keep their last on-screen size at `-30000` (never 1×1) so WebView2 still exposes a UIA Document after a hidden `load_uri`. Lookup matches by page title/URI and cached overlapping `Chrome_WidgetWin_1`, not screen-overlap first-wins ([bug](docs/bugs/2026-08-28-win32atspi-hidden-stack-host-missing-document.md)).
+
+### Changed
+
+- `webview2gtk-smoke-hidden-stack.exe --google` (bug-dir repro) must `PICK OK` / `VERDICT=HIDDEN_OK` for a Google page loaded on the unmapped stack child (`scripts/run-hidden-stack-smoke-interactive.sh`).
+
+## [0.5.6] - 2026-08-28
 
 ### Fixed
 

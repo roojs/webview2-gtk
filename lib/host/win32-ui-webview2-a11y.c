@@ -429,18 +429,65 @@ rect_center_dist2 (const RECT *a, const RECT *b)
 	return dx * dx + dy * dy;
 }
 
-static bool
-bounds_look_parked (const RECT *b)
-{
-	LONG w;
-	LONG h;
+typedef struct {
+	IUIAutomationElement *el;
+	long long score;
+	HWND hwnd;
+	bool id;
+} DocPick;
 
-	if (b == NULL) {
-		return false;
+void
+vala_webview2_host_note_visible_hwnd (WebView2Host *host)
+{
+	HWND parent;
+	HwndList hl;
+	RECT want;
+	POINT tl;
+	POINT br;
+	int best_overlap = 0;
+	HWND best = NULL;
+	int i;
+
+	/* Cache Chrome_WidgetWin_1 whose screen rect overlaps controller bounds.
+	 * No overlap (parked / not laid out yet) keeps the last HWND. */
+	if (host == NULL || host->parent == NULL) {
+		return;
 	}
-	w = b->right - b->left;
-	h = b->bottom - b->top;
-	return b->left <= -10000 || b->top <= -10000 || w <= 2 || h <= 2;
+	parent = host->parent;
+	tl.x = host->bounds.left;
+	tl.y = host->bounds.top;
+	br.x = host->bounds.right;
+	br.y = host->bounds.bottom;
+	if (!ClientToScreen (parent, &tl) || !ClientToScreen (parent, &br)) {
+		return;
+	}
+	want.left = tl.x;
+	want.top = tl.y;
+	want.right = br.x;
+	want.bottom = br.y;
+	collect_descendants (parent, &hl);
+	for (i = 0; i < hl.count; i++) {
+		wchar_t cls[128];
+		RECT wr;
+		int overlap;
+
+		cls[0] = L'\0';
+		GetClassNameW (hl.list[i], cls, 128);
+		if (wcscmp (cls, L"Chrome_WidgetWin_1") != 0) {
+			continue;
+		}
+		if (!GetWindowRect (hl.list[i], &wr)) {
+			continue;
+		}
+		overlap = rect_overlap_area (&wr, &want);
+		if (overlap > best_overlap) {
+			best_overlap = overlap;
+			best = hl.list[i];
+		}
+	}
+	if (best != NULL) {
+		host->a11y_hwnd = best;
+	}
 }
 
 static long long
@@ -450,7 +497,8 @@ score_document (
 	bool have_want,
 	const char *title,
 	const char *uri,
-	const RECT *hwnd_rect)
+	const RECT *hwnd_rect,
+	bool *id)
 {
 	char *name;
 	char *value;
@@ -486,14 +534,17 @@ score_document (
 	}
 	free (name);
 	free (value);
-	/* Identity (title / URI) outranks geometry: parked -30000 bounds have zero overlap. */
+	if (id != NULL) {
+		*id = ts > 0 || us > 0;
+	}
+	/* Title / URI outrank geometry so a parked host still beats an on-screen sibling. */
 	return (long long) ts * 1000000000000LL
 		+ (long long) us * 10000000000LL
 		+ (long long) overlap * 1000LL
 		- dist2;
 }
 
-static bool
+static void
 consider_document (
 	IUIAutomationElement *doc,
 	const RECT *want,
@@ -502,29 +553,28 @@ consider_document (
 	const char *uri,
 	const RECT *hwnd_rect,
 	HWND hwnd,
-	IUIAutomationElement **best,
-	long long *best_score,
-	HWND *best_hwnd)
+	DocPick *pick)
 {
+	bool id = false;
 	long long sc;
 
 	if (doc == NULL) {
-		return false;
+		return;
 	}
-	sc = score_document (doc, want, have_want, title, uri, hwnd_rect);
-	if (*best == NULL || sc > *best_score) {
-		if (*best != NULL) {
-			IUIAutomationElement_Release (*best);
+	sc = score_document (doc, want, have_want, title, uri, hwnd_rect, &id);
+	if (pick->el == NULL || sc > pick->score) {
+		if (pick->el != NULL) {
+			IUIAutomationElement_Release (pick->el);
 		}
-		*best = doc;
-		*best_score = sc;
-		if (best_hwnd != NULL) {
-			*best_hwnd = hwnd;
+		pick->el = doc;
+		pick->score = sc;
+		pick->id = id;
+		if (hwnd != NULL) {
+			pick->hwnd = hwnd;
 		}
-		return true;
+		return;
 	}
 	IUIAutomationElement_Release (doc);
-	return false;
 }
 
 static void
@@ -535,9 +585,7 @@ search_chrome_hwnds (
 	bool have_want,
 	const char *title,
 	const char *uri,
-	IUIAutomationElement **best,
-	long long *best_score,
-	HWND *best_hwnd)
+	DocPick *pick)
 {
 	HwndList hl;
 	int i;
@@ -559,11 +607,8 @@ search_chrome_hwnds (
 		}
 		ZeroMemory (&wr, sizeof (wr));
 		GetWindowRect (hl.list[i], &wr);
-		if (!consider_document (
-			    doc, want, have_want, title, uri, &wr, hl.list[i],
-			    best, best_score, best_hwnd)) {
-			/* released inside consider_document */
-		}
+		consider_document (
+			doc, want, have_want, title, uri, &wr, hl.list[i], pick);
 	}
 }
 
@@ -575,8 +620,7 @@ search_findall_under (
 	bool have_want,
 	const char *title,
 	const char *uri,
-	IUIAutomationElement **best,
-	long long *best_score)
+	DocPick *pick)
 {
 	IUIAutomationElement *root = NULL;
 	IUIAutomationCondition *cond;
@@ -609,8 +653,7 @@ search_findall_under (
 			continue;
 		}
 		consider_document (
-			doc, want, have_want, title, uri, NULL, NULL,
-			best, best_score, NULL);
+			doc, want, have_want, title, uri, NULL, NULL, pick);
 	}
 	IUIAutomationElementArray_Release (arr);
 }
@@ -651,11 +694,10 @@ find_page_document (IUIAutomation *uia, WebView2Host *host)
 	RECT want;
 	RECT ctl_bounds;
 	bool have_want = false;
-	IUIAutomationElement *best = NULL;
-	long long best_score = 0;
-	HWND best_hwnd = NULL;
+	DocPick pick;
 	char *title;
 	char *uri;
+	bool have_id;
 	HwndList hl;
 	int i;
 
@@ -666,12 +708,15 @@ find_page_document (IUIAutomation *uia, WebView2Host *host)
 	ctl = (ICoreWebView2Controller *) vala_webview2_com_get_controller_for (host);
 	ZeroMemory (&want, sizeof (want));
 	ZeroMemory (&ctl_bounds, sizeof (ctl_bounds));
+	ZeroMemory (&pick, sizeof (pick));
 	if (ctl != NULL) {
 		ICoreWebView2Controller_get_Bounds (ctl, &ctl_bounds);
 	}
 	have_want = controller_bounds_screen (parent, ctl, &want);
 	title = host_document_title_utf8 (host);
 	uri = host_source_utf8 (host);
+	have_id = title[0] != '\0'
+		|| (uri[0] != '\0' && strcmp (uri, "about:blank") != 0);
 
 	if (host->a11y_hwnd != NULL && IsWindow (host->a11y_hwnd)) {
 		IUIAutomationElement *cached = find_document_under (uia, host->a11y_hwnd);
@@ -681,23 +726,21 @@ find_page_document (IUIAutomation *uia, WebView2Host *host)
 		if (cached != NULL) {
 			consider_document (
 				cached, &want, have_want, title, uri, &wr, host->a11y_hwnd,
-				&best, &best_score, &best_hwnd);
+				&pick);
 		}
 	}
 
-	search_chrome_hwnds (
-		uia, parent, &want, have_want, title, uri, &best, &best_score, &best_hwnd);
-	search_findall_under (
-		uia, parent, &want, have_want, title, uri, &best, &best_score);
+	search_chrome_hwnds (uia, parent, &want, have_want, title, uri, &pick);
+	search_findall_under (uia, parent, &want, have_want, title, uri, &pick);
 
-	/* Parked 1×1 / -30000 bounds: UIA may omit the Document until the HWND has a real size. */
-	if (ctl != NULL && bounds_look_parked (&ctl_bounds)
-	    && (title[0] != '\0' || uri[0] != '\0')
-	    && (best == NULL || score_document (best, &want, have_want, title, uri, NULL) < 10000000000LL)) {
+	/* Parked bounds: UIA often omits Document until the HWND has a real size and a layout pass. */
+	if (ctl != NULL && have_id && !pick.id) {
 		RECT probe;
 		RECT restore = ctl_bounds;
 		LONG pw = ctl_bounds.right - ctl_bounds.left;
 		LONG ph = ctl_bounds.bottom - ctl_bounds.top;
+		int p;
+
 		if (pw < 400) {
 			pw = 800;
 		}
@@ -709,15 +752,35 @@ find_page_document (IUIAutomation *uia, WebView2Host *host)
 		probe.right = -30000 + pw;
 		probe.bottom = -30000 + ph;
 		ICoreWebView2Controller_put_Bounds (ctl, probe);
+		ICoreWebView2Controller_put_IsVisible (ctl, TRUE);
+		for (p = 0; p < 20; p++) {
+			vala_webview2_com_pump_messages ();
+			Sleep (25);
+		}
 		have_want = controller_bounds_screen (parent, ctl, &want);
-		search_chrome_hwnds (
-			uia, parent, &want, have_want, title, uri, &best, &best_score, &best_hwnd);
-		search_findall_under (
-			uia, parent, &want, have_want, title, uri, &best, &best_score);
+		if (host->a11y_hwnd != NULL && IsWindow (host->a11y_hwnd)) {
+			IUIAutomationElement *cached = find_document_under (uia, host->a11y_hwnd);
+			RECT wr;
+			ZeroMemory (&wr, sizeof (wr));
+			GetWindowRect (host->a11y_hwnd, &wr);
+			if (cached != NULL) {
+				consider_document (
+					cached, &want, have_want, title, uri, &wr, host->a11y_hwnd,
+					&pick);
+			}
+		}
+		search_chrome_hwnds (uia, parent, &want, have_want, title, uri, &pick);
+		search_findall_under (uia, parent, &want, have_want, title, uri, &pick);
 		ICoreWebView2Controller_put_Bounds (ctl, restore);
 	}
 
-	if (best == NULL) {
+	if (have_id && pick.el != NULL && !pick.id) {
+		IUIAutomationElement_Release (pick.el);
+		pick.el = NULL;
+		pick.hwnd = NULL;
+	}
+
+	if (pick.el == NULL && !have_id) {
 		collect_descendants (parent, &hl);
 		for (i = 0; i < hl.count; i++) {
 			wchar_t cls[128];
@@ -729,20 +792,20 @@ find_page_document (IUIAutomation *uia, WebView2Host *host)
 			}
 			doc = find_document_under (uia, hl.list[i]);
 			if (doc != NULL) {
-				best = doc;
-				best_hwnd = hl.list[i];
+				pick.el = doc;
+				pick.hwnd = hl.list[i];
 				break;
 			}
 		}
 	}
 
-	if (best_hwnd != NULL && best != NULL) {
-		host->a11y_hwnd = best_hwnd;
+	if (pick.hwnd != NULL && pick.el != NULL) {
+		host->a11y_hwnd = pick.hwnd;
 	}
 
 	free (title);
 	free (uri);
-	return best;
+	return pick.el;
 }
 
 static IUIAutomation *
@@ -914,6 +977,35 @@ a11y_walk_into (WebView2Host *host, NodeList *nl)
 	IUIAutomationTreeWalker_Release (walker);
 	IUIAutomationElement_Release (doc);
 	IUIAutomation_Release (uia);
+	if (nl->count > 0) {
+		char *title;
+		char *src;
+		webview2gtk_a11y_node *root = NULL;
+		size_t i;
+
+		for (i = 0; i < nl->count; i++) {
+			if (nl->nodes[i].parent_id < 0) {
+				root = &nl->nodes[i];
+				break;
+			}
+		}
+		title = host_document_title_utf8 (host);
+		src = host_source_utf8 (host);
+		if (root != NULL) {
+			if ((root->name == NULL || root->name[0] == '\0') && title[0] != '\0') {
+				free (root->name);
+				root->name = strdup (title);
+			}
+			if ((root->uri == NULL || root->uri[0] == '\0')
+			    && src[0] != '\0'
+			    && strcmp (src, "about:blank") != 0) {
+				free (root->uri);
+				root->uri = strdup (src);
+			}
+		}
+		free (title);
+		free (src);
+	}
 	return nl->count > 0;
 }
 
