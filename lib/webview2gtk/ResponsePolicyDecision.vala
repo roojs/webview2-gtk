@@ -2,6 +2,8 @@ namespace WebView2Gtk {
 
 /**
  * WebKitGTK-shaped response policy decision for main-frame document loads.
+ *
+ * Property accessors match WebKit's get_request / get_response.
  */
 public sealed class ResponsePolicyDecision : PolicyDecision {
 	public URIRequest request { get; construct; }
@@ -12,14 +14,6 @@ public sealed class ResponsePolicyDecision : PolicyDecision {
 			request: new URIRequest(uri),
 			response: new URIResponse(uri, status_code, http_headers)
 		);
-	}
-
-	public unowned URIRequest get_request() {
-		return this.request;
-	}
-
-	public unowned URIResponse get_response() {
-		return this.response;
 	}
 
 	public bool is_main_frame_main_resource() {
