@@ -223,8 +223,10 @@ public class WebView : Gtk.Box {
 
 	public signal void load_changed(LoadEvent load_event);
 
-	/** Main-frame document HTTP response(status + headers as Soup.MessageHeaders). */
-	public signal void main_document_response(uint status, Soup.MessageHeaders headers);
+	/**
+	 * WebKitGTK-shaped — policy decision (main-frame document RESPONSE is wired today).
+	 */
+	public signal bool decide_policy(PolicyDecision decision, PolicyDecisionType type);
 
 	/**
 	 * WebKitGTK-shaped — a subresource load began.
@@ -729,16 +731,19 @@ public class WebView : Gtk.Box {
 	[CCode(has_target = false)]
 	private static void on_document_response_cb(
 		void* user_data,
+		string uri,
 		int status,
 		[CCode(array_length = false)] string[] header_names,
 		[CCode(array_length = false)] string[] header_values,
 		size_t header_count
 	) {
+		var view = (WebView) user_data;
 		var headers = new Soup.MessageHeaders(Soup.MessageHeadersType.RESPONSE);
 		for (var i = 0; i < (int) header_count; i++) {
 			headers.append(header_names[i], header_values[i]);
 		}
-		((WebView) user_data).main_document_response((uint) status, headers);
+		var decision = new ResponsePolicyDecision(uri, (uint) status, headers);
+		view.decide_policy(decision, PolicyDecisionType.RESPONSE);
 	}
 
 	[CCode(has_target = false)]

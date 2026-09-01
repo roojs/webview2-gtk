@@ -6,7 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.5.7] - Unreleased
+## [0.5.8] - Unreleased
+
+### Added
+
+- WebKitGTK-shaped `decide_policy` / `ResponsePolicyDecision` / `URIResponse` for main-frame document HTTP responses, wired from the existing `WebResourceResponseReceived` host path ([bug](docs/bugs/done/2026-09-01-decide-policy-response-emulation.md)).
+
+### Removed
+
+- `main_document_response` — replaced by `decide_policy` with `PolicyDecisionType.RESPONSE`.
+
+## [0.5.7] - 2026-08-28
 
 ### Fixed
 

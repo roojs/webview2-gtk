@@ -38,6 +38,7 @@ typedef void (*WebView2GtkEventCb) (void *user_data);
 typedef void (*WebView2GtkNavCompletedCb) (void *user_data, bool success);
 typedef void (*WebView2GtkDocumentResponseCb) (
 	void *user_data,
+	const char *uri_utf8,
 	int status,
 	const char * const *header_names,
 	const char * const *header_values,

@@ -129,12 +129,28 @@ emit_document_response (
 	char **names_out = NULL;
 	char **values_out = NULL;
 
-	if (host == NULL || host->cb_doc_response == NULL || headers == NULL) {
+	char *uri_utf8 = NULL;
+
+	if (host == NULL || host->cb_doc_response == NULL) {
+		return;
+	}
+	if (host->doc_nav_uri != NULL) {
+		uri_utf8 = win32_ui_utf16_to_utf8 ((uint16_t *) host->doc_nav_uri,
+		                                   (int) wcslen (host->doc_nav_uri) + 1);
+	}
+	if (headers == NULL) {
+		host->cb_doc_response (host->doc_response_ctx,
+		                       uri_utf8 != NULL ? uri_utf8 : "",
+		                       status, NULL, NULL, 0);
+		free (uri_utf8);
 		return;
 	}
 	if (FAILED (ICoreWebView2HttpResponseHeaders_GetIterator (headers, &iter))
 	    || iter == NULL) {
-		host->cb_doc_response (host->doc_response_ctx, status, NULL, NULL, 0);
+		host->cb_doc_response (host->doc_response_ctx,
+		                       uri_utf8 != NULL ? uri_utf8 : "",
+		                       status, NULL, NULL, 0);
+		free (uri_utf8);
 		return;
 	}
 	for (;;) {
@@ -173,6 +189,7 @@ emit_document_response (
 					free_utf8_array (names, count);
 					free_utf8_array (values, count);
 					ICoreWebView2HttpHeadersCollectionIterator_Release (iter);
+					free (uri_utf8);
 					return;
 				}
 				names = nn;
@@ -197,11 +214,15 @@ emit_document_response (
 	if (names_out == NULL || values_out == NULL) {
 		free_utf8_array (names_out, count);
 		free_utf8_array (values_out, count);
+		free (uri_utf8);
 		return;
 	}
-	host->cb_doc_response (host->doc_response_ctx, status,
+	host->cb_doc_response (host->doc_response_ctx,
+	                       uri_utf8 != NULL ? uri_utf8 : "",
+	                       status,
 	                       (const char **) names_out,
 	                       (const char **) values_out, count);
+	free (uri_utf8);
 	free_utf8_array (names_out, count);
 	free_utf8_array (values_out, count);
 }

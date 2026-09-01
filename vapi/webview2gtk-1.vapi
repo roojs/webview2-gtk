@@ -51,6 +51,12 @@ namespace WebView2Gtk {
 		DENY
 	}
 
+	public enum PolicyDecisionType {
+		NAVIGATION_ACTION,
+		NEW_WINDOW_ACTION,
+		RESPONSE
+	}
+
 	public errordomain NetworkError {
 		FAILED,
 		TRANSPORT,
@@ -137,6 +143,36 @@ namespace WebView2Gtk {
 		public URIRequest(string uri);
 	}
 
+	public abstract class PolicyDecision : GLib.Object {
+		public virtual void use();
+		public virtual void ignore();
+		public virtual void download();
+	}
+
+	public sealed class URIResponse : GLib.Object {
+		public string uri { get; }
+		public uint status_code { get; }
+		public Soup.MessageHeaders http_headers { get; }
+		public URIResponse(string uri, uint status_code, Soup.MessageHeaders http_headers);
+		public unowned string get_uri();
+		public uint get_status_code();
+		public unowned Soup.MessageHeaders get_http_headers();
+	}
+
+	public sealed class ResponsePolicyDecision : PolicyDecision {
+		public URIRequest request { get; }
+		public URIResponse response { get; }
+		public ResponsePolicyDecision(
+			string uri,
+			uint status_code,
+			Soup.MessageHeaders http_headers
+		);
+		public unowned URIRequest get_request();
+		public unowned URIResponse get_response();
+		public bool is_main_frame_main_resource();
+		public bool is_mime_type_supported();
+	}
+
 	public class WebResource : GLib.Object {
 		public string uri { get; }
 		public unowned string get_uri();
@@ -206,9 +242,9 @@ namespace WebView2Gtk {
 		public WebsitePolicies website_policies { get; construct; }
 		public bool is_muted { get; set; }
 		public signal void load_changed(LoadEvent load_event);
-		public signal void main_document_response(
-			uint status,
-			Soup.MessageHeaders headers
+		public signal bool decide_policy(
+			PolicyDecision decision,
+			PolicyDecisionType type
 		);
 		public signal void resource_load_started(
 			WebResource resource,
