@@ -62,6 +62,25 @@ Environment.set_variable("WEBKIT_INSPECTOR_SERVER", "127.0.0.1:19222", true);
 
 Also shared: `get_settings().enable_developer_extras` and `get_inspector().show()` (opens Edge DevTools when extras are enabled). Media settings, `is_muted`, and `permission_request` / `query_permission_state` match WebKitGTK shapes (mute + `PermissionRequested` on the host).
 
+### Hiding `navigator.webdriver`
+
+Same contract as [webkitgtk-automation — Hiding `navigator.webdriver`](https://github.com/roojs/webkitgtk-automation#hiding-navigatorwebdriver-automation-flag) / WebKit [#165269](https://bugs.webkit.org/show_bug.cgi?id=165269):
+
+| `NavigatorWebDriverActivePolicy` | Page JS on a controlled / CDP session |
+|----------------------------------|----------------------------------------|
+| **AUTO** (default) | `navigator.webdriver === true` when automation-controlled |
+| **ENABLED** | always `true` |
+| **DISABLED** | always `false` (Windows: `--disable-blink-features=AutomationControlled`) |
+
+Default is **AUTO** — enabling CDP / `is_controlled_by_automation` alone does **not** hide the flag. Opt out explicitly **before** the WebView2 environment is created (before first present/attach):
+
+```vala
+view.get_settings().navigator_webdriver_active_policy =
+	NavigatorWebDriverActivePolicy.DISABLED;
+```
+
+Changing the policy after the environment exists is stored only; Chromium boot args need a new process/environment (same timing rule as autoplay DENY).
+
 ## Demo and smokes
 
 Built demos(after `package-demos` on the Windows build machine):

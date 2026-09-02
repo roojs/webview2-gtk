@@ -206,6 +206,9 @@ bool vala_webview2_host_get_automation_allowed (void);
 /* 0=ALLOW, 1=ALLOW_WITHOUT_SOUND, 2=DENY — match AutoplayPolicy */
 void vala_webview2_host_set_autoplay_policy (int policy);
 
+/* 0=AUTO, 1=ENABLED, 2=DISABLED — match NavigatorWebDriverActivePolicy */
+void vala_webview2_host_set_navigator_webdriver_active_policy (int policy);
+
 bool vala_webview2_host_open_dev_tools_window (WebView2Host *host);
 
 /* Media / mute / PermissionRequested (plan 3.7 §9) — per host. */

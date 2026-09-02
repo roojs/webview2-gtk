@@ -6,7 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.5.8] - Unreleased
+## [0.5.9] - Unreleased
+
+### Added
+
+- `NavigatorWebDriverActivePolicy` on `WebViewSettings` (`navigator_webdriver_active_policy`) — WebKit `#165269` / webkitgtk-automation shaped; **DISABLED** maps to `--disable-blink-features=AutomationControlled` at WebView2 environment create ([bug](docs/bugs/done/2026-09-02-disable-navigator-webdriver-blink.md)). Default **AUTO** leaves automation advertising unchanged.
+
+## [0.5.8] - 2026-09-01
 
 ### Added
 

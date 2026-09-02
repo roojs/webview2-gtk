@@ -44,6 +44,16 @@ public enum AutoplayPolicy {
 	DENY
 }
 
+/**
+ * WebKit-shaped — {@link WebViewSettings.navigator_webdriver_active_policy}.
+ * Matches WebCore NavigatorWebDriverActivePolicy / webkitgtk-automation README.
+ */
+public enum NavigatorWebDriverActivePolicy {
+	AUTO,
+	ENABLED,
+	DISABLED
+}
+
 /** WebKitGTK-shaped subset — used by {@link WebView.load_failed}. */
 public errordomain NetworkError {
 	FAILED,

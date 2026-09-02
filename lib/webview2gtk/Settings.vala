@@ -15,6 +15,16 @@ public class WebViewSettings : Object {
 	public bool enable_webrtc { get; set; default = true; }
 	/** WebKitGTK-shaped — require a user gesture before media playback. */
 	public bool media_playback_requires_user_gesture { get; set; default = false; }
+	/**
+	 * WebKit-shaped — whether page JS sees navigator.webdriver on automation.
+	 * Default AUTO (stock). DISABLED maps to Chromium
+	 * --disable-blink-features=AutomationControlled (set before env create).
+	 */
+	public NavigatorWebDriverActivePolicy navigator_webdriver_active_policy {
+		get;
+		set;
+		default = NavigatorWebDriverActivePolicy.AUTO;
+	}
 }
 
 }
