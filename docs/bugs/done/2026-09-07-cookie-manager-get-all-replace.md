@@ -1,6 +1,6 @@
 # Bug — CookieManager: no bulk get/replace for automation cookie mirror
 
-**Status:** ✅ fixed in **0.5.8** (`get_all_cookies` / `replace_cookies`)  
+**Status:** ✅ fixed in **0.5.9** (`get_all_cookies` / `replace_cookies`)  
 **Date:** 2026-09-07  
 **Component:** `lib/webview2gtk/CookieManager.vala` + `lib/host/win32-ui-webview2-cookies.c`  
 **Related:** [2026-08-25-add-cookie-before-attach](./2026-08-25-add-cookie-before-attach.md) (per-cookie add exists)  

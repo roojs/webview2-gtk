@@ -6,20 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.5.8] - Unreleased
+## [0.5.9] - Unreleased
+
+### Added
+
+- `CookieManager.get_all_cookies` / `replace_cookies` for automation jar mirror (WebView2 `GetCookies(null)` + `DeleteAllCookies`) ([bug](docs/bugs/done/2026-09-07-cookie-manager-get-all-replace.md)).
+
+### Changed
+
+- `examples/add-cookie --smoke-mirror` round-trips multi-host cookies via get_all + replace.
+
+## [0.5.8] - 2026-09-01
 
 ### Added
 
 - WebKitGTK-shaped `decide_policy` / `ResponsePolicyDecision` / `URIResponse` for main-frame document HTTP responses, wired from the existing `WebResourceResponseReceived` host path ([bug](docs/bugs/done/2026-09-01-decide-policy-response-emulation.md)).
-- `CookieManager.get_all_cookies` / `replace_cookies` for automation jar mirror (WebView2 `GetCookies(null)` + `DeleteAllCookies`) ([bug](docs/bugs/done/2026-09-07-cookie-manager-get-all-replace.md)).
 
 ### Removed
 
 - `main_document_response` — replaced by `decide_policy` with `PolicyDecisionType.RESPONSE`.
 
-### Changed
-
-- `examples/add-cookie --smoke-mirror` round-trips multi-host cookies via get_all + replace.
 ## [0.5.7] - 2026-08-28
 
 ### Fixed
