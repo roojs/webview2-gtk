@@ -29,6 +29,9 @@ def main() -> int:
     for name in (
         "libwebview2gtk-1.a",
         "webview2gtk-1.vapi",
+        "webview2gtk-1.deps",
+        "webview2gtk-cookie-ext.vapi",
+        "webview2gtk-cookie-ext.deps",
         "WebView2Loader.dll",
     ):
         src = os.path.join(stage_lib, name)

@@ -1,7 +1,7 @@
 project(
   'webview2-gtk',
   ['c', 'vala'],
-  version: '0.5.10',
+  version: '0.5.11',
   meson_version: '>= 1.0.0',
   default_options: ['buildtype=debugoptimized', 'c_std=c11'],
 )
@@ -59,6 +59,7 @@ lib_depend_files = files(
   'lib/webview2gtk/Enums.vala',
   'lib/webview2gtk/NetworkProxySettings.vala',
   'lib/webview2gtk/CookieManager.vala',
+  'lib/webview2gtk/CookieManagerExt.vala',
   'lib/webview2gtk/URIRequest.vala',
   'lib/webview2gtk/PolicyDecision.vala',
   'lib/webview2gtk/URIResponse.vala',
@@ -99,6 +100,8 @@ lib_depend_files = files(
   'generated/win32-wide-strings.vala',
   'generated/win32-ui-webview2-com-sync.c',
   'vapi/webview2gtk-1.vapi',
+  'vapi/webview2gtk-cookie-ext.vapi',
+  'vapi/webview2gtk-cookie-ext.deps',
 )
 
 lib_target = custom_target(

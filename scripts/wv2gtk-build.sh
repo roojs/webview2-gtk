@@ -75,6 +75,7 @@ CAPTURE_VALA=(
 	lib/webview2gtk/Enums.vala
 	lib/webview2gtk/NetworkProxySettings.vala
 	lib/webview2gtk/CookieManager.vala
+	lib/webview2gtk/CookieManagerExt.vala
 	lib/webview2gtk/URIRequest.vala
 	lib/webview2gtk/PolicyDecision.vala
 	lib/webview2gtk/URIResponse.vala
@@ -239,6 +240,8 @@ case "${MODE}" in
 		ar rcs "${PREFIX}/lib/libwebview2gtk-1.a" "${OBJ_DIR}"/*.o
 		cp -f "${VAPI}/webview2gtk-1.vapi" "${PREFIX}/lib/webview2gtk-1.vapi"
 		printf '%s\n' 'gtk4' 'libsoup-3.0' 'gee-0.8' > "${PREFIX}/lib/webview2gtk-1.deps"
+		cp -f "${VAPI}/webview2gtk-cookie-ext.vapi" "${PREFIX}/lib/webview2gtk-cookie-ext.vapi"
+		cp -f "${VAPI}/webview2gtk-cookie-ext.deps" "${PREFIX}/lib/webview2gtk-cookie-ext.deps"
 		cp -f "${GTK_HEADER}" "${PREFIX}/include/webview2gtk-1/webview2gtk.h"
 		cp -f "${GTK_HEADER}" "${WIDGET_INC}/webview2gtk.h"
 		cp -f "${HOST}/webview2gtk-host-api.h" "${PREFIX}/include/webview2gtk-1/"
@@ -265,6 +268,10 @@ case "${MODE}" in
 		rm -rf "${GTK_DIR}"
 		mkdir -p "${GTK_DIR}"
 		VALA_SRC="examples/${MODE}/main.vala"
+		EXTRA_PKGS=()
+		if [[ "${MODE}" == "add-cookie" ]]; then
+			EXTRA_PKGS=( --pkg webview2gtk-cookie-ext )
+		fi
 		(
 			cd "${ROOT}"
 			# Example only — link against staged libwebview2gtk-1.a
@@ -272,6 +279,7 @@ case "${MODE}" in
 				--vapidir "${STAGED_VAPI_DIR}" \
 				--vapidir "${VAPI}" \
 				--pkg webview2gtk-1 \
+				"${EXTRA_PKGS[@]}" \
 				-C -d "${GTK_DIR}" \
 				"${VALA_SRC}"
 		)

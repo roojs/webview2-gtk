@@ -110,6 +110,7 @@ How docs are built and marked up: [docs/code-documentation.md](docs/code-documen
 | `enable_media_stream` / `enable_webrtc` / gesture | settings; mute + `PermissionRequested` deny on host |
 | `is_muted` / `permission_request` | mute via `ICoreWebView2_8`; WebKit-shaped permission signals |
 | `CookieManager.changed` / `get_all_cookies` / `replace_cookies` | jar mirror + mutation signal (API mutations only) |
+| `CookieManagerExt` (`webview2gtk-cookie-ext`) | static get_all / replace for sealed-WebKit app parity |
 | `NavigatorWebDriverActivePolicy` | `DISABLED` → `--disable-blink-features=AutomationControlled` |
 
 WebView2Gtk-only: `ready`. Accessibility: **`Win32Atspi`** (above), not on `WebView`.

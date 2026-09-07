@@ -150,7 +150,7 @@ private async void run_smoke_mirror() {
 
 	GLib.List<Cookie> all;
 	try {
-		all = yield mgr.get_all_cookies();
+		all = yield CookieManagerExt.get_all_cookies(mgr);
 	} catch (Error e) {
 		print("smoke-mirror get_all failed: %s\n", e.message);
 		finish_mirror(false);
@@ -172,8 +172,8 @@ private async void run_smoke_mirror() {
 	replacement.append(only);
 
 	try {
-		yield mgr.replace_cookies(replacement);
-		print("smoke-mirror replace ok\n");
+		yield CookieManagerExt.replace_cookies(mgr, replacement);
+		print("smoke-mirror replace ok (CookieManagerExt)\n");
 	} catch (Error e) {
 		print("smoke-mirror replace failed: %s\n", e.message);
 		finish_mirror(false);
@@ -181,7 +181,7 @@ private async void run_smoke_mirror() {
 	}
 
 	try {
-		all = yield mgr.get_all_cookies();
+		all = yield CookieManagerExt.get_all_cookies(mgr);
 	} catch (Error e) {
 		print("smoke-mirror get_all after replace failed: %s\n", e.message);
 		finish_mirror(false);
