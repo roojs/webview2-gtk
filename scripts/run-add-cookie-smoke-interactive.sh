@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Run webview2gtk-add-cookie --smoke in the interactive Windows session.
+# Run webview2gtk-add-cookie smokes in the interactive Windows session.
 # SSH/session 0 has no Win32 desktop (GUI segfaults); schtasks /IT is required.
 #
-# Exit 0 = TEST_PASS (cookie in jar after load). Exit 1 = TEST_FAIL (add_cookie before attach).
+# Exit 0 = both TEST_PASS. Exit 1 = any TEST_FAIL.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -16,38 +16,57 @@ bash "${ROOT}/scripts/copy-exe-runtime-dlls.sh" \
 	build/webview2gtk-add-cookie.exe "${OUT_DIR}" \
 	build/vendor/webview2/x64/WebView2Loader.dll
 
-LOG=/c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-smoke.log
-rm -f "${LOG}"
+run_one() {
+	local flag="$1"
+	local task="$2"
+	local log="$3"
+	local bat="$4"
 
-BAT="${OUT_DIR}/run-add-cookie-smoke.bat"
-cat > "${BAT}" << 'EOF'
+	rm -f "${log}"
+	cat > "${bat}" << EOF
 @echo off
-set LOG=%LOCALAPPDATA%\Temp\webview2gtk-add-cookie-smoke.log
-cd /d C:\msys64\tmp\webview2-gtk\portable-demos
-set "FONTCONFIG_FILE=%~dp0etc\fonts\fonts.conf"
+set LOG=%LOCALAPPDATA%\\Temp\\$(basename "${log}")
+cd /d C:\\msys64\\tmp\\webview2-gtk\\portable-demos
+set "FONTCONFIG_FILE=%~dp0etc\\fonts\\fonts.conf"
 set "XDG_DATA_DIRS=%~dp0share"
 echo starting > "%LOG%"
-webview2gtk-add-cookie.exe --smoke >> "%LOG%" 2>&1
+webview2gtk-add-cookie.exe ${flag} >> "%LOG%" 2>&1
 echo exit=%ERRORLEVEL% >> "%LOG%"
 EOF
 
-schtasks //Delete //TN WebView2GtkAddCookieSmoke //F >/dev/null 2>&1 || true
-schtasks //Create //TN WebView2GtkAddCookieSmoke \
-	//TR "C:\\msys64\\tmp\\webview2-gtk\\portable-demos\\run-add-cookie-smoke.bat" \
-	//SC ONCE //ST 23:59 //F //IT
-schtasks //Run //TN WebView2GtkAddCookieSmoke
-echo "task started — waiting for ${LOG}"
-for _ in $(seq 1 45); do
-	if [[ -f "${LOG}" ]] && grep -qE 'TEST_PASS|TEST_FAIL|^exit=' "${LOG}" 2>/dev/null; then
-		break
-	fi
-	sleep 1
-done
-schtasks //Delete //TN WebView2GtkAddCookieSmoke //F >/dev/null 2>&1 || true
+	schtasks //Delete //TN "${task}" //F >/dev/null 2>&1 || true
+	schtasks //Create //TN "${task}" \
+		//TR "C:\\msys64\\tmp\\webview2-gtk\\portable-demos\\$(basename "${bat}")" \
+		//SC ONCE //ST 23:59 //F //IT
+	schtasks //Run //TN "${task}"
+	echo "task ${task} started — waiting for ${log}"
+	for _ in $(seq 1 45); do
+		if [[ -f "${log}" ]] && grep -qE 'TEST_PASS|TEST_FAIL|^exit=' "${log}" 2>/dev/null; then
+			break
+		fi
+		sleep 1
+	done
+	schtasks //Delete //TN "${task}" //F >/dev/null 2>&1 || true
 
-echo "--- log ---"
-cat "${LOG}" 2>&1 || echo NO_LOG
-if grep -q TEST_PASS "${LOG}" 2>/dev/null; then
+	echo "--- ${flag} log ---"
+	cat "${log}" 2>&1 || echo NO_LOG
+	if ! grep -q TEST_PASS "${log}" 2>/dev/null; then
+		echo "SMOKE_FAIL (${flag})"
+		return 1
+	fi
+	echo "SMOKE_PASS (${flag})"
+	return 0
+}
+
+LOG_ATTACH=/c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-smoke.log
+LOG_MIRROR=/c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-mirror-smoke.log
+fail=0
+run_one --smoke WebView2GtkAddCookieSmoke "${LOG_ATTACH}" \
+	"${OUT_DIR}/run-add-cookie-smoke.bat" || fail=1
+run_one --smoke-mirror WebView2GtkAddCookieMirrorSmoke "${LOG_MIRROR}" \
+	"${OUT_DIR}/run-add-cookie-mirror-smoke.bat" || fail=1
+
+if [[ "${fail}" -eq 0 ]]; then
 	echo SMOKE_PASS
 	exit 0
 fi

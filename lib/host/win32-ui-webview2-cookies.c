@@ -291,6 +291,10 @@ out:
 	return ok;
 }
 
+/*
+ * uri_utf8 NULL or "" → all cookies in the profile (WebView2 GetCookies contract).
+ * Otherwise cookies matching that URI.
+ */
 bool
 vala_webview2_host_get_cookies_sync (WebView2Host *host, const char *uri_utf8, char **cookies_text_out)
 {
@@ -298,22 +302,23 @@ vala_webview2_host_get_cookies_sync (WebView2Host *host, const char *uri_utf8, c
 	uint16_t *uri_wide = NULL;
 	CookiesHandler ch;
 	HRESULT hr;
+	LPCWSTR uri_arg = NULL;
 
 	if (cookies_text_out != NULL) {
 		*cookies_text_out = NULL;
-	}
-	if (uri_utf8 == NULL || uri_utf8[0] == '\0') {
-		return false;
 	}
 	manager = cookie_manager_from_host (host);
 	if (manager == NULL) {
 		return false;
 	}
 
-	uri_wide = win32_ui_utf8_to_utf16 (uri_utf8, NULL);
-	if (uri_wide == NULL) {
-		ICoreWebView2CookieManager_Release (manager);
-		return false;
+	if (uri_utf8 != NULL && uri_utf8[0] != '\0') {
+		uri_wide = win32_ui_utf8_to_utf16 (uri_utf8, NULL);
+		if (uri_wide == NULL) {
+			ICoreWebView2CookieManager_Release (manager);
+			return false;
+		}
+		uri_arg = (LPCWSTR) uri_wide;
 	}
 
 	ZeroMemory (&ch, sizeof (ch));
@@ -325,7 +330,7 @@ vala_webview2_host_get_cookies_sync (WebView2Host *host, const char *uri_utf8, c
 
 	hr = ICoreWebView2CookieManager_GetCookies (
 		manager,
-		(LPCWSTR) uri_wide,
+		uri_arg,
 		&ch.handler);
 	free (uri_wide);
 	ICoreWebView2CookieManager_Release (manager);
@@ -345,4 +350,19 @@ vala_webview2_host_get_cookies_sync (WebView2Host *host, const char *uri_utf8, c
 		free (ch.result);
 	}
 	return true;
+}
+
+bool
+vala_webview2_host_delete_all_cookies_sync (WebView2Host *host)
+{
+	ICoreWebView2CookieManager *manager;
+	HRESULT hr;
+
+	manager = cookie_manager_from_host (host);
+	if (manager == NULL) {
+		return false;
+	}
+	hr = ICoreWebView2CookieManager_DeleteAllCookies (manager);
+	ICoreWebView2CookieManager_Release (manager);
+	return SUCCEEDED (hr);
 }

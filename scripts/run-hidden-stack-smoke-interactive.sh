@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run webview2gtk-smoke-hidden-stack --google in the interactive Windows session.
-# Gate for docs/bugs/2026-08-28-win32atspi-hidden-stack-host-missing-document.md
+# Gate for docs/bugs/done/2026-08-28-win32atspi-hidden-stack-host-missing-document.md
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

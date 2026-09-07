@@ -11,16 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - WebKitGTK-shaped `decide_policy` / `ResponsePolicyDecision` / `URIResponse` for main-frame document HTTP responses, wired from the existing `WebResourceResponseReceived` host path ([bug](docs/bugs/done/2026-09-01-decide-policy-response-emulation.md)).
+- `CookieManager.get_all_cookies` / `replace_cookies` for automation jar mirror (WebView2 `GetCookies(null)` + `DeleteAllCookies`) ([bug](docs/bugs/done/2026-09-07-cookie-manager-get-all-replace.md)).
 
 ### Removed
 
 - `main_document_response` — replaced by `decide_policy` with `PolicyDecisionType.RESPONSE`.
 
+### Changed
+
+- `examples/add-cookie --smoke-mirror` round-trips multi-host cookies via get_all + replace.
 ## [0.5.7] - 2026-08-28
 
 ### Fixed
 
-- Parked hosts keep their last on-screen size at `-30000` (never 1×1) so WebView2 still exposes a UIA Document after a hidden `load_uri`. Lookup matches by page title/URI and cached overlapping `Chrome_WidgetWin_1`, not screen-overlap first-wins ([bug](docs/bugs/2026-08-28-win32atspi-hidden-stack-host-missing-document.md)).
+- Parked hosts keep their last on-screen size at `-30000` (never 1×1) so WebView2 still exposes a UIA Document after a hidden `load_uri`. Lookup matches by page title/URI and cached overlapping `Chrome_WidgetWin_1`, not screen-overlap first-wins ([bug](docs/bugs/done/2026-08-28-win32atspi-hidden-stack-host-missing-document.md)).
 
 ### Changed
 

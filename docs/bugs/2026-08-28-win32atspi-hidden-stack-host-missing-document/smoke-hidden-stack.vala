@@ -1,5 +1,5 @@
 /* Consumer-shaped Gtk.Stack + Win32Atspi document pick repro.
- * See ../2026-08-28-win32atspi-hidden-stack-host-missing-document.md
+ * See ../done/2026-08-28-win32atspi-hidden-stack-host-missing-document.md
  *
  * Build against an installed webview2gtk-1 (pkg-config) on Windows/MSYS2.
  * Flags:

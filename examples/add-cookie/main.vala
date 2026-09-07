@@ -1,12 +1,13 @@
-/* Repro: CookieManager.add_cookie before WebView COM attach.
- *
- * Construct WebView, add_cookie, then load_uri — no wait for ready/map.
- * Pending navigate already queues; cookies currently do not (add_cookie failed).
+/* CookieManager smokes:
+ *   --smoke         add_cookie before COM attach, then load_uri (bug 2026-08-25)
+ *   --smoke-mirror  get_all_cookies + replace_cookies round-trip (bug 2026-09-07)
  *
  *   webview2gtk-add-cookie.exe [url]
- *   --smoke        inject + load, assert cookie in jar after FINISHED, quit
+ *   webview2gtk-add-cookie.exe --smoke
+ *   webview2gtk-add-cookie.exe --smoke-mirror
  *
  * See docs/bugs/done/2026-08-25-add-cookie-before-attach.md
+ *     docs/bugs/done/2026-09-07-cookie-manager-get-all-replace.md
  */
 
 using Gtk;
@@ -18,6 +19,7 @@ private const string COOKIE_VALUE = "before_attach";
 
 private string start_uri;
 private bool smoke = false;
+private bool smoke_mirror = false;
 private int smoke_status = 1;
 private bool smoke_done = false;
 private bool add_ok = false;
@@ -100,6 +102,111 @@ private async void check_cookies_then_finish() {
 	finish_smoke();
 }
 
+private bool jar_has(GLib.List<Cookie> list, string name, string value, string domain_hint) {
+	foreach (unowned Cookie c in list) {
+		print("all %s=%s domain=%s path=%s\n",
+			c.get_name(), c.get_value(), c.get_domain(), c.get_path());
+		if (c.get_name() != name || c.get_value() != value) {
+			continue;
+		}
+		var d = c.get_domain() ?? "";
+		if (d == domain_hint || d == "." + domain_hint || d.has_suffix(domain_hint)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+private async void run_smoke_mirror() {
+	var mgr = web.network_session.get_cookie_manager();
+	print("smoke-mirror wait ready %s\n", diag_line());
+	while (!web.ready) {
+		Idle.add(run_smoke_mirror.callback);
+		yield;
+	}
+	print("smoke-mirror ready %s\n", diag_line());
+
+	var a = new Cookie("mirror_a", "one", "a.example", "/", 3600);
+	a.set_http_only(false);
+	a.set_secure(false);
+	var b = new Cookie("mirror_b", "two", "b.example", "/", 3600);
+	b.set_http_only(false);
+	b.set_secure(false);
+
+	try {
+		yield mgr.add_cookie(a);
+		yield mgr.add_cookie(b);
+		print("smoke-mirror added a+b\n");
+	} catch (Error e) {
+		print("smoke-mirror add failed: %s\n", e.message);
+		finish_mirror(false);
+		return;
+	}
+
+	GLib.List<Cookie> all;
+	try {
+		all = yield mgr.get_all_cookies();
+	} catch (Error e) {
+		print("smoke-mirror get_all failed: %s\n", e.message);
+		finish_mirror(false);
+		return;
+	}
+	var have_a = jar_has(all, "mirror_a", "one", "a.example");
+	var have_b = jar_has(all, "mirror_b", "two", "b.example");
+	print("smoke-mirror get_all have_a=%s have_b=%s count~=%u\n",
+		have_a ? "yes" : "no", have_b ? "yes" : "no", all.length());
+	if (!have_a || !have_b) {
+		finish_mirror(false);
+		return;
+	}
+
+	var replacement = new GLib.List<Cookie> ();
+	var only = new Cookie("mirror_c", "three", "c.example", "/", 3600);
+	only.set_http_only(false);
+	only.set_secure(false);
+	replacement.append(only);
+
+	try {
+		yield mgr.replace_cookies(replacement);
+		print("smoke-mirror replace ok\n");
+	} catch (Error e) {
+		print("smoke-mirror replace failed: %s\n", e.message);
+		finish_mirror(false);
+		return;
+	}
+
+	try {
+		all = yield mgr.get_all_cookies();
+	} catch (Error e) {
+		print("smoke-mirror get_all after replace failed: %s\n", e.message);
+		finish_mirror(false);
+		return;
+	}
+	have_a = jar_has(all, "mirror_a", "one", "a.example");
+	have_b = jar_has(all, "mirror_b", "two", "b.example");
+	var have_c = jar_has(all, "mirror_c", "three", "c.example");
+	print("smoke-mirror after replace have_a=%s have_b=%s have_c=%s\n",
+		have_a ? "yes" : "no", have_b ? "yes" : "no", have_c ? "yes" : "no");
+	finish_mirror(!have_a && !have_b && have_c);
+}
+
+private void finish_mirror(bool ok) {
+	if (smoke_done) {
+		return;
+	}
+	smoke_done = true;
+	if (ok) {
+		print("TEST_PASS\n");
+		smoke_status = 0;
+	} else {
+		print("TEST_FAIL (get_all_cookies / replace_cookies mirror)\n");
+		smoke_status = 1;
+	}
+	if (window != null) {
+		window.close();
+	}
+}
+
 private void on_load_changed(LoadEvent load_event) {
 	print("load_changed %d %s\n", (int) load_event, diag_line());
 	if (load_event == LoadEvent.FINISHED) {
@@ -150,6 +257,10 @@ public static int main(string[] args) {
 			smoke = true;
 			continue;
 		}
+		if (args[i] == "--smoke-mirror") {
+			smoke_mirror = true;
+			continue;
+		}
 		if (args[i].has_prefix("-")) {
 			gtk_args += args[i];
 			continue;
@@ -173,7 +284,7 @@ public static int main(string[] args) {
 		box.set_margin_end(8);
 		box.set_margin_top(8);
 		box.set_margin_bottom(8);
-		status = new Gtk.Label("injecting…");
+		status = new Gtk.Label(smoke_mirror ? "mirror…" : "injecting…");
 		status.set_wrap(true);
 		status.set_xalign(0);
 		status.set_selectable(true);
@@ -181,22 +292,33 @@ public static int main(string[] args) {
 		box.append(web);
 
 		window.set_child(box);
-		/* Inject on the same turn as first show — do not wait for ready/map. */
-		print("startup before present %s\n", diag_line());
-		inject_then_load.begin();
+		if (smoke_mirror) {
+			print("startup mirror before present %s\n", diag_line());
+			web.load_uri("about:blank");
+			run_smoke_mirror.begin();
+		} else {
+			/* Inject on the same turn as first show — do not wait for ready/map. */
+			print("startup before present %s\n", diag_line());
+			inject_then_load.begin();
+		}
 		window.present();
 		print("startup after present %s\n", diag_line());
 		refresh_status();
 
-		if (smoke) {
+		if (smoke || smoke_mirror) {
 			Timeout.add(12000, () => {
 				if (!smoke_done) {
-					check_cookies_then_finish.begin();
+					if (smoke_mirror) {
+						print("smoke-mirror timeout\n");
+						finish_mirror(false);
+					} else {
+						check_cookies_then_finish.begin();
+					}
 				}
 				return Source.REMOVE;
 			});
 		}
 	});
 	app.run(gtk_args);
-	return smoke ? smoke_status : 0;
+	return (smoke || smoke_mirror) ? smoke_status : 0;
 }

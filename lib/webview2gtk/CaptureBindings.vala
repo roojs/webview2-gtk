@@ -7,7 +7,7 @@ extern bool wv2_capture_screenshot_sync(void* host, bool full_document, out stri
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_print_to_pdf_sync")]
 extern bool wv2_print_to_pdf_sync(void* host, string output_path_utf8);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_get_cookies_sync")]
-extern bool wv2_get_cookies_sync(void* host, string uri_utf8, out string? cookies_text);
+extern bool wv2_get_cookies_sync(void* host, string? uri_utf8, out string? cookies_text);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_add_cookie_sync")]
 extern bool wv2_add_cookie_sync(
 	void* host,
@@ -18,6 +18,8 @@ extern bool wv2_add_cookie_sync(
 	bool http_only,
 	bool secure
 );
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_delete_all_cookies_sync")]
+extern bool wv2_delete_all_cookies_sync(void* host);
 
 [CCode(cheader_filename = "webview2gtk-host-api.h", has_target = false)]
 public delegate void Wv2CookieApplyCb(void* user_data);

@@ -1,7 +1,8 @@
 # Smoke — hidden Gtk.Stack primary document pick
 
 Standalone Vala repro for
-[2026-08-28-win32atspi-hidden-stack-host-missing-document](../2026-08-28-win32atspi-hidden-stack-host-missing-document.md).
+[2026-08-28-win32atspi-hidden-stack-host-missing-document](../done/2026-08-28-win32atspi-hidden-stack-host-missing-document.md)
+(✅ fixed in **0.5.7**).
 
 | File | Role |
 |------|------|
@@ -30,4 +31,4 @@ webview2gtk-smoke-hidden-stack.exe --google --restore-primary
 | `--google` (primary hidden) | `PICK OK` + `VERDICT=HIDDEN_OK` |
 | `--google --restore-primary` | `PICK OK` (workaround only if hidden fails) |
 
-`VERDICT=HIDDEN_MISS` with only the secondary document in the walk = bug still open.
+`VERDICT=HIDDEN_MISS` with only the secondary document in the walk = regression.

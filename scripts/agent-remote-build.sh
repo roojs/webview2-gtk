@@ -174,6 +174,10 @@ print_hint() {
 		echo "--- add-cookie-smoke.log ---"
 		cat "${ROOT}/build-remote/add-cookie-smoke.log"
 	fi
+	if [[ -f "${ROOT}/build-remote/add-cookie-mirror-smoke.log" ]]; then
+		echo "--- add-cookie-mirror-smoke.log ---"
+		cat "${ROOT}/build-remote/add-cookie-mirror-smoke.log"
+	fi
 	if [[ -f "${ROOT}/build-remote/hidden-stack-smoke.log" ]]; then
 		echo "--- hidden-stack-smoke.log ---"
 		cat "${ROOT}/build-remote/hidden-stack-smoke.log"
@@ -262,7 +266,7 @@ case "${cmd}" in
 			run_remote_add_cookie_smoke || build_rc=$?
 		fi
 		ssh -o BatchMode=yes "${REMOTE_HOST}" \
-			"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cp -f /c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-smoke.log /c/msys64/tmp/webview2-gtk/build/add-cookie-smoke.log 2>/dev/null || true\"" \
+			"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cp -f /c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-smoke.log /c/msys64/tmp/webview2-gtk/build/add-cookie-smoke.log 2>/dev/null || true; cp -f /c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-mirror-smoke.log /c/msys64/tmp/webview2-gtk/build/add-cookie-mirror-smoke.log 2>/dev/null || true\"" \
 			|| true
 		pull_artifacts || true
 		print_hint
