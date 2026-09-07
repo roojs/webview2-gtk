@@ -1,10 +1,8 @@
-/* Consumer-shaped Gtk.Stack + Win32Atspi document pick repro.
- * See ../done/2026-08-28-win32atspi-hidden-stack-host-missing-document.md
+/* Gtk.Stack + Win32Atspi document pick (hidden primary).
+ * Regression gate for docs/bugs/done/2026-08-28-win32atspi-hidden-stack-host-missing-document.md
  *
- * Build against an installed webview2gtk-1 (pkg-config) on Windows/MSYS2.
- * Flags:
- *   --google           load https://www.google.com/?hl=en on hidden primary
- *   --restore-primary  map primary before pick (visibility workaround)
+ *   webview2gtk-smoke-hidden-stack.exe --google
+ *   webview2gtk-smoke-hidden-stack.exe --google --restore-primary
  */
 using Gtk;
 using WebView2Gtk;

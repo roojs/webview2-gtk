@@ -4,7 +4,7 @@ name: Release
 # release assets for tags like `v0.2.0` (same trigger pattern as OLLMchat).
 #
 # Pacman remote installs need a companion .sig. Tag releases sign the package
-# with WEBVIEW2GTK_GPG_PRIVATE_KEY (see docs/plans/0.3-pacman-package-signatures.md).
+# with WEBVIEW2GTK_GPG_PRIVATE_KEY (see docs/plans/done/0.3-pacman-package-signatures.md).
 #
 # One meson compile feeds both the .pkg.tar.zst and the NSIS installer.
 # WebView2 NuGet + ccache are cached across runs. Examples link the staged

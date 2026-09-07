@@ -59,4 +59,4 @@ Uninstall: `pacman -R mingw-w64-ucrt-x86_64-webview2gtk`
 C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -c 'cd /c/path/to/webview2-gtk && ./scripts/build-pacman-package.sh && pacman -U --noconfirm packaging/msys2/mingw-w64-ucrt-x86_64-webview2gtk-*.pkg.tar.zst'
 ```
 
-PKGBUILD: [`packaging/msys2/PKGBUILD`](../packaging/msys2/PKGBUILD). Signing details: [0.3-pacman-package-signatures.md](plans/0.3-pacman-package-signatures.md).
+PKGBUILD: [`packaging/msys2/PKGBUILD`](../packaging/msys2/PKGBUILD). Signing details: [0.3-pacman-package-signatures.md](plans/done/0.3-pacman-package-signatures.md).

@@ -107,6 +107,6 @@ Pass: `ATTACH_FILL_PASS` and the page’s `#q` field shows `webview2gtk-cdp-fill
 
 ## Related
 
-- Plan: [plans/3.0-engine-fill-input.md](plans/3.0-engine-fill-input.md)
+- Plan: [plans/3.0-engine-fill-input.md](plans/done/3.0-engine-fill-input.md)
 - Example source: [examples/automation/](../examples/automation/)
 - Attach client: [examples/cdp-attach/](../examples/cdp-attach/)

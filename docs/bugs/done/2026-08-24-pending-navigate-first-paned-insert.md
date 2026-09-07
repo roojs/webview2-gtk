@@ -37,5 +37,5 @@ Expect **`TEST_PASS`** (`ready=yes`, `load_changed` FINISHED).
 ## Related
 
 - Nested 0×0 attach: [2026-08-21-webview-nested-zero-size-attach.md](./2026-08-21-webview-nested-zero-size-attach.md)
-- Automation construct props: [plans/3.6-webview-construct-automation.md](../../plans/3.6-webview-construct-automation.md)
-- Multi-controller: [plans/4.0-multi-webview-host.md](../../plans/4.0-multi-webview-host.md)
+- Automation construct props: [plans/3.6-webview-construct-automation.md](../../plans/done/3.6-webview-construct-automation.md)
+- Multi-controller: [plans/4.0-multi-webview-host.md](../../plans/done/4.0-multi-webview-host.md)

@@ -186,9 +186,7 @@ hidden_stack_exe = custom_target(
   output: 'webview2gtk-smoke-hidden-stack.exe',
   command: [_build_bash, wv2gtk_build_sh, 'hidden-stack', build_root / 'hidden-stack', '@OUTPUT@', lib_stage],
   depends: lib_target,
-  depend_files: files(
-    'docs/bugs/2026-08-28-win32atspi-hidden-stack-host-missing-document/smoke-hidden-stack.vala',
-  ),
+  depend_files: files('examples/hidden-stack/main.vala'),
   build_by_default: get_option('examples'),
   install: false,
 )

@@ -54,7 +54,7 @@ No public API change.
 
 ## Notes
 
-🔷 Multi-WebView backlog already noted in `docs/plans/4.0-multi-webview-host.md` /
+🔷 Multi-WebView backlog already noted in `docs/plans/done/4.0-multi-webview-host.md` /
   `1.0-uia-accessibility.md`.
 
 🔷 Private apps may re-pin with `register_webview` before dump; that is not the
@@ -65,4 +65,4 @@ No public API change.
 ## Related
 
 - [docs/a11y.md](../../a11y.md)  
-- [plans/4.0-multi-webview-host.md](../../plans/4.0-multi-webview-host.md)  
+- [plans/4.0-multi-webview-host.md](../../plans/done/4.0-multi-webview-host.md)  

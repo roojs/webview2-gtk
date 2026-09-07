@@ -9,7 +9,7 @@
 
 ## Problem
 
-🔷 **webview2-gtk’s stated job** is to emulate WebKitGTK 6 so shared Vala compiles with one `using` swap and **no `#if` around handler logic** ([using-in-your-app.md](../using-in-your-app.md), [plan 3.7](../plans/3.7-website-policies.md): *“remove `#if` around WebKitGTK-shaped APIs”*).
+🔷 **webview2-gtk’s stated job** is to emulate WebKitGTK 6 so shared Vala compiles with one `using` swap and **no `#if` around handler logic** ([using-in-your-app.md](../../using-in-your-app.md), [plan 3.7](../../plans/done/3.7-website-policies.md): *“remove `#if` around WebKitGTK-shaped APIs”*).
 
 🔷 For main-frame document HTTP responses, WebKitGTK exposes:
 
@@ -46,6 +46,6 @@ web_view.decide_policy.connect((decision, type) => {
 
 ## Related
 
-- [2.1-webresource-load-started](../plans/2.1-webresource-load-started.md)  
-- [3.7-website-policies](../plans/3.7-website-policies.md)  
+- [2.1-webresource-load-started](../../plans/done/2.1-webresource-load-started.md)  
+- [3.7-website-policies](../../plans/done/3.7-website-policies.md)  
 - Host: `win32-ui-webview2-document-response.c`, `emit_document_response()`

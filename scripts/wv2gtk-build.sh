@@ -264,11 +264,7 @@ case "${MODE}" in
 		GTK_DIR="${BUILD_DIR}/gtk-${MODE}"
 		rm -rf "${GTK_DIR}"
 		mkdir -p "${GTK_DIR}"
-		if [[ "${MODE}" == "hidden-stack" ]]; then
-			VALA_SRC="docs/bugs/2026-08-28-win32atspi-hidden-stack-host-missing-document/smoke-hidden-stack.vala"
-		else
-			VALA_SRC="examples/${MODE}/main.vala"
-		fi
+		VALA_SRC="examples/${MODE}/main.vala"
 		(
 			cd "${ROOT}"
 			# Example only — link against staged libwebview2gtk-1.a

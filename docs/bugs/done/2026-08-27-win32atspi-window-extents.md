@@ -56,4 +56,4 @@
 ## Related
 
 - [docs/a11y.md](../../a11y.md)  
-- [plans/1.0-uia-accessibility.md](../../plans/1.0-uia-accessibility.md)  
+- [plans/1.0-uia-accessibility.md](../../plans/done/1.0-uia-accessibility.md)  

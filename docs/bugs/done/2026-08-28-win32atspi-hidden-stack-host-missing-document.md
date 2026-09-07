@@ -5,7 +5,7 @@
 **Area:** `lib/host/win32-ui-webview2-a11y.c` (`find_page_document`, `a11y_walk_into`), `lib/webview2gtk/webview.vala` (`sync_host_visible`), `lib/webview2gtk/win32atspi/Win32Atspi.vala` (`Bridge.rebuild`)  
 **Seen:** 2026-08-28 — multi-WebView app with `Gtk.Stack` (one visible, one hidden); reopened on 0.5.6, closed in 0.5.7  
 
-**Repro (consumer-shaped):** [2026-08-28-win32atspi-hidden-stack-host-missing-document/](../2026-08-28-win32atspi-hidden-stack-host-missing-document/) — `smoke-hidden-stack.vala`
+**Repro (consumer-shaped):** [examples/hidden-stack](../../../examples/hidden-stack/main.vala)
 
 ---
 
@@ -119,7 +119,7 @@ Google document in the walk — same failure class.
 ## Evidence summary (external consumer, generic)
 
 A private GTK app hit this with the layout above. Minimal diagnostic
-([smoke-hidden-stack.vala](../2026-08-28-win32atspi-hidden-stack-host-missing-document/smoke-hidden-stack.vala))
+([examples/hidden-stack/main.vala](../../../examples/hidden-stack/main.vala))
 confirmed on **0.5.6** (2026-08-28 recheck):
 
 ```text
@@ -148,7 +148,7 @@ long-term contract should not require it.
 
 | Check | Result on 0.5.6 |
 |-------|-----------------|
-| [smoke-hidden-stack.vala](../2026-08-28-win32atspi-hidden-stack-host-missing-document/smoke-hidden-stack.vala) `--google` | `VERDICT=HIDDEN_MISS` |
+| [examples/hidden-stack](../../../examples/hidden-stack/main.vala) `--google` | `VERDICT=HIDDEN_MISS` |
 | same + `--restore-primary` | `VERDICT=WORKAROUND_OK` |
 
 In-tree `webview2gtk-automation.exe --smoke-stack` (static HTML titles) may
@@ -241,7 +241,7 @@ and `FindAll` under the GTK parent so a parked host still matches. The winning
 HWND is cached on the host. Brief parked-bounds probe on mismatch.
 
 **Still failed on 0.5.6:** consumer Google pick
-([smoke-hidden-stack.vala](../2026-08-28-win32atspi-hidden-stack-host-missing-document/smoke-hidden-stack.vala)
+([examples/hidden-stack/main.vala](../../../examples/hidden-stack/main.vala)
 `--google`) → `HIDDEN_MISS` (1×1 park still broke the UIA Document).
 
 **0.5.7 (complete):** parked hosts keep their **last on-screen size** at
@@ -259,7 +259,7 @@ Gate: `scripts/run-hidden-stack-smoke-interactive.sh` (`--google`).
 
 | Check | Criterion |
 |-------|-----------|
-| [smoke-hidden-stack.vala](../2026-08-28-win32atspi-hidden-stack-host-missing-document/smoke-hidden-stack.vala) `--google` | `PICK OK` + `VERDICT=HIDDEN_OK` |
+| [examples/hidden-stack](../../../examples/hidden-stack/main.vala) `--google` | `PICK OK` + `VERDICT=HIDDEN_OK` |
 | same `--restore-primary` | Still `PICK OK` (no regression when mapped) |
 | `--smoke-stack` Phase A | ≥2 distinct document names; includes `stack primary document` |
 | `--smoke` (HBox) | Still `TEST_PASS` / `a11y_documents>=2` |
@@ -270,9 +270,9 @@ Gate: `scripts/run-hidden-stack-smoke-interactive.sh` (`--google`).
 
 ## Related
 
-- Repro dir: [2026-08-28-win32atspi-hidden-stack-host-missing-document/](../2026-08-28-win32atspi-hidden-stack-host-missing-document/)  
+- Example: [examples/hidden-stack](../../../examples/hidden-stack/)  
 - [docs/a11y.md](../../a11y.md) — tree shape, multi-document contract  
-- [plans/4.0-multi-webview-host.md](../../plans/4.0-multi-webview-host.md)  
+- [plans/4.0-multi-webview-host.md](../../plans/done/4.0-multi-webview-host.md)  
 - [2026-08-27-win32atspi-single-host](./2026-08-27-win32atspi-single-host.md)  
 - [2026-08-27-win32atspi-hosts-null](./2026-08-27-win32atspi-hosts-null.md)  
 - [examples/paned-insert/main.vala](../../../examples/paned-insert/main.vala) — Stack layout reference  
