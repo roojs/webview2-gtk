@@ -149,10 +149,20 @@ private async void run_smoke_mirror() {
 	}
 
 	GLib.List<Cookie> all;
-	try {
-		all = yield CookieManagerExt.get_all_cookies(mgr);
-	} catch (Error e) {
-		print("smoke-mirror get_all failed: %s\n", e.message);
+	Error? ext_err = null;
+	all = null;
+	ext_err = null;
+	CookieManagerExt.get_all_cookies_async(mgr, null, (o, r) => {
+		try {
+			all = CookieManagerExt.get_all_cookies_finish(mgr, r);
+		} catch (Error e) {
+			ext_err = e;
+		}
+		Idle.add(run_smoke_mirror.callback);
+	});
+	yield;
+	if (ext_err != null) {
+		print("smoke-mirror get_all failed: %s\n", ext_err.message);
 		finish_mirror(false);
 		return;
 	}
@@ -171,19 +181,38 @@ private async void run_smoke_mirror() {
 	only.set_secure(false);
 	replacement.append(only);
 
-	try {
-		yield CookieManagerExt.replace_cookies(mgr, replacement);
-		print("smoke-mirror replace ok (CookieManagerExt)\n");
-	} catch (Error e) {
-		print("smoke-mirror replace failed: %s\n", e.message);
+	ext_err = null;
+	var replace_ok = false;
+	CookieManagerExt.replace_cookies_async(mgr, replacement, null, (o, r) => {
+		try {
+			replace_ok = CookieManagerExt.replace_cookies_finish(mgr, r);
+		} catch (Error e) {
+			ext_err = e;
+		}
+		Idle.add(run_smoke_mirror.callback);
+	});
+	yield;
+	if (ext_err != null || !replace_ok) {
+		print("smoke-mirror replace failed: %s\n",
+			ext_err != null ? ext_err.message : "false");
 		finish_mirror(false);
 		return;
 	}
+	print("smoke-mirror replace ok (CookieManagerExt *_async/*_finish)\n");
 
-	try {
-		all = yield CookieManagerExt.get_all_cookies(mgr);
-	} catch (Error e) {
-		print("smoke-mirror get_all after replace failed: %s\n", e.message);
+	all = null;
+	ext_err = null;
+	CookieManagerExt.get_all_cookies_async(mgr, null, (o, r) => {
+		try {
+			all = CookieManagerExt.get_all_cookies_finish(mgr, r);
+		} catch (Error e) {
+			ext_err = e;
+		}
+		Idle.add(run_smoke_mirror.callback);
+	});
+	yield;
+	if (ext_err != null) {
+		print("smoke-mirror get_all after replace failed: %s\n", ext_err.message);
 		finish_mirror(false);
 		return;
 	}

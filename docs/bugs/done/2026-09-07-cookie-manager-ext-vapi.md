@@ -3,7 +3,8 @@
 **Status:** ✅ fixed in **0.5.11** (`webview2gtk-cookie-ext` + `CookieManagerExt`)  
 **Date:** 2026-09-07  
 **Component:** `vapi/webview2gtk-cookie-ext.vapi` + `lib/webview2gtk/CookieManagerExt.vala`  
-**Related:** [2026-09-07-cookie-manager-get-all-replace.md](./2026-09-07-cookie-manager-get-all-replace.md)  
+**Related:** [2026-09-07-cookie-manager-get-all-replace.md](./2026-09-07-cookie-manager-get-all-replace.md),
+[2026-09-07-cookie-manager-ext-async-finish.md](./2026-09-07-cookie-manager-ext-async-finish.md)  
 **Smoke:** `examples/add-cookie --smoke-mirror` (uses Ext)
 
 ---
@@ -20,14 +21,14 @@ workarounds for **sealed** stock WebKit Vala bindings.
 
 | Artifact | Contents |
 |----------|----------|
-| `webview2gtk-1.vapi` | `CookieManager` instance methods (spaced, one arg per line) |
-| `webview2gtk-cookie-ext.vapi` + `.deps` | `CookieManagerExt` static twins; `.deps` → `webview2gtk-1` |
-| `CookieManagerExt.vala` | thin `yield` wrappers into instance methods |
+| `webview2gtk-1.vapi` | `CookieManager` instance methods |
+| `webview2gtk-cookie-ext.vapi` + `.deps` | `CookieManagerExt` `*_async` / `*_finish`; `.deps` → `webview2gtk-1` |
+| `CookieManagerExt.vala` | thin wrappers into instance begin/end |
 
 ```vala
 using WebView2Gtk;
-CookieManagerExt.replace_cookies.begin(mgr, cookies, null, (o, r) => {
-	CookieManagerExt.replace_cookies.end(r);
+CookieManagerExt.replace_cookies_async(mgr, cookies, null, (o, r) => {
+	CookieManagerExt.replace_cookies_finish(mgr, r);
 });
 ```
 

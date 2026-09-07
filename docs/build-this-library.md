@@ -84,7 +84,7 @@ Use **`dist-demos\`** (from `meson compile` or `./scripts/package-demos.sh`):
 |--------|---------|
 | `build\install-staging\lib\libwebview2gtk-1.a` | Static library |
 | `build\install-staging\lib\webview2gtk-1.vapi` | Vala API |
-| `build\install-staging\lib\webview2gtk-cookie-ext.vapi` | CookieManagerExt supplement (`--pkg webview2gtk-cookie-ext`) |
+| `build\install-staging\lib\webview2gtk-cookie-ext.vapi` | CookieManagerExt `*_async` / `*_finish` (`--pkg webview2gtk-cookie-ext`) |
 | `build\install-staging\include\webview2gtk-1\…` | C headers |
 | `build\install-staging\lib\pkgconfig\webview2gtk-1.pc` | pkg-config |
 | `build\install-staging\lib\WebView2Loader.dll` | Ship next to your exe |
