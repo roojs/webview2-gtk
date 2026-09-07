@@ -62,6 +62,22 @@ Environment.set_variable("WEBKIT_INSPECTOR_SERVER", "127.0.0.1:19222", true);
 
 Also shared: `get_settings().enable_developer_extras` and `get_inspector().show()` (opens Edge DevTools when extras are enabled). Media settings, `is_muted`, and `permission_request` / `query_permission_state` match WebKitGTK shapes (mute + `PermissionRequested` on the host).
 
+To hide Blink’s automation fingerprint on controlled views (WebKit twin of
+`NavigatorWebDriverActivePolicy.DISABLED`):
+
+```vala
+set_navigator_webdriver_active_policy(
+	view.get_settings(),
+	NavigatorWebDriverActivePolicy.DISABLED
+);
+/* or: view.get_settings().navigator_webdriver_active_policy =
+ *     NavigatorWebDriverActivePolicy.DISABLED; */
+```
+
+Set **before** the WebView2 environment is created (before first present/attach).
+`DISABLED` merges `--disable-blink-features=AutomationControlled` into
+`AdditionalBrowserArguments` alongside CDP / autoplay args.
+
 ## Demo and smokes
 
 Built demos(after `package-demos` on the Windows build machine):
@@ -86,6 +102,14 @@ Same exe, `Gtk.Stack` with one unmapped child (load on the hidden view):
 ```
 
 Pass: `STACK_SMOKE_PASS` and Phase A lists both `stack primary document` and `stack secondary document`. Interactive: `./scripts/run-automation-smoke-stack-interactive.sh`.
+
+### Hide `navigator.webdriver` (policy)
+
+```powershell
+& 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-automation.exe' --smoke-webdriver
+```
+
+Pass: `navigator.webdriver===true → false` and `TEST_PASS`.
 
 ### Attach + fill via CDP (3.3)
 

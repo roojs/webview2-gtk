@@ -109,10 +109,12 @@ How docs are built and marked up: [docs/code-documentation.md](docs/code-documen
 | `enable_developer_extras` / `get_inspector().show()` | Edge DevTools window |
 | `enable_media_stream` / `enable_webrtc` / gesture | settings; mute + `PermissionRequested` deny on host |
 | `is_muted` / `permission_request` | mute via `ICoreWebView2_8`; WebKit-shaped permission signals |
+| `CookieManager.changed` / `get_all_cookies` / `replace_cookies` | jar mirror + mutation signal (API mutations only) |
+| `NavigatorWebDriverActivePolicy` | `DISABLED` → `--disable-blink-features=AutomationControlled` |
 
 WebView2Gtk-only: `ready`. Accessibility: **`Win32Atspi`** (above), not on `WebView`.
 
-Not implemented yet: full settings surface, policy callbacks, `register_script_message_handler_with_reply`, mute/WebRTC/permission APIs, etc. (`load_failed` and `JavaScriptResult.to_string` are implemented.)  
+Not implemented yet: full settings surface, `register_script_message_handler_with_reply`, etc. (`load_failed` and `JavaScriptResult.to_string` are implemented.)  
 🚫 Public `WebView` click/type APIs are intentional omissions — fill stays with an **external** driver/CDP client ([automation.md](docs/automation.md)).
 
 **Limitation:** each GTK `WebView` owns its own WebView2 controller (shared Environment). Cookie profile and CDP/automation remain process-scoped by design.
@@ -129,7 +131,7 @@ examples/hello/     Minimal demo
 examples/browser/   Browser chrome + Win32Atspi smoke
 examples/automation/  Automation setup smoke (plan 3.0)
 examples/paned-insert/  Login → first paned insert + load_uri (blank-pane repro)
-examples/add-cookie/    add_cookie before attach; --smoke-mirror for get_all/replace
+examples/add-cookie/    add_cookie / get_all / replace; --smoke-changed for `changed`
 examples/hidden-stack/  Win32Atspi Gtk.Stack hidden-primary document pick
 examples/consumer-meson.build
 docs/               Install / build / use / deploy / a11y / automation / Valadoc

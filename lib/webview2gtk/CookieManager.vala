@@ -3,6 +3,13 @@ namespace WebView2Gtk {
 public class CookieManager : Object {
 	private weak NetworkSession? session;
 
+	/**
+	 * WebKitGTK-shaped — emitted after successful {@link add_cookie} /
+	 * {@link replace_cookies}. Page Set-Cookie / host jar mutations are not
+	 * observed (WebView2 exposes no cookie-change COM event here).
+	 */
+	public signal void changed();
+
 	internal CookieManager(NetworkSession session) {
 		this.session = session;
 	}
@@ -151,6 +158,7 @@ public class CookieManager : Object {
 				throw new NetworkError.FAILED("replace_cookies failed");
 			}
 		}
+		this.changed();
 		return true;
 	}
 
@@ -180,6 +188,7 @@ public class CookieManager : Object {
 		if (!pending.ok) {
 			throw new NetworkError.FAILED("add_cookie failed");
 		}
+		this.changed();
 		return true;
 	}
 }

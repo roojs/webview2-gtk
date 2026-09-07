@@ -14,6 +14,8 @@
 static BOOL g_automation_allowed = FALSE;
 /* 0=ALLOW, 1=ALLOW_WITHOUT_SOUND, 2=DENY — match WebView2Gtk.AutoplayPolicy */
 static int g_autoplay_policy = 0;
+/* 0=AUTO, 1=ENABLED, 2=DISABLED — match NavigatorWebDriverActivePolicy */
+static int g_navigator_webdriver_policy = 0;
 
 void
 vala_webview2_host_set_automation_allowed (bool allowed)
@@ -31,6 +33,12 @@ void
 vala_webview2_host_set_autoplay_policy (int policy)
 {
 	g_autoplay_policy = policy;
+}
+
+void
+vala_webview2_host_set_navigator_webdriver_policy (int policy)
+{
+	g_navigator_webdriver_policy = policy;
 }
 
 /* --- ICoreWebView2EnvironmentOptions (minimal C implementation) --- */
@@ -257,13 +265,15 @@ vala_webview2_host_create_environment_options (void)
 {
 	unsigned port;
 	EnvOptions *opt;
-	wchar_t args[256];
+	wchar_t args[512];
 	size_t used = 0;
 	BOOL need_deny;
+	BOOL need_hide_webdriver;
 
 	port = parse_inspector_port ();
 	need_deny = (g_autoplay_policy == 2); /* DENY */
-	if (port == 0 && !need_deny) {
+	need_hide_webdriver = (g_navigator_webdriver_policy == 2); /* DISABLED */
+	if (port == 0 && !need_deny && !need_hide_webdriver) {
 		return NULL;
 	}
 
@@ -305,9 +315,26 @@ vala_webview2_host_create_environment_options (void)
 			L"--autoplay-policy=user-gesture-required"
 		);
 		args[(sizeof (args) / sizeof (args[0])) - 1] = L'\0';
+		used = wcslen (args);
 		fprintf (
 			stderr,
 			"webview2gtk: autoplay DENY (--autoplay-policy=user-gesture-required)\n"
+		);
+	}
+	if (need_hide_webdriver) {
+		if (used > 0 && used + 1 < sizeof (args) / sizeof (args[0])) {
+			args[used++] = L' ';
+			args[used] = L'\0';
+		}
+		_snwprintf (
+			args + used,
+			(sizeof (args) / sizeof (args[0])) - used,
+			L"--disable-blink-features=AutomationControlled"
+		);
+		args[(sizeof (args) / sizeof (args[0])) - 1] = L'\0';
+		fprintf (
+			stderr,
+			"webview2gtk: navigator.webdriver DISABLED (--disable-blink-features=AutomationControlled)\n"
 		);
 	}
 

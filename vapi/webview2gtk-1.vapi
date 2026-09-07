@@ -51,6 +51,12 @@ namespace WebView2Gtk {
 		DENY
 	}
 
+	public enum NavigatorWebDriverActivePolicy {
+		AUTO,
+		ENABLED,
+		DISABLED
+	}
+
 	public enum PolicyDecisionType {
 		NAVIGATION_ACTION,
 		NEW_WINDOW_ACTION,
@@ -76,6 +82,7 @@ namespace WebView2Gtk {
 		public async GLib.List<Soup.Cookie> get_all_cookies(GLib.Cancellable? cancellable = null) throws GLib.Error;
 		public async bool replace_cookies(GLib.List<Soup.Cookie> cookies, GLib.Cancellable? cancellable = null) throws GLib.Error;
 		public async bool add_cookie(Soup.Cookie cookie, GLib.Cancellable? cancellable = null) throws GLib.Error;
+		public signal void changed();
 	}
 
 	public class NetworkSession : GLib.Object {
@@ -199,7 +206,11 @@ namespace WebView2Gtk {
 		public bool enable_media_stream { get; set; }
 		public bool enable_webrtc { get; set; }
 		public bool media_playback_requires_user_gesture { get; set; }
+		public NavigatorWebDriverActivePolicy navigator_webdriver_active_policy { get; set; }
 	}
+
+	public void set_navigator_webdriver_active_policy(WebViewSettings settings, NavigatorWebDriverActivePolicy policy);
+	public NavigatorWebDriverActivePolicy get_navigator_webdriver_active_policy(WebViewSettings settings);
 
 	public class WebInspector : GLib.Object {
 		public void show();

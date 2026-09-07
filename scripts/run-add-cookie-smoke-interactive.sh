@@ -2,7 +2,7 @@
 # Run webview2gtk-add-cookie smokes in the interactive Windows session.
 # SSH/session 0 has no Win32 desktop (GUI segfaults); schtasks /IT is required.
 #
-# Exit 0 = both TEST_PASS. Exit 1 = any TEST_FAIL.
+# Exit 0 = all TEST_PASS. Exit 1 = any TEST_FAIL.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -60,11 +60,14 @@ EOF
 
 LOG_ATTACH=/c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-smoke.log
 LOG_MIRROR=/c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-mirror-smoke.log
+LOG_CHANGED=/c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-changed-smoke.log
 fail=0
 run_one --smoke WebView2GtkAddCookieSmoke "${LOG_ATTACH}" \
 	"${OUT_DIR}/run-add-cookie-smoke.bat" || fail=1
 run_one --smoke-mirror WebView2GtkAddCookieMirrorSmoke "${LOG_MIRROR}" \
 	"${OUT_DIR}/run-add-cookie-mirror-smoke.bat" || fail=1
+run_one --smoke-changed WebView2GtkAddCookieChangedSmoke "${LOG_CHANGED}" \
+	"${OUT_DIR}/run-add-cookie-changed-smoke.bat" || fail=1
 
 if [[ "${fail}" -eq 0 ]]; then
 	echo SMOKE_PASS

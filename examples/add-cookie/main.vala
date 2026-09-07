@@ -1,13 +1,16 @@
 /* CookieManager smokes:
  *   --smoke         add_cookie before COM attach, then load_uri (bug 2026-08-25)
  *   --smoke-mirror  get_all_cookies + replace_cookies round-trip (bug 2026-09-07)
+ *   --smoke-changed CookieManager.changed fires on add/replace (bug 2026-09-07)
  *
  *   webview2gtk-add-cookie.exe [url]
  *   webview2gtk-add-cookie.exe --smoke
  *   webview2gtk-add-cookie.exe --smoke-mirror
+ *   webview2gtk-add-cookie.exe --smoke-changed
  *
  * See docs/bugs/done/2026-08-25-add-cookie-before-attach.md
  *     docs/bugs/done/2026-09-07-cookie-manager-get-all-replace.md
+ *     docs/bugs/done/2026-09-07-cookie-manager-changed-signal.md
  */
 
 using Gtk;
@@ -20,12 +23,14 @@ private const string COOKIE_VALUE = "before_attach";
 private string start_uri;
 private bool smoke = false;
 private bool smoke_mirror = false;
+private bool smoke_changed = false;
 private int smoke_status = 1;
 private bool smoke_done = false;
 private bool add_ok = false;
 private string add_err;
 private bool load_finished = false;
 private bool cookie_found = false;
+private int changed_count = 0;
 
 private WebView? web = null;
 private Gtk.Label status;
@@ -190,6 +195,75 @@ private async void run_smoke_mirror() {
 	finish_mirror(!have_a && !have_b && have_c);
 }
 
+private async void run_smoke_changed() {
+	var mgr = web.network_session.get_cookie_manager();
+	changed_count = 0;
+	mgr.changed.connect(() => {
+		changed_count++;
+		print("cookie_manager.changed count=%d\n", changed_count);
+	});
+	print("smoke-changed wait ready %s\n", diag_line());
+	while (!web.ready) {
+		Idle.add(run_smoke_changed.callback);
+		yield;
+	}
+	print("smoke-changed ready %s\n", diag_line());
+
+	var a = new Cookie("chg_a", "one", "chg.example", "/", 3600);
+	a.set_http_only(false);
+	a.set_secure(false);
+	try {
+		yield mgr.add_cookie(a);
+	} catch (Error e) {
+		print("smoke-changed add failed: %s\n", e.message);
+		finish_changed(false);
+		return;
+	}
+	if (changed_count < 1) {
+		print("smoke-changed no signal after add_cookie\n");
+		finish_changed(false);
+		return;
+	}
+	var after_add = changed_count;
+
+	var replacement = new GLib.List<Cookie> ();
+	var only = new Cookie("chg_b", "two", "chg.example", "/", 3600);
+	only.set_http_only(false);
+	only.set_secure(false);
+	replacement.append(only);
+	try {
+		yield mgr.replace_cookies(replacement);
+	} catch (Error e) {
+		print("smoke-changed replace failed: %s\n", e.message);
+		finish_changed(false);
+		return;
+	}
+	if (changed_count <= after_add) {
+		print("smoke-changed no signal after replace_cookies\n");
+		finish_changed(false);
+		return;
+	}
+	print("smoke-changed ok count=%d\n", changed_count);
+	finish_changed(true);
+}
+
+private void finish_changed(bool ok) {
+	if (smoke_done) {
+		return;
+	}
+	smoke_done = true;
+	if (ok) {
+		print("TEST_PASS\n");
+		smoke_status = 0;
+	} else {
+		print("TEST_FAIL (CookieManager.changed)\n");
+		smoke_status = 1;
+	}
+	if (window != null) {
+		window.close();
+	}
+}
+
 private void finish_mirror(bool ok) {
 	if (smoke_done) {
 		return;
@@ -261,6 +335,10 @@ public static int main(string[] args) {
 			smoke_mirror = true;
 			continue;
 		}
+		if (args[i] == "--smoke-changed") {
+			smoke_changed = true;
+			continue;
+		}
 		if (args[i].has_prefix("-")) {
 			gtk_args += args[i];
 			continue;
@@ -284,7 +362,7 @@ public static int main(string[] args) {
 		box.set_margin_end(8);
 		box.set_margin_top(8);
 		box.set_margin_bottom(8);
-		status = new Gtk.Label(smoke_mirror ? "mirror…" : "injecting…");
+		status = new Gtk.Label(smoke_mirror ? "mirror…" : (smoke_changed ? "changed…" : "injecting…"));
 		status.set_wrap(true);
 		status.set_xalign(0);
 		status.set_selectable(true);
@@ -296,6 +374,10 @@ public static int main(string[] args) {
 			print("startup mirror before present %s\n", diag_line());
 			web.load_uri("about:blank");
 			run_smoke_mirror.begin();
+		} else if (smoke_changed) {
+			print("startup changed before present %s\n", diag_line());
+			web.load_uri("about:blank");
+			run_smoke_changed.begin();
 		} else {
 			/* Inject on the same turn as first show — do not wait for ready/map. */
 			print("startup before present %s\n", diag_line());
@@ -305,12 +387,15 @@ public static int main(string[] args) {
 		print("startup after present %s\n", diag_line());
 		refresh_status();
 
-		if (smoke || smoke_mirror) {
+		if (smoke || smoke_mirror || smoke_changed) {
 			Timeout.add(12000, () => {
 				if (!smoke_done) {
 					if (smoke_mirror) {
 						print("smoke-mirror timeout\n");
 						finish_mirror(false);
+					} else if (smoke_changed) {
+						print("smoke-changed timeout\n");
+						finish_changed(false);
 					} else {
 						check_cookies_then_finish.begin();
 					}
@@ -320,5 +405,5 @@ public static int main(string[] args) {
 		}
 	});
 	app.run(gtk_args);
-	return (smoke || smoke_mirror) ? smoke_status : 0;
+	return (smoke || smoke_mirror || smoke_changed) ? smoke_status : 0;
 }

@@ -6,7 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.5.9] - Unreleased
+## [0.5.10] - Unreleased
+
+### Added
+
+- `CookieManager.changed` signal after successful `add_cookie` / `replace_cookies` (WebKitGTK-shaped; page Set-Cookie not observed) ([bug](docs/bugs/done/2026-09-07-cookie-manager-changed-signal.md)).
+- `NavigatorWebDriverActivePolicy` + `WebViewSettings.navigator_webdriver_active_policy` / `set_navigator_webdriver_active_policy` — `DISABLED` merges `--disable-blink-features=AutomationControlled` at environment create ([bug](docs/bugs/done/2026-09-07-navigator-webdriver-policy.md)).
+
+### Changed
+
+- `examples/add-cookie --smoke-changed` checks `CookieManager.changed`.
+- `examples/automation --smoke-webdriver` checks `navigator.webdriver === true` is false under `DISABLED`.
+
+## [0.5.9] - 2026-09-07
 
 ### Added
 

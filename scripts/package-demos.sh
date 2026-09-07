@@ -85,7 +85,7 @@ echo "  run-browser.bat / webview2gtk-browser.exe"
 echo "  run-automation.bat / webview2gtk-automation.exe"
 echo "  webview2gtk-cdp-attach.exe  (CDP attach/fill smoke; needs automation running)"
 echo "  webview2gtk-paned-insert.exe  (login → first paned insert + load_uri)"
-echo "  webview2gtk-add-cookie.exe     (add_cookie before attach; --smoke-mirror get_all/replace)"
+echo "  webview2gtk-add-cookie.exe     (add_cookie; --smoke-mirror get_all/replace; --smoke-changed)"
 echo "Double-click the .bat launchers (or exes if fonts are configured)."
 echo "WebView2 Runtime must still be installed on the PC."
 

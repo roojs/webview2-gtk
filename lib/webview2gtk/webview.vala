@@ -58,6 +58,9 @@ extern bool wv2_host_put_is_visible(void* host, bool visible);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_autoplay_policy")]
 extern void wv2_host_set_autoplay_policy(int policy);
 
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_navigator_webdriver_policy")]
+extern void wv2_host_set_navigator_webdriver_policy(int policy);
+
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_open_dev_tools_window")]
 extern bool wv2_host_open_dev_tools_window(void* host);
 
@@ -206,6 +209,7 @@ public class WebView : Gtk.Box {
 
 		this.capture_settings.notify.connect(on_settings_notify);
 		this.push_media_settings(false);
+		this.push_navigator_webdriver_policy(false);
 	}
 
 	public bool is_loading { get; private set; }
@@ -693,7 +697,20 @@ public class WebView : Gtk.Box {
 		case "media-playback-requires-user-gesture":
 			this.push_media_settings(true);
 			break;
+		case "navigator-webdriver-active-policy":
+			this.push_navigator_webdriver_policy(true);
+			break;
 		}
+	}
+
+	private void push_navigator_webdriver_policy(bool from_prop) {
+		var policy = this.capture_settings.navigator_webdriver_active_policy;
+		if (from_prop && attached && wv2_host_is_ready(host_handle)) {
+			warning(
+				"WebView2Gtk: navigator_webdriver_active_policy after env create — stored only; restart required for Chromium AutomationControlled flag"
+			);
+		}
+		wv2_host_set_navigator_webdriver_policy((int) policy);
 	}
 
 	private void push_media_settings(bool from_gesture_prop) {

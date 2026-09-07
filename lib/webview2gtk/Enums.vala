@@ -44,6 +44,17 @@ public enum AutoplayPolicy {
 	DENY
 }
 
+/**
+ * WebKitGTK-shaped — whether page JS sees navigator.webdriver as active.
+ * On Windows, {@link NavigatorWebDriverActivePolicy.DISABLED} maps to
+ * Chromium `--disable-blink-features=AutomationControlled` at environment create.
+ */
+public enum NavigatorWebDriverActivePolicy {
+	AUTO,
+	ENABLED,
+	DISABLED
+}
+
 /** WebKitGTK-shaped subset — used by {@link WebView.load_failed}. */
 public errordomain NetworkError {
 	FAILED,

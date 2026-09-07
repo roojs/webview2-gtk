@@ -5,6 +5,7 @@
  *   --inspector-port <n>   (default 19222; also WV2GTK_INSPECTOR_PORT)
  *   --smoke               two WebViews side-by-side + Win32Atspi walk; holds ~2.5s then quits
  *   --smoke-stack         Gtk.Stack (one unmapped) + two-phase Win32Atspi walk
+ *   --smoke-webdriver     controlled view + DISABLED policy; navigator.webdriver must not be true
  */
 
 using Gtk;
@@ -17,6 +18,7 @@ const string STACK_SECONDARY_TITLE = "stack secondary document";
 private int smoke_status = 1;
 private bool smoke = false;
 private bool smoke_stack = false;
+private bool smoke_webdriver = false;
 
 private Gtk.Widget wrap_webview(WebView view) {
 	var browser = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
@@ -281,6 +283,10 @@ public static int main(string[] args) {
 			smoke_stack = true;
 			continue;
 		}
+		if (args[i] == "--smoke-webdriver") {
+			smoke_webdriver = true;
+			continue;
+		}
 		gtk_args += args[i];
 	}
 
@@ -307,6 +313,13 @@ public static int main(string[] args) {
 
 		WebView view = new WebViewAuto(context, ns);
 		WebView? view2 = null;
+
+		if (smoke_webdriver) {
+			set_navigator_webdriver_active_policy(
+				view.get_settings(),
+				NavigatorWebDriverActivePolicy.DISABLED
+			);
+		}
 
 		context.automation_started.connect((session) => {
 			var info = new ApplicationInfo();
@@ -348,6 +361,13 @@ public static int main(string[] args) {
 </head><body><p>Second WebView</p></body></html>""",
 				null
 			);
+		} else if (smoke_webdriver) {
+			view.load_html(
+				"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>webdriver policy smoke</title>
+</head><body><p>navigator.webdriver probe</p></body></html>""",
+				null
+			);
 		} else {
 			view.load_html(
 				"""<!DOCTYPE html>
@@ -367,7 +387,47 @@ body{font-family:sans-serif;margin:2rem}
 		GLib.message("inspector 127.0.0.1:%u — CDP --remote-debugging-port(WEBKIT_INSPECTOR_SERVER)",
 			insp);
 		window.present();
-		if (smoke) {
+		if (smoke_webdriver) {
+			var tries = 0;
+			Timeout.add(250, () => {
+				tries++;
+				if (!view.ready) {
+					if (tries < 40) {
+						return Source.CONTINUE;
+					}
+					print("TEST_FAIL (webdriver smoke: view not ready)\n");
+					smoke_status = 1;
+					finish_quit(window, app);
+					return Source.REMOVE;
+				}
+				/* Allow NavigateToString to settle before probing navigator.webdriver. */
+				Timeout.add(400, () => {
+					view.evaluate_javascript.begin(
+						"navigator.webdriver === true",
+						-1,
+						null,
+						null,
+						null,
+						(obj, res) => {
+							try {
+								var result = view.evaluate_javascript.end(res);
+								var json = result.to_json();
+								print("navigator.webdriver===true → %s\n", json);
+								var ok = json == "false";
+								print(ok ? "TEST_PASS\n" : "TEST_FAIL (navigator.webdriver still true)\n");
+								smoke_status = ok ? 0 : 1;
+							} catch (Error e) {
+								print("TEST_FAIL (evaluate_javascript: %s)\n", e.message);
+								smoke_status = 1;
+							}
+							finish_quit(window, app);
+						}
+					);
+					return Source.REMOVE;
+				});
+				return Source.REMOVE;
+			});
+		} else if (smoke) {
 			SourceFunc finish = () => {
 				Timeout.add(2500, () => {
 					window.close();
@@ -441,7 +501,7 @@ body{font-family:sans-serif;margin:2rem}
 	});
 
 	var code = app.run(gtk_args);
-	return (smoke || smoke_stack) ? smoke_status : code;
+	return (smoke || smoke_stack || smoke_webdriver) ? smoke_status : code;
 }
 
 class WebViewAuto : WebView
