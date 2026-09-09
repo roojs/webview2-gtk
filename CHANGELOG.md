@@ -8,10 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.12] - Unreleased
 
+### Added
+
+- `CookieManager.set_persistent_storage` (`TEXT`): path jar (newline Set-Cookie headers); load on set, flush on `changed`; jar-only get/add/replace without COM. `SQLITE` is not supported (`GLib.error`). Ephemeral / automation sessions no-op ([bug](docs/bugs/2026-09-09-cookie-manager-set-persistent-storage.md)).
+- `examples/add-cookie --smoke-persist` checks TEXT survive “restart”.
+
+### Fixed
+
+- `CookieManager.replace_cookies` no longer tight-loops sync COM after ready while navigation is in flight. It queues clear+adds on the same pending path as `add_cookie` so finish_setup can drain before first Navigate; live hosts clear then Idle between adds ([bug](docs/bugs/done/2026-09-09-cookie-manager-replace-cookies-large-av.md)).
+
 ### Changed
 
 - `CookieManagerExt` now exposes C-shaped `get_all_cookies_async` / `get_all_cookies_finish` and `replace_cookies_async` / `replace_cookies_finish` (replacing Vala `.begin` / `.end`) for sealed-WebKit app parity ([bug](docs/bugs/done/2026-09-07-cookie-manager-ext-async-finish.md)).
 - `examples/add-cookie --smoke-mirror` exercises the `*_async` / `*_finish` surface.
+- `examples/add-cookie --smoke-replace-startup` fires a large `replace_cookies_async` at construct.
 
 ## [0.5.11] - 2026-09-07
 

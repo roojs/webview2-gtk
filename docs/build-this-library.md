@@ -65,6 +65,8 @@ Use **`dist-demos\`** (from `meson compile` or `./scripts/package-demos.sh`):
 & 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-paned-insert.exe' --smoke
 & 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-add-cookie.exe' --smoke
 & 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-add-cookie.exe' --smoke-mirror
+& 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-add-cookie.exe' --smoke-replace-startup
+& 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-add-cookie.exe' --smoke-persist
 & 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-multi-host-spike.exe' --smoke
 & 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-automation.exe' --smoke --inspector-port 19222
 & 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-automation.exe' --smoke-stack
@@ -108,7 +110,7 @@ If you develop on Linux but have a Windows box with MSYS2:
 ./scripts/agent-remote-build.sh pull
 ./scripts/agent-remote-build.sh run            # short smoke of hello on Windows
 ./scripts/agent-remote-build.sh paned-insert   # 0.5 multi-WebView gate
-./scripts/agent-remote-build.sh add-cookie     # add_cookie before attach + get_all/replace mirror
+./scripts/agent-remote-build.sh add-cookie     # add_cookie smokes (attach / mirror / changed / replace-startup)
 ./scripts/agent-remote-build.sh multi-host-spike
 ./scripts/agent-remote-build.sh automation
 ```

@@ -21,6 +21,7 @@ run_one() {
 	local task="$2"
 	local log="$3"
 	local bat="$4"
+	local wait_secs="${5:-45}"
 
 	rm -f "${log}"
 	cat > "${bat}" << EOF
@@ -40,7 +41,7 @@ EOF
 		//SC ONCE //ST 23:59 //F //IT
 	schtasks //Run //TN "${task}"
 	echo "task ${task} started — waiting for ${log}"
-	for _ in $(seq 1 45); do
+	for _ in $(seq 1 "${wait_secs}"); do
 		if [[ -f "${log}" ]] && grep -qE 'TEST_PASS|TEST_FAIL|^exit=' "${log}" 2>/dev/null; then
 			break
 		fi
@@ -61,6 +62,8 @@ EOF
 LOG_ATTACH=/c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-smoke.log
 LOG_MIRROR=/c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-mirror-smoke.log
 LOG_CHANGED=/c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-changed-smoke.log
+LOG_REPLACE=/c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-replace-startup-smoke.log
+LOG_PERSIST=/c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-persist-smoke.log
 fail=0
 run_one --smoke WebView2GtkAddCookieSmoke "${LOG_ATTACH}" \
 	"${OUT_DIR}/run-add-cookie-smoke.bat" || fail=1
@@ -68,6 +71,10 @@ run_one --smoke-mirror WebView2GtkAddCookieMirrorSmoke "${LOG_MIRROR}" \
 	"${OUT_DIR}/run-add-cookie-mirror-smoke.bat" || fail=1
 run_one --smoke-changed WebView2GtkAddCookieChangedSmoke "${LOG_CHANGED}" \
 	"${OUT_DIR}/run-add-cookie-changed-smoke.bat" || fail=1
+run_one --smoke-replace-startup WebView2GtkAddCookieReplaceStartupSmoke "${LOG_REPLACE}" \
+	"${OUT_DIR}/run-add-cookie-replace-startup-smoke.bat" 75 || fail=1
+run_one --smoke-persist WebView2GtkAddCookiePersistSmoke "${LOG_PERSIST}" \
+	"${OUT_DIR}/run-add-cookie-persist-smoke.bat" || fail=1
 
 if [[ "${fail}" -eq 0 ]]; then
 	echo SMOKE_PASS

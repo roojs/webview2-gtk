@@ -86,6 +86,7 @@ public class WebContext : Object {
 	public NetworkSession? get_network_session_for_automation() {
 		if (this.automation_network_session == null) {
 			this.automation_network_session = new NetworkSession();
+			this.automation_network_session.mark_ephemeral();
 		}
 		return this.automation_network_session;
 	}

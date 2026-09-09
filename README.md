@@ -110,6 +110,7 @@ How docs are built and marked up: [docs/code-documentation.md](docs/code-documen
 | `enable_media_stream` / `enable_webrtc` / gesture | settings; mute + `PermissionRequested` deny on host |
 | `is_muted` / `permission_request` | mute via `ICoreWebView2_8`; WebKit-shaped permission signals |
 | `CookieManager.changed` / `get_all_cookies` / `replace_cookies` | jar mirror + mutation signal (API mutations only) |
+| `CookieManager.set_persistent_storage` (`TEXT`) | path jar (Set-Cookie lines); `SQLITE` → `GLib.error` (not supported) |
 | `CookieManagerExt` (`webview2gtk-cookie-ext`) | `*_async` / `*_finish` get_all + replace (sealed-WebKit parity) |
 | `NavigatorWebDriverActivePolicy` | `DISABLED` → `--disable-blink-features=AutomationControlled` |
 
@@ -132,7 +133,7 @@ examples/hello/     Minimal demo
 examples/browser/   Browser chrome + Win32Atspi smoke
 examples/automation/  Automation setup smoke (plan 3.0)
 examples/paned-insert/  Login → first paned insert + load_uri (blank-pane repro)
-examples/add-cookie/    add_cookie / get_all / replace; --smoke-changed for `changed`
+examples/add-cookie/    add_cookie / get_all / replace; --smoke-changed; --smoke-replace-startup
 examples/hidden-stack/  Win32Atspi Gtk.Stack hidden-primary document pick
 examples/consumer-meson.build
 docs/               Install / build / use / deploy / a11y / automation / Valadoc

@@ -2,15 +2,21 @@
  *   --smoke         add_cookie before COM attach, then load_uri (bug 2026-08-25)
  *   --smoke-mirror  get_all_cookies + replace_cookies round-trip (bug 2026-09-07)
  *   --smoke-changed CookieManager.changed fires on add/replace (bug 2026-09-07)
+ *   --smoke-replace-startup  large fire-and-forget replace at construct (bug 2026-09-09)
+ *   --smoke-persist TEXT set_persistent_storage survives “restart” (bug 2026-09-09)
  *
  *   webview2gtk-add-cookie.exe [url]
  *   webview2gtk-add-cookie.exe --smoke
  *   webview2gtk-add-cookie.exe --smoke-mirror
  *   webview2gtk-add-cookie.exe --smoke-changed
+ *   webview2gtk-add-cookie.exe --smoke-replace-startup
+ *   webview2gtk-add-cookie.exe --smoke-persist
  *
  * See docs/bugs/done/2026-08-25-add-cookie-before-attach.md
  *     docs/bugs/done/2026-09-07-cookie-manager-get-all-replace.md
  *     docs/bugs/done/2026-09-07-cookie-manager-changed-signal.md
+ *     docs/bugs/done/2026-09-09-cookie-manager-replace-cookies-large-av.md
+ *     docs/bugs/2026-09-09-cookie-manager-set-persistent-storage.md
  */
 
 using Gtk;
@@ -19,11 +25,15 @@ using WebView2Gtk;
 
 private const string COOKIE_NAME = "wv2gtk_probe";
 private const string COOKIE_VALUE = "before_attach";
+private const string PERSIST_NAME = "wv2gtk_persist";
+private const string PERSIST_VALUE = "phase1_text";
 
 private string start_uri;
 private bool smoke = false;
 private bool smoke_mirror = false;
 private bool smoke_changed = false;
+private bool smoke_replace_startup = false;
+private bool smoke_persist = false;
 private int smoke_status = 1;
 private bool smoke_done = false;
 private bool add_ok = false;
@@ -293,6 +303,192 @@ private void finish_changed(bool ok) {
 	}
 }
 
+/**
+ * TEXT jar: write via session A, reload via session B (same path).
+ * SQLITE is not smoke-tested here — it calls GLib.error (process abort).
+ */
+private async void run_smoke_persist() {
+	var path = Path.build_filename(
+		Environment.get_tmp_dir(),
+		"wv2gtk-smoke-persist-cookies.txt"
+	);
+	print("smoke-persist path=%s\n", path);
+	try {
+		FileUtils.remove(path);
+	} catch (Error e) {
+	}
+
+	var writer = new NetworkSession();
+	var writer_mgr = writer.get_cookie_manager();
+	writer_mgr.set_persistent_storage(path, CookiePersistentStorage.TEXT);
+	var cookie = new Cookie(PERSIST_NAME, PERSIST_VALUE, "persist.example", "/", 3600);
+	cookie.set_http_only(false);
+	cookie.set_secure(false);
+	try {
+		yield writer_mgr.add_cookie(cookie);
+	} catch (Error e) {
+		print("smoke-persist add failed: %s\n", e.message);
+		finish_persist(false);
+		return;
+	}
+	if (!FileUtils.test(path, FileTest.EXISTS)) {
+		print("smoke-persist file missing after add\n");
+		finish_persist(false);
+		return;
+	}
+
+	var reader = new NetworkSession();
+	var reader_mgr = reader.get_cookie_manager();
+	reader_mgr.set_persistent_storage(path, CookiePersistentStorage.TEXT);
+	GLib.List<Cookie> all;
+	try {
+		all = yield reader_mgr.get_all_cookies();
+	} catch (Error e) {
+		print("smoke-persist get_all failed: %s\n", e.message);
+		finish_persist(false);
+		return;
+	}
+	var found = false;
+	foreach (unowned Cookie c in all) {
+		if (c.get_name() == PERSIST_NAME && (c.get_value() ?? "") == PERSIST_VALUE) {
+			found = true;
+			break;
+		}
+	}
+	print("smoke-persist count=%u found=%s\n", all.length(), found ? "yes" : "no");
+	finish_persist(found);
+}
+
+private void finish_persist(bool ok) {
+	if (smoke_done) {
+		return;
+	}
+	smoke_done = true;
+	if (ok) {
+		print("TEST_PASS\n");
+		smoke_status = 0;
+	} else {
+		print("TEST_FAIL (set_persistent_storage TEXT)\n");
+		smoke_status = 1;
+	}
+	if (window != null) {
+		window.close();
+	}
+}
+
+private string big_cookie_value(int len) {
+	var sb = new StringBuilder();
+	for (var i = 0; i < len; i++) {
+		sb.append_c((char) ('a' + (i % 26)));
+	}
+	return sb.str;
+}
+
+private GLib.List<Cookie> build_large_replace_list() {
+	var list = new GLib.List<Cookie> ();
+	const int COUNT = 320;
+	for (var i = 0; i < COUNT; i++) {
+		var domain = "h%03d.example".printf(i % 40);
+		var name = "n%03d".printf(i);
+		string value;
+		if (i == 10 || i == 200) {
+			value = big_cookie_value(3500);
+		} else {
+			value = "v%d".printf(i);
+		}
+		var c = new Cookie(name, value, domain, "/", 3600);
+		c.set_http_only(false);
+		c.set_secure(false);
+		list.append(c);
+	}
+	return list;
+}
+
+/**
+ * Fire-and-forget replace_cookies_async at construct with a large multi-host
+ * list (incl. oversized values), overlapping load_uri — must not AV.
+ */
+private void start_smoke_replace_startup() {
+	var mgr = web.network_session.get_cookie_manager();
+	var list = build_large_replace_list();
+	print("smoke-replace-startup fire replace count=%u ready=%s\n",
+		list.length(), web.ready ? "yes" : "no");
+	CookieManagerExt.replace_cookies_async(mgr, list, null, (o, r) => {
+		Error? err = null;
+		var ok = false;
+		/* Use async source object — this frame returns before the callback. */
+		var cm = (CookieManager) o;
+		try {
+			ok = CookieManagerExt.replace_cookies_finish(cm, r);
+		} catch (Error e) {
+			err = e;
+		}
+		Idle.add(() => {
+			verify_smoke_replace_startup.begin(ok, err);
+			return Source.REMOVE;
+		});
+	});
+	/* Overlap with other WebView / network work while replace runs. */
+	web.load_uri("about:blank");
+	web.load_uri("https://example.com/");
+}
+
+private async void verify_smoke_replace_startup(bool replace_ok, Error? err) {
+	if (smoke_done) {
+		return;
+	}
+	if (err != null || !replace_ok) {
+		print("smoke-replace-startup replace failed: %s\n",
+			err != null ? err.message : "false");
+		finish_replace_startup(false);
+		return;
+	}
+	print("smoke-replace-startup replace finished, verifying jar\n");
+	var mgr = web.network_session.get_cookie_manager();
+	GLib.List<Cookie> all;
+	try {
+		all = yield mgr.get_all_cookies();
+	} catch (Error e) {
+		print("smoke-replace-startup get_all failed: %s\n", e.message);
+		finish_replace_startup(false);
+		return;
+	}
+	var have_small = false;
+	var have_big = false;
+	foreach (unowned Cookie c in all) {
+		var name = c.get_name();
+		var value = c.get_value() ?? "";
+		var d = c.get_domain() ?? "";
+		if (name == "n000" && value == "v0"
+			&& (d == "h000.example" || d == ".h000.example" || d.has_suffix("h000.example"))) {
+			have_small = true;
+		}
+		if (name == "n010" && value.length >= 3000) {
+			have_big = true;
+		}
+	}
+	print("smoke-replace-startup count=%u have_small=%s have_big=%s\n",
+		all.length(), have_small ? "yes" : "no", have_big ? "yes" : "no");
+	finish_replace_startup(all.length() >= 300 && have_small && have_big);
+}
+
+private void finish_replace_startup(bool ok) {
+	if (smoke_done) {
+		return;
+	}
+	smoke_done = true;
+	if (ok) {
+		print("TEST_PASS\n");
+		smoke_status = 0;
+	} else {
+		print("TEST_FAIL (replace_cookies large startup)\n");
+		smoke_status = 1;
+	}
+	if (window != null) {
+		window.close();
+	}
+}
+
 private void finish_mirror(bool ok) {
 	if (smoke_done) {
 		return;
@@ -368,6 +564,14 @@ public static int main(string[] args) {
 			smoke_changed = true;
 			continue;
 		}
+		if (args[i] == "--smoke-replace-startup") {
+			smoke_replace_startup = true;
+			continue;
+		}
+		if (args[i] == "--smoke-persist") {
+			smoke_persist = true;
+			continue;
+		}
 		if (args[i].has_prefix("-")) {
 			gtk_args += args[i];
 			continue;
@@ -391,7 +595,11 @@ public static int main(string[] args) {
 		box.set_margin_end(8);
 		box.set_margin_top(8);
 		box.set_margin_bottom(8);
-		status = new Gtk.Label(smoke_mirror ? "mirror…" : (smoke_changed ? "changed…" : "injecting…"));
+		status = new Gtk.Label(
+			smoke_mirror ? "mirror…"
+			: (smoke_changed ? "changed…"
+			: (smoke_replace_startup ? "replace-startup…"
+			: (smoke_persist ? "persist…" : "injecting…"))));
 		status.set_wrap(true);
 		status.set_xalign(0);
 		status.set_selectable(true);
@@ -407,6 +615,12 @@ public static int main(string[] args) {
 			print("startup changed before present %s\n", diag_line());
 			web.load_uri("about:blank");
 			run_smoke_changed.begin();
+		} else if (smoke_replace_startup) {
+			print("startup replace-startup before present %s\n", diag_line());
+			start_smoke_replace_startup();
+		} else if (smoke_persist) {
+			print("startup persist before present %s\n", diag_line());
+			run_smoke_persist.begin();
 		} else {
 			/* Inject on the same turn as first show — do not wait for ready/map. */
 			print("startup before present %s\n", diag_line());
@@ -416,8 +630,9 @@ public static int main(string[] args) {
 		print("startup after present %s\n", diag_line());
 		refresh_status();
 
-		if (smoke || smoke_mirror || smoke_changed) {
-			Timeout.add(12000, () => {
+		if (smoke || smoke_mirror || smoke_changed || smoke_replace_startup || smoke_persist) {
+			var timeout_ms = smoke_replace_startup ? 60000 : 12000;
+			Timeout.add(timeout_ms, () => {
 				if (!smoke_done) {
 					if (smoke_mirror) {
 						print("smoke-mirror timeout\n");
@@ -425,6 +640,12 @@ public static int main(string[] args) {
 					} else if (smoke_changed) {
 						print("smoke-changed timeout\n");
 						finish_changed(false);
+					} else if (smoke_replace_startup) {
+						print("smoke-replace-startup timeout\n");
+						finish_replace_startup(false);
+					} else if (smoke_persist) {
+						print("smoke-persist timeout\n");
+						finish_persist(false);
 					} else {
 						check_cookies_then_finish.begin();
 					}
@@ -434,5 +655,6 @@ public static int main(string[] args) {
 		}
 	});
 	app.run(gtk_args);
-	return (smoke || smoke_mirror || smoke_changed) ? smoke_status : 0;
+	return (smoke || smoke_mirror || smoke_changed || smoke_replace_startup || smoke_persist)
+		? smoke_status : 0;
 }

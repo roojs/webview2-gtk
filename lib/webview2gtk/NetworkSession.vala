@@ -12,6 +12,18 @@ internal class PendingCookie {
 }
 
 /**
+ * One replace_cookies operation — clear flag + cookie rows shared with the
+ * pending queue so finish_setup can drain them before the first Navigate.
+ */
+internal class PendingReplace {
+	public bool clear_done;
+	public bool clear_ok;
+	public GenericArray<PendingCookie> cookies = new GenericArray<PendingCookie> ();
+	public bool done;
+	public bool ok;
+}
+
+/**
  * WebKitGTK-shaped network session — cookies + download_started.
  *
  * Download COM handlers are installed per WebView2Host when a WebView binds
@@ -23,13 +35,28 @@ public class NetworkSession : Object {
 	private CookieManager cookie_manager;
 	private GenericArray<Download> downloads = new GenericArray<Download> ();
 	private GenericArray<PendingCookie> pending_cookies = new GenericArray<PendingCookie> ();
+	private bool pending_clear = false;
+	private PendingReplace? active_replace = null;
 	private void* cookie_host = null;
+	private bool ephemeral = false;
 
 	public signal void download_started(Download download);
 
 	public NetworkSession() {
 		this.cookie_manager = new CookieManager(this);
 		NetworkSession.active_session = this;
+	}
+
+	/**
+	 * WebKitGTK-shaped — automation sessions are ephemeral; persistent
+	 * cookie storage must not apply.
+	 */
+	internal void mark_ephemeral() {
+		this.ephemeral = true;
+	}
+
+	internal bool is_ephemeral() {
+		return this.ephemeral;
 	}
 
 	public CookieManager get_cookie_manager() {
@@ -56,31 +83,169 @@ public class NetworkSession : Object {
 		pending.http_only = http_only;
 		pending.secure = secure;
 		this.pending_cookies.add(pending);
-		this.apply_pending_cookies();
+		this.apply_pending_cookies(false);
 		return pending;
 	}
 
-	internal void apply_pending_cookies() {
+	/**
+	 * Queue DeleteAllCookies + the replacement list. Prefer calling this before
+	 * the host is ready so finish_setup drains the jar before first Navigate.
+	 */
+	internal PendingReplace enqueue_replace(GLib.List<Soup.Cookie> cookies) {
+		this.fail_pending_cookies();
+		if (this.active_replace != null && !this.active_replace.done) {
+			this.active_replace.ok = false;
+			this.active_replace.done = true;
+		}
+		var op = new PendingReplace();
+		this.pending_clear = true;
+		this.active_replace = op;
+		foreach (unowned Soup.Cookie cookie in cookies) {
+			var pending = new PendingCookie();
+			pending.name = cookie.get_name();
+			pending.value = cookie.get_value() ?? "";
+			pending.domain = cookie.get_domain() ?? "";
+			pending.path = cookie.get_path() ?? "/";
+			pending.http_only = cookie.get_http_only();
+			pending.secure = cookie.get_secure();
+			op.cookies.add(pending);
+			this.pending_cookies.add(pending);
+		}
+		this.apply_pending_cookies(false);
+		this.refresh_replace_state(op);
+		return op;
+	}
+
+	private void refresh_replace_state(PendingReplace op) {
+		if (op.done || this.pending_clear || !op.clear_done) {
+			return;
+		}
+		var all_done = true;
+		var all_ok = op.clear_ok;
+		for (var i = 0; i < op.cookies.length; i++) {
+			var c = op.cookies[i];
+			if (!c.done) {
+				all_done = false;
+				break;
+			}
+			if (!c.ok) {
+				all_ok = false;
+			}
+		}
+		if (!all_done) {
+			return;
+		}
+		op.ok = all_ok;
+		op.done = true;
+		if (this.active_replace == op) {
+			this.active_replace = null;
+		}
+	}
+
+	private bool add_one_pending(PendingCookie pending) {
+		pending.ok = wv2_add_cookie_sync(
+			this.cookie_host,
+			pending.name,
+			pending.value,
+			pending.domain,
+			pending.path,
+			pending.http_only,
+			pending.secure
+		);
+		pending.done = true;
+		return pending.ok;
+	}
+
+	private void prune_done_pending() {
+		var remaining = new GenericArray<PendingCookie> ();
+		for (var i = 0; i < this.pending_cookies.length; i++) {
+			var pending = this.pending_cookies[i];
+			if (!pending.done) {
+				remaining.add(pending);
+			}
+		}
+		this.pending_cookies = remaining;
+	}
+
+	/**
+	 * @param drain_all if true, apply clear + every pending cookie now (used
+	 * from finish_setup before first Navigate). Otherwise clear then one cookie
+	 * per turn with Idle between adds while the UI / navigation is live.
+	 */
+	internal void apply_pending_cookies(bool drain_all = false) {
 		if (this.cookie_host == null || !wv2_host_is_ready(this.cookie_host)) {
 			return;
 		}
+
+		if (this.pending_clear) {
+			var clear_ok = wv2_delete_all_cookies_sync(this.cookie_host);
+			this.pending_clear = false;
+			if (this.active_replace != null) {
+				this.active_replace.clear_ok = clear_ok;
+				this.active_replace.clear_done = true;
+				if (!clear_ok) {
+					this.fail_pending_cookies();
+					this.active_replace.ok = false;
+					this.active_replace.done = true;
+					this.active_replace = null;
+					return;
+				}
+			}
+			if (!drain_all && this.pending_cookies.length > 0) {
+				Idle.add(() => {
+					this.apply_pending_cookies(false);
+					return Source.REMOVE;
+				});
+				return;
+			}
+			if (this.active_replace != null && this.pending_cookies.length == 0) {
+				this.refresh_replace_state(this.active_replace);
+				return;
+			}
+		}
+
+		if (drain_all) {
+			for (var i = 0; i < this.pending_cookies.length; i++) {
+				var pending = this.pending_cookies[i];
+				if (pending.done) {
+					continue;
+				}
+				this.add_one_pending(pending);
+			}
+			this.pending_cookies = new GenericArray<PendingCookie> ();
+			if (this.active_replace != null) {
+				this.refresh_replace_state(this.active_replace);
+			}
+			return;
+		}
+
+		PendingCookie? next = null;
 		for (var i = 0; i < this.pending_cookies.length; i++) {
 			var pending = this.pending_cookies[i];
 			if (pending.done) {
 				continue;
 			}
-			pending.ok = wv2_add_cookie_sync(
-				this.cookie_host,
-				pending.name,
-				pending.value,
-				pending.domain,
-				pending.path,
-				pending.http_only,
-				pending.secure
-			);
-			pending.done = true;
+			next = pending;
+			break;
 		}
-		this.pending_cookies = new GenericArray<PendingCookie> ();
+		if (next == null) {
+			this.pending_cookies = new GenericArray<PendingCookie> ();
+			if (this.active_replace != null) {
+				this.refresh_replace_state(this.active_replace);
+			}
+			return;
+		}
+		this.add_one_pending(next);
+		this.prune_done_pending();
+		if (this.active_replace != null) {
+			this.refresh_replace_state(this.active_replace);
+		}
+		if (this.pending_cookies.length > 0) {
+			Idle.add(() => {
+				this.apply_pending_cookies(false);
+				return Source.REMOVE;
+			});
+		}
 	}
 
 	private void fail_pending_cookies() {
@@ -93,10 +258,12 @@ public class NetworkSession : Object {
 			pending.done = true;
 		}
 		this.pending_cookies = new GenericArray<PendingCookie> ();
+		this.pending_clear = false;
 	}
 
 	private static void on_apply_pending_cookies(void* user_data) {
-		((NetworkSession) user_data).apply_pending_cookies();
+		/* finish_setup — drain the full queue before first Navigate. */
+		((NetworkSession) user_data).apply_pending_cookies(true);
 	}
 
 	public void set_proxy_settings(
@@ -118,7 +285,8 @@ public class NetworkSession : Object {
 		wv2_host_set_download_handlers(host, NetworkSession.on_host_started,
 			NetworkSession.on_host_progress, NetworkSession.on_host_finished,
 			NetworkSession.on_host_failed, null);
-		this.apply_pending_cookies();
+		/* Host may already be ready (rebind); drain if so. */
+		this.apply_pending_cookies(true);
 	}
 
 	internal void unbind_download_host(void* host) {
@@ -129,6 +297,11 @@ public class NetworkSession : Object {
 		wv2_host_set_download_handlers(host, null, null, null, null, null);
 		if (this.cookie_host == host) {
 			this.fail_pending_cookies();
+			if (this.active_replace != null && !this.active_replace.done) {
+				this.active_replace.ok = false;
+				this.active_replace.done = true;
+				this.active_replace = null;
+			}
 			this.cookie_host = null;
 		}
 	}
