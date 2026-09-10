@@ -1,9 +1,10 @@
-/* CookieManager smokes:
+/* CookieManager / NetworkSession smokes:
  *   --smoke         add_cookie before COM attach, then load_uri (bug 2026-08-25)
  *   --smoke-mirror  get_all_cookies + replace_cookies round-trip (bug 2026-09-07)
  *   --smoke-changed CookieManager.changed fires on add/replace (bug 2026-09-07)
  *   --smoke-replace-startup  large fire-and-forget replace at construct (bug 2026-09-09)
  *   --smoke-persist TEXT set_persistent_storage survives “restart” (bug 2026-09-09)
+ *   --smoke-proxy   CUSTOM proxy to closed port → navigate fails closed (plan 5.0)
  *
  *   webview2gtk-add-cookie.exe [url]
  *   webview2gtk-add-cookie.exe --smoke
@@ -11,12 +12,14 @@
  *   webview2gtk-add-cookie.exe --smoke-changed
  *   webview2gtk-add-cookie.exe --smoke-replace-startup
  *   webview2gtk-add-cookie.exe --smoke-persist
+ *   webview2gtk-add-cookie.exe --smoke-proxy
  *
  * See docs/bugs/done/2026-08-25-add-cookie-before-attach.md
  *     docs/bugs/done/2026-09-07-cookie-manager-get-all-replace.md
  *     docs/bugs/done/2026-09-07-cookie-manager-changed-signal.md
  *     docs/bugs/done/2026-09-09-cookie-manager-replace-cookies-large-av.md
  *     docs/bugs/2026-09-09-cookie-manager-set-persistent-storage.md
+ *     docs/bugs/done/2026-09-10-network-session-set-proxy-settings-stub.md
  */
 
 using Gtk;
@@ -34,6 +37,9 @@ private bool smoke_mirror = false;
 private bool smoke_changed = false;
 private bool smoke_replace_startup = false;
 private bool smoke_persist = false;
+private bool smoke_proxy = false;
+private bool proxy_load_failed = false;
+private bool proxy_saw_example = false;
 private int smoke_status = 1;
 private bool smoke_done = false;
 private bool add_ok = false;
@@ -376,6 +382,61 @@ private void finish_persist(bool ok) {
 	}
 }
 
+private void finish_proxy(bool ok) {
+	if (smoke_done) {
+		return;
+	}
+	smoke_done = true;
+	print(
+		"smoke-proxy load_failed=%s saw_example=%s\n",
+		proxy_load_failed ? "yes" : "no",
+		proxy_saw_example ? "yes" : "no"
+	);
+	if (ok) {
+		print("TEST_PASS\n");
+		smoke_status = 0;
+	} else {
+		print("TEST_FAIL (CUSTOM proxy did not fail-closed)\n");
+		smoke_status = 1;
+	}
+	if (window != null) {
+		window.close();
+	}
+}
+
+private void start_smoke_proxy() {
+	/*
+	 * Closed local port — if --proxy-server is honored, https://example.com
+	 * must not load “Example Domain”. Fail-closed = pass.
+	 */
+	web.network_session.set_proxy_settings(
+		NetworkProxyMode.CUSTOM,
+		new NetworkProxySettings("http://127.0.0.1:1", null)
+	);
+	print("smoke-proxy set CUSTOM http://127.0.0.1:1 before present\n");
+	web.load_failed.connect((load_event, failing_uri, error) => {
+		print("smoke-proxy load_failed %s: %s\n", failing_uri, error.message);
+		proxy_load_failed = true;
+		Idle.add(() => {
+			finish_proxy(true);
+			return Source.REMOVE;
+		});
+		return false;
+	});
+	web.load_changed.connect((load_event) => {
+		if (load_event != LoadEvent.FINISHED || smoke_done) {
+			return;
+		}
+		var title = web.get_title() ?? "";
+		print("smoke-proxy FINISHED title=%s\n", title);
+		if (title.down().contains("example domain")) {
+			proxy_saw_example = true;
+			finish_proxy(false);
+		}
+	});
+	web.load_uri("https://example.com/");
+}
+
 private string big_cookie_value(int len) {
 	var sb = new StringBuilder();
 	for (var i = 0; i < len; i++) {
@@ -572,6 +633,10 @@ public static int main(string[] args) {
 			smoke_persist = true;
 			continue;
 		}
+		if (args[i] == "--smoke-proxy") {
+			smoke_proxy = true;
+			continue;
+		}
 		if (args[i].has_prefix("-")) {
 			gtk_args += args[i];
 			continue;
@@ -599,7 +664,8 @@ public static int main(string[] args) {
 			smoke_mirror ? "mirror…"
 			: (smoke_changed ? "changed…"
 			: (smoke_replace_startup ? "replace-startup…"
-			: (smoke_persist ? "persist…" : "injecting…"))));
+			: (smoke_persist ? "persist…"
+			: (smoke_proxy ? "proxy…" : "injecting…")))));
 		status.set_wrap(true);
 		status.set_xalign(0);
 		status.set_selectable(true);
@@ -621,6 +687,10 @@ public static int main(string[] args) {
 		} else if (smoke_persist) {
 			print("startup persist before present %s\n", diag_line());
 			run_smoke_persist.begin();
+		} else if (smoke_proxy) {
+			print("startup proxy before present %s\n", diag_line());
+			/* Must latch --proxy-server before first present/env create. */
+			start_smoke_proxy();
 		} else {
 			/* Inject on the same turn as first show — do not wait for ready/map. */
 			print("startup before present %s\n", diag_line());
@@ -630,7 +700,8 @@ public static int main(string[] args) {
 		print("startup after present %s\n", diag_line());
 		refresh_status();
 
-		if (smoke || smoke_mirror || smoke_changed || smoke_replace_startup || smoke_persist) {
+		if (smoke || smoke_mirror || smoke_changed || smoke_replace_startup
+		    || smoke_persist || smoke_proxy) {
 			var timeout_ms = smoke_replace_startup ? 60000 : 12000;
 			Timeout.add(timeout_ms, () => {
 				if (!smoke_done) {
@@ -646,6 +717,10 @@ public static int main(string[] args) {
 					} else if (smoke_persist) {
 						print("smoke-persist timeout\n");
 						finish_persist(false);
+					} else if (smoke_proxy) {
+						/* Hung / no Example Domain ⇒ fail-closed ⇒ pass. */
+						print("smoke-proxy timeout (treat as fail-closed)\n");
+						finish_proxy(!proxy_saw_example);
 					} else {
 						check_cookies_then_finish.begin();
 					}
@@ -655,6 +730,7 @@ public static int main(string[] args) {
 		}
 	});
 	app.run(gtk_args);
-	return (smoke || smoke_mirror || smoke_changed || smoke_replace_startup || smoke_persist)
+	return (smoke || smoke_mirror || smoke_changed || smoke_replace_startup
+	    || smoke_persist || smoke_proxy)
 		? smoke_status : 0;
 }

@@ -22,8 +22,8 @@ public class CookieManager : Object {
 
 	/**
 	 * WebKitGTK-shaped path jar. {@link CookiePersistentStorage.TEXT} loads and
-	 * flushes newline Set-Cookie headers at {@code filename}.
-	 * {@link CookiePersistentStorage.SQLITE} is not supported ({@link GLib.error}).
+	 * flushes newline Set-Cookie headers at ''filename''.
+	 * {@link CookiePersistentStorage.SQLITE} is not supported (calls ''GLib.error'').
 	 * No-op on ephemeral / automation sessions.
 	 */
 	public void set_persistent_storage(string filename, CookiePersistentStorage storage) {

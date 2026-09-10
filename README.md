@@ -15,6 +15,7 @@ Build and link on **Windows**. Share Vala source with Linux via `#if WINDOWS` (W
 | [Build this library](docs/build-this-library.md) | Clone, MSYS2, meson, demos |
 | [Use in your app](docs/using-in-your-app.md) | Consumer Meson + `#if WINDOWS` |
 | [Automation](docs/automation.md) | WebKit-shaped setup; fill via external CDP/driver |
+| [Limitations vs WebKitGTK](#limitations-vs-webkitgtk) | Proxy / create-time flags / process scope |
 | [Releasing](docs/releasing.md) | Tag-driven release flow and changelog preflight |
 | [Deploying a Windows build](docs/deploying-windows.md) | Bundle GTK / WebView2Loader DLLs |
 | **[API docs (Valadoc)](https://roojs.github.io/webview2-gtk/)** | Generated reference on GitHub Pages |
@@ -83,46 +84,46 @@ Full reference: **[https://roojs.github.io/webview2-gtk/](https://roojs.github.i
 
 How docs are built and marked up: [docs/code-documentation.md](docs/code-documentation.md).
 
-### WebKitGTK 6–aligned surface
+Names and call shapes follow **WebKitGTK 6** so shared `#if WINDOWS` sites stay small (`load_uri`, `load_changed`, cookies, downloads, automation construct props, …). WebView2Gtk-only: `ready`. Accessibility is **`Win32Atspi`**, not methods on `WebView`.
 
-`WebView2Gtk.WebView` mirrors the common **WebKit.WebView** calls so shared `#if WINDOWS` sites stay small:
-
-| WebKitGTK 6 | WebView2Gtk |
-|-------------|-------------|
-| `load_uri()` | `load_uri()` |
-| `load_html()` / `load_plain_text()` | same |
-| `go_back()` / `go_forward()` / `reload()` | same |
-| `can_go_back()` / `can_go_forward()` | same |
-| `stop_loading()` | same |
-| `get_uri()` / `get_title()` | same |
-| `is_loading` / `estimated_load_progress` | same (progress approximate) |
-| `zoom_level` | same |
-| `load_changed(LoadEvent)` | same enum names |
-| `UserContentManager` / `get_user_content_manager()` | `register_script_message_handler` + detailed `script_message_received` |
-| `evaluate_javascript` | same (host→page replies) |
-| `download_uri` / `NetworkSession.download_started` / `Download` | same shapes (destination via `set_destination`) |
-| `resource_load_started` / `WebResource` | same (`finished` / `failed` on the resource) |
-| `WebContext` automation allow / `automation_started` | same names; see [automation.md](docs/automation.md) |
-| `AutomationSession` / `ApplicationInfo` | same names |
-| `WEBKIT_INSPECTOR_SERVER` | honored → WebView2 CDP `--remote-debugging-port` |
-| `WebsitePolicies` / `autoplay` | construct on `WebView`; `DENY` → Chromium autoplay flag |
-| `enable_developer_extras` / `get_inspector().show()` | Edge DevTools window |
-| `enable_media_stream` / `enable_webrtc` / gesture | settings; mute + `PermissionRequested` deny on host |
-| `is_muted` / `permission_request` | mute via `ICoreWebView2_8`; WebKit-shaped permission signals |
-| `CookieManager.changed` / `get_all_cookies` / `replace_cookies` | jar mirror + mutation signal (API mutations only) |
-| `CookieManager.set_persistent_storage` (`TEXT`) | path jar (Set-Cookie lines); `SQLITE` → `GLib.error` (not supported) |
-| `CookieManagerExt` (`webview2gtk-cookie-ext`) | `*_async` / `*_finish` get_all + replace (sealed-WebKit parity) |
-| `NavigatorWebDriverActivePolicy` | `DISABLED` → `--disable-blink-features=AutomationControlled` |
-
-WebView2Gtk-only: `ready`. Accessibility: **`Win32Atspi`** (above), not on `WebView`.
-
-Not implemented yet: full settings surface, `register_script_message_handler_with_reply`, etc. (`load_failed` and `JavaScriptResult.to_string` are implemented.)  
 🚫 Public `WebView` click/type APIs are intentional omissions — fill stays with an **external** driver/CDP client ([automation.md](docs/automation.md)).
 
-**Limitation:** each GTK `WebView` owns its own WebView2 controller (shared Environment). Cookie profile and CDP/automation remain process-scoped by design.
+Not implemented yet: full settings surface, `register_script_message_handler_with_reply`, etc. (`load_failed` and `JavaScriptResult.to_string` are implemented.)
 
 ---
 
+## Limitations vs WebKitGTK
+
+The API **looks** like WebKitGTK; several behaviors do **not**. Read these before porting network or automation setup.
+
+### Proxy (`NetworkSession.set_proxy_settings`)
+
+On **WebKitGTK**, `set_proxy_settings` applies to that `NetworkSession` and can change while the session is live.
+
+On **Windows**, WebView2 only honors proxy via Chromium flags (`--proxy-server` / `--no-proxy-server`) at **environment create**:
+
+- Call **before** the first WebView attaches (before first `present` / host create).
+- The latch is **process-wide** (one shared WebView2 environment) — every controller from that env uses the same proxy.
+- Changing proxy **after** the env exists does **not** retarget traffic (warns once; stored for a future recreate only).
+- Typical app pattern: one browser window at a time; point `CUSTOM` at a **local** forwarding proxy for that window’s life; close the window (release last host → env dropped) before opening another with a different latch. Details and smoke: [automation.md](docs/automation.md).
+
+### Other create-time Chromium flags
+
+Same “set before first attach” class as proxy (not live mid-session toggles like some WebKit knobs):
+
+| Surface | Windows behavior |
+|---------|------------------|
+| `WebsitePolicies` autoplay `DENY` / media gesture | `--autoplay-policy=…` at env create |
+| `NavigatorWebDriverActivePolicy.DISABLED` | `--disable-blink-features=AutomationControlled` at env create |
+| `WEBKIT_INSPECTOR_SERVER` | `--remote-debugging-port` at env create |
+
+### Process / profile scope
+
+Each GTK `WebView` owns its own WebView2 **controller**, but they share one **Environment**. Cookie profile and CDP/automation remain process-scoped by design.
+
+`CookieManager.set_persistent_storage(SQLITE)` is not supported (`GLib.error`); `TEXT` path jars work. Page-driven Set-Cookie is not mirrored into `CookieManager.changed` the way a full WebKit jar observer might.
+
+---
 ## Layout
 
 ```

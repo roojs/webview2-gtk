@@ -78,6 +78,40 @@ Set **before** the WebView2 environment is created (before first present/attach)
 `DISABLED` merges `--disable-blink-features=AutomationControlled` into
 `AdditionalBrowserArguments` alongside CDP / autoplay args.
 
+### HTTP(S) proxy (`NetworkSession.set_proxy_settings`)
+
+Same create-time latch as webdriver / autoplay. Typical consumer pattern: one
+browser window at a time; point `CUSTOM` at a **local** forwarding proxy for the
+life of that window; the local proxy routes by request host (ChatGPT → CA, etc.).
+Chromium applies the flag to **all** HTTP(S) from that environment (main frame,
+subresources, XHR) — not only the top-level navigation host.
+
+```vala
+web_view.network_session.set_proxy_settings(
+	NetworkProxyMode.CUSTOM,
+	new NetworkProxySettings("http://127.0.0.1:8888", null)
+);
+/* then present / load_uri — before first WebView2 env create */
+```
+
+| Mode | Chromium arg |
+|------|----------------|
+| `CUSTOM` | `--proxy-server=<uri>` |
+| `NONE` | `--no-proxy-server` |
+| `DEFAULT` | omit (system default) |
+
+Late calls after env create warn and do not retarget a live environment. Closing
+the window and creating a new one (new process env after last host release, or a
+fresh process) is how you switch proxy for the next browser session.
+
+Smoke:
+
+```powershell
+& 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-add-cookie.exe' --smoke-proxy
+```
+
+Pass: `TEST_PASS` (CUSTOM to a closed local port fails closed — no “Example Domain”).
+
 ## Demo and smokes
 
 Built demos(after `package-demos` on the Windows build machine):

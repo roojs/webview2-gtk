@@ -9,6 +9,7 @@
 #include <wchar.h>
 
 #include "win32-ui-webview2-automation.h"
+#include "win32-ui-webview2-com-glue.h"
 #include "win32-ui-webview2-sdk.h"
 
 static BOOL g_automation_allowed = FALSE;
@@ -16,6 +17,10 @@ static BOOL g_automation_allowed = FALSE;
 static int g_autoplay_policy = 0;
 /* 0=AUTO, 1=ENABLED, 2=DISABLED — match NavigatorWebDriverActivePolicy */
 static int g_navigator_webdriver_policy = 0;
+/* 0=DEFAULT, 1=CUSTOM, 2=NONE — match NetworkProxyMode */
+static int g_proxy_mode = 0;
+static char *g_proxy_uri = NULL;
+static BOOL g_proxy_late_warned = FALSE;
 
 void
 vala_webview2_host_set_automation_allowed (bool allowed)
@@ -39,6 +44,46 @@ void
 vala_webview2_host_set_navigator_webdriver_policy (int policy)
 {
 	g_navigator_webdriver_policy = policy;
+}
+
+bool
+vala_webview2_host_environment_created (void)
+{
+	return vala_webview2_com_get_environment () != NULL;
+}
+
+void
+vala_webview2_host_set_proxy_settings (int mode, const char *proxy_uri_utf8)
+{
+	if (vala_webview2_host_environment_created () && !g_proxy_late_warned) {
+		g_proxy_late_warned = TRUE;
+		fprintf (
+			stderr,
+			"webview2gtk: set_proxy_settings after env create — stored only; "
+			"new WebView2 environment required for Chromium proxy flags\n"
+		);
+	}
+
+	if (g_proxy_uri != NULL) {
+		free (g_proxy_uri);
+		g_proxy_uri = NULL;
+	}
+
+	if (mode == 1 && proxy_uri_utf8 != NULL && proxy_uri_utf8[0] != '\0') {
+		/* CUSTOM */
+		size_t n = strlen (proxy_uri_utf8) + 1;
+		g_proxy_uri = (char *) malloc (n);
+		if (g_proxy_uri != NULL) {
+			memcpy (g_proxy_uri, proxy_uri_utf8, n);
+		}
+		g_proxy_mode = (g_proxy_uri != NULL) ? 1 : 0;
+	} else if (mode == 2) {
+		/* NONE */
+		g_proxy_mode = 2;
+	} else {
+		/* DEFAULT, or CUSTOM without URI */
+		g_proxy_mode = 0;
+	}
 }
 
 /* --- ICoreWebView2EnvironmentOptions (minimal C implementation) --- */
@@ -265,15 +310,22 @@ vala_webview2_host_create_environment_options (void)
 {
 	unsigned port;
 	EnvOptions *opt;
-	wchar_t args[512];
+	wchar_t args[768];
 	size_t used = 0;
+	size_t cap;
 	BOOL need_deny;
 	BOOL need_hide_webdriver;
+	BOOL need_proxy_server;
+	BOOL need_no_proxy;
 
+	cap = sizeof (args) / sizeof (args[0]);
 	port = parse_inspector_port ();
 	need_deny = (g_autoplay_policy == 2); /* DENY */
 	need_hide_webdriver = (g_navigator_webdriver_policy == 2); /* DISABLED */
-	if (port == 0 && !need_deny && !need_hide_webdriver) {
+	need_proxy_server = (g_proxy_mode == 1 && g_proxy_uri != NULL);
+	need_no_proxy = (g_proxy_mode == 2); /* NONE */
+	if (port == 0 && !need_deny && !need_hide_webdriver
+	    && !need_proxy_server && !need_no_proxy) {
 		return NULL;
 	}
 
@@ -290,12 +342,12 @@ vala_webview2_host_create_environment_options (void)
 		 */
 		used = (size_t) _snwprintf (
 			args,
-			sizeof (args) / sizeof (args[0]),
+			cap,
 			L"--remote-debugging-port=%u --remote-allow-origins=*",
 			port
 		);
-		if (used >= sizeof (args) / sizeof (args[0])) {
-			used = (sizeof (args) / sizeof (args[0])) - 1;
+		if (used >= cap) {
+			used = cap - 1;
 		}
 		args[used] = L'\0';
 		fprintf (
@@ -305,16 +357,16 @@ vala_webview2_host_create_environment_options (void)
 		);
 	}
 	if (need_deny) {
-		if (used > 0 && used + 1 < sizeof (args) / sizeof (args[0])) {
+		if (used > 0 && used + 1 < cap) {
 			args[used++] = L' ';
 			args[used] = L'\0';
 		}
 		_snwprintf (
 			args + used,
-			(sizeof (args) / sizeof (args[0])) - used,
+			cap - used,
 			L"--autoplay-policy=user-gesture-required"
 		);
-		args[(sizeof (args) / sizeof (args[0])) - 1] = L'\0';
+		args[cap - 1] = L'\0';
 		used = wcslen (args);
 		fprintf (
 			stderr,
@@ -322,21 +374,62 @@ vala_webview2_host_create_environment_options (void)
 		);
 	}
 	if (need_hide_webdriver) {
-		if (used > 0 && used + 1 < sizeof (args) / sizeof (args[0])) {
+		if (used > 0 && used + 1 < cap) {
 			args[used++] = L' ';
 			args[used] = L'\0';
 		}
 		_snwprintf (
 			args + used,
-			(sizeof (args) / sizeof (args[0])) - used,
+			cap - used,
 			L"--disable-blink-features=AutomationControlled"
 		);
-		args[(sizeof (args) / sizeof (args[0])) - 1] = L'\0';
+		args[cap - 1] = L'\0';
+		used = wcslen (args);
 		fprintf (
 			stderr,
 			"webview2gtk: navigator.webdriver DISABLED (--disable-blink-features=AutomationControlled)\n"
 		);
 	}
+	if (need_proxy_server) {
+		wchar_t *uri_wide = (wchar_t *) win32_ui_utf8_to_utf16 (g_proxy_uri, NULL);
+		if (uri_wide != NULL) {
+			if (used > 0 && used + 1 < cap) {
+				args[used++] = L' ';
+				args[used] = L'\0';
+			}
+			_snwprintf (
+				args + used,
+				cap - used,
+				L"--proxy-server=%s",
+				uri_wide
+			);
+			args[cap - 1] = L'\0';
+			used = wcslen (args);
+			fprintf (
+				stderr,
+				"webview2gtk: proxy CUSTOM (--proxy-server=%s)\n",
+				g_proxy_uri
+			);
+			free (uri_wide);
+		}
+	} else if (need_no_proxy) {
+		if (used > 0 && used + 1 < cap) {
+			args[used++] = L' ';
+			args[used] = L'\0';
+		}
+		_snwprintf (
+			args + used,
+			cap - used,
+			L"--no-proxy-server"
+		);
+		args[cap - 1] = L'\0';
+		used = wcslen (args);
+		fprintf (
+			stderr,
+			"webview2gtk: proxy NONE (--no-proxy-server)\n"
+		);
+	}
+	(void) used;
 
 	if (FAILED (envopt_put_args (&opt->iface, args))) {
 		ICoreWebView2EnvironmentOptions_Release (&opt->iface);

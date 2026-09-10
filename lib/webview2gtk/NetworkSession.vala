@@ -1,3 +1,9 @@
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_proxy_settings")]
+extern void wv2_host_set_proxy_settings(int mode, string? proxy_uri);
+
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_environment_created")]
+extern bool wv2_host_environment_created();
+
 namespace WebView2Gtk {
 
 internal class PendingCookie {
@@ -39,6 +45,9 @@ public class NetworkSession : Object {
 	private PendingReplace? active_replace = null;
 	private void* cookie_host = null;
 	private bool ephemeral = false;
+	private NetworkProxyMode proxy_mode = NetworkProxyMode.DEFAULT;
+	private NetworkProxySettings? proxy_settings = null;
+	private bool proxy_late_warned = false;
 
 	public signal void download_started(Download download);
 
@@ -266,10 +275,44 @@ public class NetworkSession : Object {
 		((NetworkSession) user_data).apply_pending_cookies(true);
 	}
 
+	/**
+	 * WebKitGTK-shaped — set HTTP(S) proxy for this session.
+	 *
+	 * On Windows, Chromium honors ''--proxy-server'' / ''--no-proxy-server'' only at
+	 * WebView2 environment create (process-wide shared env). Call before the first
+	 * WebView attaches. Late calls warn once and are stored for a future recreate;
+	 * they do not retarget a live environment. All HTTP(S) from that env (main
+	 * frame, subresources, XHR) use the latch — a local forwarding proxy can route
+	 * by request host.
+	 */
 	public void set_proxy_settings(
 		NetworkProxyMode mode,
 		NetworkProxySettings? settings
 	) {
+		this.proxy_mode = mode;
+		this.proxy_settings = (mode == NetworkProxyMode.CUSTOM) ? settings : null;
+
+		string? uri = null;
+		if (mode == NetworkProxyMode.CUSTOM) {
+			if (settings == null) {
+				warning("WebView2Gtk: set_proxy_settings CUSTOM requires NetworkProxySettings");
+				mode = NetworkProxyMode.DEFAULT;
+				this.proxy_mode = mode;
+			} else if (settings.http_proxy_uri != null && settings.http_proxy_uri.length > 0) {
+				uri = settings.http_proxy_uri;
+			} else {
+				uri = settings.default_proxy_uri;
+			}
+		}
+
+		if (wv2_host_environment_created() && !this.proxy_late_warned) {
+			this.proxy_late_warned = true;
+			warning(
+				"WebView2Gtk: set_proxy_settings after env create — stored only; restart required for Chromium proxy flags"
+			);
+		}
+
+		wv2_host_set_proxy_settings((int) mode, uri);
 	}
 
 	public void set_tls_errors_policy(TLSErrorsPolicy policy) {

@@ -6,11 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.5.12] - Unreleased
+## [0.5.13] - Unreleased
 
 ### Added
 
-- `CookieManager.set_persistent_storage` (`TEXT`): path jar (newline Set-Cookie headers); load on set, flush on `changed`; jar-only get/add/replace without COM. `SQLITE` is not supported (`GLib.error`). Ephemeral / automation sessions no-op ([bug](docs/bugs/2026-09-09-cookie-manager-set-persistent-storage.md)).
+- `NetworkSession.set_proxy_settings` honors `CUSTOM` / `NONE` / `DEFAULT` via Chromium `--proxy-server` / `--no-proxy-server` at environment create ([bug](docs/bugs/done/2026-09-10-network-session-set-proxy-settings-stub.md), [plan 5.0](docs/plans/done/5.0-network-session-proxy.md)).
+- `examples/add-cookie --smoke-proxy` checks CUSTOM to a closed port fails closed.
+
+### Changed
+
+- README: **Limitations vs WebKitGTK** section (proxy is create-time / process-wide — not a live mid-session switch like WebKitGTK).
+
+## [0.5.12] - 2026-09-08
+
+### Added
+
+- `CookieManager.set_persistent_storage` (`TEXT`): path jar (newline Set-Cookie headers); load on set, flush on `changed`; jar-only get/add/replace without COM. `SQLITE` is not supported (`GLib.error`). Ephemeral / automation sessions no-op ([bug](docs/bugs/done/2026-09-09-cookie-manager-set-persistent-storage.md)).
 - `examples/add-cookie --smoke-persist` checks TEXT survive “restart”.
 
 ### Fixed

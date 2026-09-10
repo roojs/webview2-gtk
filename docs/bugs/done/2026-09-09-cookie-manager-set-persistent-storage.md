@@ -1,12 +1,12 @@
 # Bug — CookieManager.set_persistent_storage TEXT path jar
 
-**Status:** ✔️ agent (TEXT); `SQLITE` not supported  
+**Status:** ✅ fixed in **0.5.12** (`TEXT` path jar; `SQLITE` not supported)  
 **Date:** 2026-09-09  
 **Component:** `lib/webview2gtk/CookieManager.vala` (`set_persistent_storage`)
 
 ℹ️ Plan emoji: 🔷 user req, 💩 LLM suggestion, ⏳ backlog, 🚫 veto.
 
-ℹ️ Related: [done/2026-09-07-cookie-manager-get-all-replace.md](./done/2026-09-07-cookie-manager-get-all-replace.md)
+ℹ️ Related: [2026-09-07-cookie-manager-get-all-replace.md](./2026-09-07-cookie-manager-get-all-replace.md)
 
 ℹ️ WebKit: `webkit_cookie_manager_set_persistent_storage` — load from path; flush non-session cookies on `changed`; never on ephemeral.
 
