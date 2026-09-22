@@ -60,6 +60,7 @@ GTK apps need toolchain DLLs beside the `.exe`. Raw `build\webview2gtk-hello.exe
 Use **`dist-demos\`** (from `meson compile` or `./scripts/package-demos.sh`):
 
 ```powershell
+& 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-hello.exe' --smoke-policy-ignore
 & 'C:\msys64\tmp\webview2-gtk\dist-demos\webview2gtk-hello.exe'
 & 'C:\msys64\tmp\webview2-gtk\dist-demos\webview2gtk-browser.exe' 'https://example.com/'
 & 'C:\msys64\tmp\webview2-gtk\portable-demos\webview2gtk-paned-insert.exe' --smoke

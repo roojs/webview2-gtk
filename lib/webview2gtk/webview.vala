@@ -127,6 +127,8 @@ public class WebView : Gtk.Box {
 	private string uri = "about:blank";
 	private string title = "";
 	private bool load_cancelled = false;
+	private string policy_ignored_uri = "";
+	private bool blanking_after_ignore = false;
 	private double zoom_level = 1.0;
 	private WebViewSettings capture_settings = new WebViewSettings();
 	private UserContentManager user_content_manager = new UserContentManager();
@@ -229,6 +231,8 @@ public class WebView : Gtk.Box {
 
 	/**
 	 * WebKitGTK-shaped — policy decision (main-frame document RESPONSE is wired today).
+	 *
+	 * Call {@link PolicyDecision.ignore} to refuse the document after MIME is known.
 	 */
 	public signal bool decide_policy(PolicyDecision decision, PolicyDecisionType type);
 
@@ -638,12 +642,45 @@ public class WebView : Gtk.Box {
 		this.estimated_load_progress = progress;
 	}
 
+	private void apply_ignored_response(string ignored_uri) {
+		policy_ignored_uri = ignored_uri;
+		load_cancelled = true;
+		wv2_host_stop(host_handle);
+	}
+
+	private void emit_ignored_load_failed(string fail_uri) {
+		load_cancelled = false;
+		policy_ignored_uri = "";
+		var err = new NetworkError.CANCELLED("Load cancelled");
+		load_failed(LoadEvent.STARTED, fail_uri, err);
+		set_loading(false, 0.0);
+	}
+
 	private void on_navigation_starting() {
+		if (blanking_after_ignore) {
+			return;
+		}
 		set_loading(true, 0.1);
 		load_changed(LoadEvent.STARTED);
 	}
 
 	private void on_navigation_completed(bool success) {
+		if (blanking_after_ignore) {
+			blanking_after_ignore = false;
+			get_uri();
+			get_title();
+			set_loading(false, 0.0);
+			return;
+		}
+		if (policy_ignored_uri.length > 0) {
+			var fail_uri = policy_ignored_uri;
+			emit_ignored_load_failed(fail_uri);
+			if (success) {
+				blanking_after_ignore = true;
+				wv2_host_navigate(host_handle, "about:blank");
+			}
+			return;
+		}
 		if (!success) {
 			var fail_uri = pending_uri;
 			if (fail_uri.length == 0) {
@@ -755,12 +792,18 @@ public class WebView : Gtk.Box {
 		size_t header_count
 	) {
 		var view = (WebView) user_data;
+		if (view.blanking_after_ignore) {
+			return;
+		}
 		var headers = new Soup.MessageHeaders(Soup.MessageHeadersType.RESPONSE);
 		for (var i = 0; i < (int) header_count; i++) {
 			headers.append(header_names[i], header_values[i]);
 		}
 		var decision = new ResponsePolicyDecision(uri, (uint) status, headers);
 		view.decide_policy(decision, PolicyDecisionType.RESPONSE);
+		if (decision.was_ignored()) {
+			view.apply_ignored_response(uri);
+		}
 	}
 
 	[CCode(has_target = false)]
