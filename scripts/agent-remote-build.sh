@@ -12,6 +12,8 @@
 #   ./scripts/agent-remote-build.sh automation        # build + automation --smoke
 #   ./scripts/agent-remote-build.sh automation-stack  # build + automation --smoke-stack
 #   ./scripts/agent-remote-build.sh hidden-stack      # build + smoke-hidden-stack --google
+#   ./scripts/agent-remote-build.sh hello-print       # build + hello --smoke-print
+#   ./scripts/agent-remote-build.sh print             # build + static-font PDF sample
 #
 # Requires: AGENT_WIN_HOST (SSH Host), MSYS2 rsync on Windows (see vala.win32 docs/windows-build.md § Rsync).
 set -euo pipefail
@@ -47,7 +49,7 @@ run_remote_build() {
 	echo "[agent-remote-build] build on ${REMOTE_HOST} (C: mirror)"
 	# Prefer ninja targets; package-demos often fails if dist-demos is locked.
 	ssh -o BatchMode=yes "${REMOTE_HOST}" \
-		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup --reconfigure build && ninja -C build libwebview2gtk-1.stamp webview2gtk-hello.exe webview2gtk-browser.exe webview2gtk-automation.exe webview2gtk-cdp-attach.exe webview2gtk-paned-insert.exe webview2gtk-add-cookie.exe 2>&1 | tee build/last-build.log && (OUT_DIR=/c/msys64/tmp/webview2-gtk/portable-demos ./scripts/package-demos.sh || true)\""
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup --reconfigure build && ninja -C build libwebview2gtk-1.stamp webview2gtk-hello.exe webview2gtk-browser.exe webview2gtk-automation.exe webview2gtk-cdp-attach.exe webview2gtk-paned-insert.exe webview2gtk-add-cookie.exe webview2gtk-print.exe 2>&1 | tee build/last-build.log && (OUT_DIR=/c/msys64/tmp/webview2-gtk/portable-demos ./scripts/package-demos.sh || true)\""
 }
 
 run_remote_smoke() {
@@ -82,6 +84,30 @@ run_remote_hidden_stack_build() {
 	echo "[agent-remote-build] hidden-stack smoke build on ${REMOTE_HOST}"
 	ssh -o BatchMode=yes "${REMOTE_HOST}" \
 		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup --reconfigure build && rm -f build/webview2gtk-smoke-hidden-stack.exe build/libwebview2gtk-1.stamp && set -o pipefail && ninja -C build libwebview2gtk-1.stamp webview2gtk-smoke-hidden-stack.exe 2>&1 | tee build/last-build.log && OUT_DIR=/c/msys64/tmp/webview2-gtk/portable-demos ./scripts/copy-exe-runtime-dlls.sh build/webview2gtk-smoke-hidden-stack.exe /c/msys64/tmp/webview2-gtk/portable-demos build/vendor/webview2/x64/WebView2Loader.dll\""
+}
+
+run_remote_hello_print_build() {
+	echo "[agent-remote-build] hello print smoke build on ${REMOTE_HOST}"
+	ssh -o BatchMode=yes "${REMOTE_HOST}" \
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup --reconfigure build && rm -f build/webview2gtk-hello.exe && set -o pipefail && ninja -C build libwebview2gtk-1.stamp webview2gtk-hello.exe 2>&1 | tee build/last-build.log && OUT_DIR=/c/msys64/tmp/webview2-gtk/portable-demos ./scripts/copy-exe-runtime-dlls.sh build/webview2gtk-hello.exe /c/msys64/tmp/webview2-gtk/portable-demos build/vendor/webview2/x64/WebView2Loader.dll\""
+}
+
+run_remote_print_build() {
+	echo "[agent-remote-build] print sample build on ${REMOTE_HOST}"
+	ssh -o BatchMode=yes "${REMOTE_HOST}" \
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup --reconfigure build && rm -f build/webview2gtk-print.exe && set -o pipefail && ninja -C build libwebview2gtk-1.stamp webview2gtk-print.exe 2>&1 | tee build/last-build.log && OUT_DIR=/c/msys64/tmp/webview2-gtk/portable-demos ./scripts/copy-exe-runtime-dlls.sh build/webview2gtk-print.exe /c/msys64/tmp/webview2-gtk/portable-demos build/vendor/webview2/x64/WebView2Loader.dll\""
+}
+
+run_remote_print_sample() {
+	echo "[agent-remote-build] print sample (interactive RDP session) on ${REMOTE_HOST}"
+	ssh -o BatchMode=yes "${REMOTE_HOST}" \
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"bash /c/msys64/tmp/webview2-gtk/scripts/run-print-sample-interactive.sh\""
+}
+
+run_remote_hello_print_smoke() {
+	echo "[agent-remote-build] hello --smoke-print (interactive RDP session) on ${REMOTE_HOST}"
+	ssh -o BatchMode=yes "${REMOTE_HOST}" \
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"bash /c/msys64/tmp/webview2-gtk/scripts/run-hello-print-smoke-interactive.sh\""
 }
 
 run_remote_hidden_stack_smoke() {
@@ -202,6 +228,10 @@ print_hint() {
 		echo "--- hidden-stack-smoke.log ---"
 		cat "${ROOT}/build-remote/hidden-stack-smoke.log"
 	fi
+	if [[ -f "${ROOT}/build-remote/hello-print-smoke.log" ]]; then
+		echo "--- hello-print-smoke.log ---"
+		cat "${ROOT}/build-remote/hello-print-smoke.log"
+	fi
 }
 
 cmd="${1:-build}"
@@ -306,6 +336,34 @@ case "${cmd}" in
 		print_hint
 		exit "${build_rc}"
 		;;
+	print)
+		sync_to_windows
+		build_rc=0
+		run_remote_print_build || build_rc=$?
+		if [[ "${build_rc}" -eq 0 ]]; then
+			run_remote_print_sample || build_rc=$?
+		fi
+		ssh -o BatchMode=yes "${REMOTE_HOST}" \
+			"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cp -f /c/Users/Alan/AppData/Local/Temp/webview2gtk-print-sample.log /c/msys64/tmp/webview2-gtk/build/print-sample.log 2>/dev/null || true\"" \
+			|| true
+		pull_artifacts || true
+		print_hint
+		exit "${build_rc}"
+		;;
+	hello-print)
+		sync_to_windows
+		build_rc=0
+		run_remote_hello_print_build || build_rc=$?
+		if [[ "${build_rc}" -eq 0 ]]; then
+			run_remote_hello_print_smoke || build_rc=$?
+		fi
+		ssh -o BatchMode=yes "${REMOTE_HOST}" \
+			"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cp -f /c/Users/Alan/AppData/Local/Temp/webview2gtk-hello-print-smoke.log /c/msys64/tmp/webview2-gtk/build/hello-print-smoke.log 2>/dev/null || true\"" \
+			|| true
+		pull_artifacts || true
+		print_hint
+		exit "${build_rc}"
+		;;
 	hidden-stack)
 		sync_to_windows
 		build_rc=0
@@ -321,7 +379,7 @@ case "${cmd}" in
 		exit "${build_rc}"
 		;;
 	*)
-		echo "usage: $0 [build|sync|remote-build|pull|run|automation|automation-stack|hidden-stack|paned-insert|add-cookie|multi-host-spike]" >&2
+		echo "usage: $0 [build|sync|remote-build|pull|run|automation|automation-stack|hidden-stack|paned-insert|add-cookie|multi-host-spike|hello-print|print]" >&2
 		exit 1
 		;;
 esac

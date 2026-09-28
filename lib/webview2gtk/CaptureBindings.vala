@@ -5,7 +5,18 @@ extern bool wv2_execute_script_sync(void* host, string script_utf8, out string r
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_capture_screenshot_sync")]
 extern bool wv2_capture_screenshot_sync(void* host, bool full_document, out string devtools_json);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_print_to_pdf_sync")]
-extern bool wv2_print_to_pdf_sync(void* host, string output_path_utf8);
+extern bool wv2_print_to_pdf_sync(
+	void* host,
+	string output_path_utf8,
+	double page_width_in,
+	double page_height_in,
+	double margin_top_in,
+	double margin_bottom_in,
+	double margin_left_in,
+	double margin_right_in,
+	int landscape,
+	double scale_factor
+);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_get_cookies_sync")]
 extern bool wv2_get_cookies_sync(void* host, string? uri_utf8, out string? cookies_text);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_add_cookie_sync")]

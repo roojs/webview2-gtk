@@ -1,7 +1,7 @@
 project(
   'webview2-gtk',
   ['c', 'vala'],
-  version: '0.6.5',
+  version: '0.6.6',
   meson_version: '>= 1.0.0',
   default_options: ['buildtype=debugoptimized', 'c_std=c11'],
 )
@@ -116,11 +116,23 @@ lib_target = custom_target(
 )
 
 # Examples link the staged static lib (do not re-valac the whole widget tree).
+print_exe = custom_target(
+  'webview2gtk-print',
+  output: 'webview2gtk-print.exe',
+  command: [_build_bash, wv2gtk_build_sh, 'print', build_root / 'print', '@OUTPUT@', lib_stage],
+  depends: lib_target,
+  depend_files: files('examples/print/main.vala'),
+  build_by_default: get_option('examples'),
+  install: get_option('examples'),
+  install_dir: get_option('bindir'),
+)
+
 hello_exe = custom_target(
   'webview2gtk-hello',
   output: 'webview2gtk-hello.exe',
   command: [_build_bash, wv2gtk_build_sh, 'hello', build_root / 'hello', '@OUTPUT@', lib_stage],
   depends: lib_target,
+  depend_files: files('examples/hello/main.vala'),
   build_by_default: get_option('examples'),
   install: get_option('examples'),
   install_dir: get_option('bindir'),
@@ -202,7 +214,7 @@ custom_target(
   'package-demos',
   output: 'package-demos.stamp',
   command: [_build_bash, package_demos_sh, '@OUTPUT@'],
-  depends: [hello_exe, browser_exe, automation_exe, cdp_attach_exe, paned_insert_exe, add_cookie_exe],
+  depends: [hello_exe, browser_exe, automation_exe, cdp_attach_exe, paned_insert_exe, add_cookie_exe, print_exe],
   build_by_default: get_option('examples'),
 )
 

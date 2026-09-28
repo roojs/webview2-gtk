@@ -127,7 +127,20 @@ void vala_webview2_host_set_accept_language (const char *accept_language_utf8);
 
 bool vala_webview2_host_execute_script_sync (WebView2Host *host, const char *script_utf8, char **result_json_out);
 bool vala_webview2_host_capture_screenshot_sync (WebView2Host *host, bool full_document, char **devtools_json_out);
-bool vala_webview2_host_print_to_pdf_sync (WebView2Host *host, const char *output_path_utf8);
+/* page_width_in or page_height_in <= 0 leaves WebView2's paper default.
+ * landscape is 0 portrait / 1 landscape, used only when a page size is set.
+ * scale_factor is 1.0 at 100%; the host clamps it into 0.1–2.0. */
+bool vala_webview2_host_print_to_pdf_sync (
+	WebView2Host *host,
+	const char *output_path_utf8,
+	double page_width_in,
+	double page_height_in,
+	double margin_top_in,
+	double margin_bottom_in,
+	double margin_left_in,
+	double margin_right_in,
+	int landscape,
+	double scale_factor);
 /* uri_utf8 NULL or "" returns every cookie in the profile. */
 bool vala_webview2_host_get_cookies_sync (WebView2Host *host, const char *uri_utf8, char **cookies_text_out);
 bool vala_webview2_host_add_cookie_sync (

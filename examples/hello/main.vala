@@ -2,6 +2,7 @@
  *
  *   webview2gtk-hello.exe
  *   webview2gtk-hello.exe --smoke-policy-ignore
+ *   webview2gtk-hello.exe --smoke-print [--output PATH]
  */
 
 using Gtk;
@@ -11,11 +12,32 @@ private const string PDF_URI =
 	"https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
 
 private bool smoke_policy_ignore = false;
+private bool smoke_print = false;
+private string print_output_path;
 private int smoke_status = 1;
 private bool smoke_done = false;
 private bool html_finished = false;
+private int print_font_tries = 0;
 private Gtk.ApplicationWindow? window = null;
 private WebView? web = null;
+
+/* Bug 2026-09-28: A4 page setup + variable webfont. Today the PDF is US Letter
+ * and Roboto Flex lands as Type3. */
+private const string PRINT_HTML = """
+<!DOCTYPE html>
+<html><head>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,400;8..144,700&amp;display=swap">
+<style>
+  body { margin: 24px; }
+  .static { font-family: Arial, sans-serif; font-size: 18px; }
+  .variable { font-family: "Roboto Flex", sans-serif; font-size: 18px; font-weight: 400; }
+  .variable b { font-weight: 700; }
+</style>
+</head><body>
+<p class="static">Static Arial: The quick brown fox jumps over the lazy dog.</p>
+<p class="variable">Variable Roboto Flex: The quick brown fox jumps over the lazy dog. <b>Bold weight.</b></p>
+</body></html>
+""";
 
 private static string mime_from(Soup.MessageHeaders headers) {
 	var raw = headers.get_one("Content-Type");
@@ -174,6 +196,109 @@ private void run_smoke_policy_ignore(WebView view) {
 	});
 }
 
+private void start_print(WebView view) {
+	var page_setup = new Gtk.PageSetup();
+	page_setup.set_orientation(Gtk.PageOrientation.PORTRAIT);
+	page_setup.set_paper_size(new Gtk.PaperSize(Gtk.PAPER_NAME_A4));
+	page_setup.set_top_margin(5.0, Gtk.Unit.MM);
+	page_setup.set_bottom_margin(5.0, Gtk.Unit.MM);
+	page_setup.set_left_margin(5.0, Gtk.Unit.MM);
+	page_setup.set_right_margin(5.0, Gtk.Unit.MM);
+
+	var settings = new Gtk.PrintSettings();
+	settings.set_printer("Print to File");
+	settings.set("output-file-format", "pdf");
+	settings.set("output-uri", print_output_path);
+	settings.set_scale(100.0);
+	settings.set_print_pages(Gtk.PrintPages.ALL);
+
+	print("smoke-print output=%s paper=A4 margins=5mm scale=100\n", print_output_path);
+	var op = new WebView2Gtk.PrintOperation(view);
+	op.finished.connect(() => {
+		print("smoke-print finished %s\n", print_output_path);
+		finish_smoke(true, "");
+	});
+	op.failed.connect((err) => {
+		print("smoke-print failed: %s\n", err.message);
+		finish_smoke(false, err.message);
+	});
+	op.set_page_setup(page_setup);
+	op.set_print_settings(settings);
+	op.print();
+}
+
+private void wait_for_print_font(WebView view) {
+	view.evaluate_javascript.begin(
+		"""(function(){
+			try {
+				if (document.fonts && document.fonts.check('18px "Roboto Flex"')) {
+					return "font-ready";
+				}
+			} catch (e) {}
+			return "font-missing";
+		})()""",
+		-1, null, null, null,
+		(obj, res) => {
+			if (smoke_done) {
+				return;
+			}
+			string state = "font-missing";
+			try {
+				state = view.evaluate_javascript.end(res).to_string();
+			} catch (Error e) {
+				print("smoke-print font check: %s\n", e.message);
+			}
+			print_font_tries++;
+			print("smoke-print font %s try=%d\n", state, print_font_tries);
+			if (state == "font-ready" || print_font_tries >= 8) {
+				start_print(view);
+				return;
+			}
+			Timeout.add(500, () => {
+				if (!smoke_done) {
+					wait_for_print_font(view);
+				}
+				return Source.REMOVE;
+			});
+		}
+	);
+}
+
+private void run_smoke_print(WebView view) {
+	if (print_output_path == null || print_output_path == "") {
+		print_output_path = Path.build_filename(
+			Environment.get_tmp_dir(),
+			"webview2gtk-print-repro.pdf"
+		);
+	}
+	view.load_changed.connect((load_event) => {
+		if (load_event != LoadEvent.FINISHED || smoke_done) {
+			return;
+		}
+		print("smoke-print html FINISHED uri=%s\n", view.get_uri());
+		/* Stylesheet is in the document; the webfont file arrives after FINISHED. */
+		Timeout.add(500, () => {
+			if (!smoke_done) {
+				wait_for_print_font(view);
+			}
+			return Source.REMOVE;
+		});
+	});
+	view.load_failed.connect((load_event, failing_uri, error) => {
+		print("smoke-print load_failed %s: %s\n", failing_uri, error.message);
+		finish_smoke(false, "load_failed");
+		return true;
+	});
+	view.load_html(PRINT_HTML, "https://example.test/");
+	Timeout.add(60000, () => {
+		if (!smoke_done) {
+			print("smoke-print timeout uri=%s\n", view.get_uri());
+			finish_smoke(false, "timeout");
+		}
+		return Source.REMOVE;
+	});
+}
+
 public static int main(string[] args) {
 	string[] gtk_args = {};
 	for (var i = 0; i < args.length; i++) {
@@ -183,6 +308,15 @@ public static int main(string[] args) {
 		}
 		if (args[i] == "--smoke-policy-ignore") {
 			smoke_policy_ignore = true;
+			continue;
+		}
+		if (args[i] == "--smoke-print") {
+			smoke_print = true;
+			continue;
+		}
+		if (args[i] == "--output" && i + 1 < args.length) {
+			i++;
+			print_output_path = args[i];
 			continue;
 		}
 		gtk_args += args[i];
@@ -199,6 +333,8 @@ public static int main(string[] args) {
 		web.set_vexpand(true);
 		if (smoke_policy_ignore) {
 			run_smoke_policy_ignore(web);
+		} else if (smoke_print) {
+			run_smoke_print(web);
 		} else {
 			run_hello(web);
 		}
@@ -206,5 +342,5 @@ public static int main(string[] args) {
 		window.present();
 	});
 	app.run(gtk_args);
-	return smoke_policy_ignore ? smoke_status : 0;
+	return (smoke_policy_ignore || smoke_print) ? smoke_status : 0;
 }

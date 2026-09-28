@@ -125,7 +125,8 @@ Each GTK `WebView` owns its own WebView2 **controller**. Without the local host 
 lib/host/           WebView2 COM host
 lib/webview2gtk/    Public GTK 4 widget + Win32Atspi (Vala)
 vapi/               Bindings
-examples/hello/     Minimal demo
+examples/hello/     Minimal demo (`--smoke-print` reproduces the print bug)
+examples/print/     Static-font PDF (`--output PATH`)
 examples/browser/   Browser chrome + Win32Atspi smoke
 examples/automation/  Automation setup smoke (plan 3.0)
 examples/paned-insert/  Login → first paned insert + load_uri (blank-pane repro)

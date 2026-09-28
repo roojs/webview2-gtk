@@ -51,6 +51,48 @@ static HRESULT STDMETHODCALLTYPE print_invoke (
 	return S_OK;
 }
 
+static double
+clamp_scale_factor (double scale_factor)
+{
+	if (scale_factor < 0.1) {
+		return 0.1;
+	}
+	if (scale_factor > 2.0) {
+		return 2.0;
+	}
+	return scale_factor;
+}
+
+static void
+apply_print_settings (
+	ICoreWebView2PrintSettings *settings,
+	double page_width_in,
+	double page_height_in,
+	double margin_top_in,
+	double margin_bottom_in,
+	double margin_left_in,
+	double margin_right_in,
+	int landscape,
+	double scale_factor)
+{
+	ICoreWebView2PrintSettings_put_ShouldPrintBackgrounds (settings, TRUE);
+	ICoreWebView2PrintSettings_put_ScaleFactor (settings, clamp_scale_factor (scale_factor));
+	if (page_width_in <= 0.0 || page_height_in <= 0.0) {
+		return;
+	}
+	ICoreWebView2PrintSettings_put_PageWidth (settings, page_width_in);
+	ICoreWebView2PrintSettings_put_PageHeight (settings, page_height_in);
+	ICoreWebView2PrintSettings_put_MarginTop (settings, margin_top_in);
+	ICoreWebView2PrintSettings_put_MarginBottom (settings, margin_bottom_in);
+	ICoreWebView2PrintSettings_put_MarginLeft (settings, margin_left_in);
+	ICoreWebView2PrintSettings_put_MarginRight (settings, margin_right_in);
+	ICoreWebView2PrintSettings_put_Orientation (
+		settings,
+		landscape
+			? COREWEBVIEW2_PRINT_ORIENTATION_LANDSCAPE
+			: COREWEBVIEW2_PRINT_ORIENTATION_PORTRAIT);
+}
+
 static ICoreWebView2PrintSettings *
 create_print_settings_with_backgrounds (ICoreWebView2 *webview)
 {
@@ -84,12 +126,21 @@ create_print_settings_with_backgrounds (ICoreWebView2 *webview)
 	if (FAILED (hr) || settings == NULL) {
 		return NULL;
 	}
-	ICoreWebView2PrintSettings_put_ShouldPrintBackgrounds (settings, TRUE);
 	return settings;
 }
 
 bool
-vala_webview2_host_print_to_pdf_sync (WebView2Host *host, const char *output_path_utf8)
+vala_webview2_host_print_to_pdf_sync (
+	WebView2Host *host,
+	const char *output_path_utf8,
+	double page_width_in,
+	double page_height_in,
+	double margin_top_in,
+	double margin_bottom_in,
+	double margin_left_in,
+	double margin_right_in,
+	int landscape,
+	double scale_factor)
 {
 	ICoreWebView2 *webview;
 	ICoreWebView2_7 *webview7 = NULL;
@@ -117,6 +168,18 @@ vala_webview2_host_print_to_pdf_sync (WebView2Host *host, const char *output_pat
 	}
 
 	print_settings = create_print_settings_with_backgrounds (webview);
+	if (print_settings != NULL) {
+		apply_print_settings (
+			print_settings,
+			page_width_in,
+			page_height_in,
+			margin_top_in,
+			margin_bottom_in,
+			margin_left_in,
+			margin_right_in,
+			landscape,
+			scale_factor);
+	}
 
 	ZeroMemory (&ph, sizeof (ph));
 	ph.handler.lpVtbl = &ph.vtbl;
