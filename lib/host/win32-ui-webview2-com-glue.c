@@ -13,6 +13,7 @@
 #include "win32-ui-webview2-proxy.h"
 #include "win32-ui-webview2-sdk.h"
 #include "webview2gtk-host-api.h"
+#include "win32-ui-webview2-script-dialogs.h"
 
 void vala_webview2_host_finish_setup (
 	void *host,
@@ -406,6 +407,7 @@ vala_webview2_host_create_with_xywh (void *parent_hwnd, int x, int y, int width,
 	ZeroMemory (host, sizeof (*host));
 	host->enable_media_stream = TRUE;
 	host->enable_webrtc = TRUE;
+	host->default_script_dialogs = vala_webview2_script_dialogs_default_enabled ();
 	bounds.left = x;
 	bounds.top = y;
 	bounds.right = x + width;

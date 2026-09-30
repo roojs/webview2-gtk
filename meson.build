@@ -1,7 +1,7 @@
 project(
   'webview2-gtk',
   ['c', 'vala'],
-  version: '0.6.6',
+  version: '0.6.7',
   meson_version: '>= 1.0.0',
   default_options: ['buildtype=debugoptimized', 'c_std=c11'],
 )
@@ -74,6 +74,7 @@ lib_depend_files = files(
   'lib/webview2gtk/WebsitePolicies.vala',
   'lib/webview2gtk/Settings.vala',
   'lib/webview2gtk/PermissionRequest.vala',
+  'lib/webview2gtk/ScriptDialog.vala',
   'lib/webview2gtk/JavaScriptResult.vala',
   'lib/webview2gtk/UserContentManager.vala',
   'lib/webview2gtk/PrintOperation.vala',
@@ -95,6 +96,8 @@ lib_depend_files = files(
   'lib/host/win32-ui-webview2-downloads.c',
   'lib/host/win32-ui-webview2-web-resources.c',
   'lib/host/win32-ui-webview2-permissions.c',
+  'lib/host/win32-ui-webview2-script-dialogs.c',
+  'lib/host/win32-ui-webview2-script-dialogs.h',
   'lib/host/win32-ui-webview2-a11y.c',
   'lib/host/win32-ui-webview2-a11y-diag.c',
   'lib/host/webview2gtk-host-api.h',

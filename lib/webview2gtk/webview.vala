@@ -76,6 +76,15 @@ extern bool wv2_host_get_is_muted(void* host);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_permission_handler")]
 extern void wv2_host_set_permission_handler(void* host, void* decide, void* user_data);
 
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_script_dialog_handler")]
+extern void wv2_host_set_script_dialog_handler(void* host, void* cb, void* user_data);
+
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_default_script_dialogs_enabled")]
+extern void wv2_host_set_default_script_dialogs_enabled(void* host, bool enabled);
+
+[CCode(cheader_filename = "win32-ui-webview2-script-dialogs.h", cname = "vala_webview2_host_prepare_default_script_dialogs")]
+extern void wv2_host_prepare_default_script_dialogs(bool enabled);
+
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_event_handlers")]
 extern void wv2_host_set_event_handlers(
 	void* host,
@@ -135,6 +144,8 @@ public class WebView : Gtk.Box {
 	private Gee.HashMap<int, WebResource> resources = new Gee.HashMap<int, WebResource> ();
 	private WebInspector? inspector = null;
 	private bool muted = false;
+	/* TRUE = Edge's script dialog. FALSE once a script_dialog handler is connected. */
+	private bool script_dialog_edge_defaults = true;
 
 	/** WebKitGTK-shaped — context for this view. */
 	public WebContext web_context { owned get; construct; }
@@ -247,6 +258,30 @@ public class WebView : Gtk.Box {
 	/** WebKitGTK-shaped — emitted when navigation fails or is cancelled. */
 	public signal bool load_failed(LoadEvent load_event, string failing_uri, GLib.Error error);
 
+	/**
+	 * WebKitGTK-shaped — page ''alert'', ''confirm'', ''prompt'', or before-unload.
+	 *
+	 * Return ''true'' so Edge does not show its dialog. Confirm and before-unload
+	 * need {@link ScriptDialog.confirm_set_confirmed} or they cancel. Prompt needs
+	 * {@link ScriptDialog.prompt_set_text} or it cancels. Return ''false'' with no
+	 * handler to keep Edge's dialog. A handler that returns ''false'' gets a window
+	 * dialog instead: WebView2 only delivers this event with Edge dialogs disabled.
+	 *
+	 * == Usage Examples ==
+	 *
+	 * === Handle script dialogs ===
+	 *
+	 * {{{
+	 * web.script_dialog.connect((dialog) => {
+	 *     if (dialog.get_dialog_type() == ScriptDialogType.CONFIRM) {
+	 *         dialog.confirm_set_confirmed(true);
+	 *     }
+	 *     return true;
+	 * });
+	 * }}}
+	 */
+	public signal bool script_dialog(ScriptDialog dialog);
+
 	/** WebKitGTK-shaped — permission prompt; return true if handled. */
 	public signal bool permission_request(PermissionRequest permission_request);
 
@@ -266,6 +301,7 @@ public class WebView : Gtk.Box {
 		if (attached) {
 			Win32Atspi.Bridge.unregister(this);
 			wv2_host_set_permission_handler(host_handle, null, null);
+			wv2_host_set_script_dialog_handler(host_handle, null, null);
 			wv2_host_set_script_message_handler(host_handle, null, null);
 			user_content_manager.unbind_host(host_handle);
 			this.network_session.unbind_download_host(host_handle);
@@ -544,6 +580,7 @@ public class WebView : Gtk.Box {
 		if (!attached) {
 			return;
 		}
+		sync_script_dialog_mode();
 		this.network_session.apply_pending_cookies();
 		if (pending_html.length > 0) {
 			if (!wv2_host_is_ready(host_handle)) {
@@ -582,12 +619,17 @@ public class WebView : Gtk.Box {
 			return;
 		}
 
+		var edge_defaults = !script_dialog_handlers_connected();
+		wv2_host_prepare_default_script_dialogs(edge_defaults);
 		host_handle = wv2_host_create_with_xywh(parent_hwnd, x, y, width, height, null);
 		if (host_handle == null) {
 			warning("WebView2Gtk: create_with_xywh failed(runtime/loader missing?)");
 			return;
 		}
 		attached = true;
+		script_dialog_edge_defaults = edge_defaults;
+		wv2_host_set_script_dialog_handler(host_handle, (void*) on_script_dialog_cb, this);
+		wv2_host_set_default_script_dialogs_enabled(host_handle, edge_defaults);
 		Win32Atspi.register_webview(this);
 		this.push_media_settings(false);
 		wv2_host_set_is_muted(host_handle, this.muted);
@@ -763,6 +805,51 @@ public class WebView : Gtk.Box {
 			}
 			wv2_host_set_autoplay_policy((int) AutoplayPolicy.DENY);
 		}
+	}
+
+	private bool script_dialog_handlers_connected() {
+		var id = Signal.lookup("script-dialog", this.get_type());
+		if (id == 0) {
+			return false;
+		}
+		return Signal.has_handler_pending(this, id, 0, true);
+	}
+
+	private void sync_script_dialog_mode() {
+		if (host_handle == null) {
+			return;
+		}
+		var edge = !script_dialog_handlers_connected();
+		if (edge == script_dialog_edge_defaults) {
+			return;
+		}
+		script_dialog_edge_defaults = edge;
+		wv2_host_set_default_script_dialogs_enabled(host_handle, edge);
+	}
+
+	[CCode(has_target = false)]
+	private static int on_script_dialog_cb(
+		int kind,
+		string message,
+		string default_text,
+		int* accept_out,
+		out string? result_text,
+		void* user_data
+	) {
+		result_text = null;
+		var view = (WebView) user_data;
+		var dialog = new ScriptDialog((ScriptDialogType) kind, message, default_text);
+		if (!view.script_dialog(dialog)) {
+			return 0;
+		}
+		if (accept_out != null) {
+			*accept_out = dialog.wants_accept() ? 1 : 0;
+		}
+		var prompt = dialog.prompt_result();
+		if (prompt != null) {
+			result_text = prompt;
+		}
+		return 1;
 	}
 
 	[CCode(has_target = false)]

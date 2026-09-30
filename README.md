@@ -84,7 +84,7 @@ Full reference: **[https://roojs.github.io/webview2-gtk/](https://roojs.github.i
 
 How docs are built and marked up: [docs/code-documentation.md](docs/code-documentation.md).
 
-Names and call shapes follow **WebKitGTK 6** so shared `#if WINDOWS` sites stay small (`load_uri`, `load_changed`, cookies, downloads, automation construct props, …). WebView2Gtk-only: `ready`. Accessibility is **`Win32Atspi`**, not methods on `WebView`.
+Names and call shapes follow **WebKitGTK 6** so shared `#if WINDOWS` sites stay small (`load_uri`, `load_changed`, `script_dialog`, cookies, downloads, automation construct props, …). WebView2Gtk-only: `ready`. Accessibility is **`Win32Atspi`**, not methods on `WebView`.
 
 🚫 Public `WebView` click/type APIs are intentional omissions — fill stays with an **external** driver/CDP client ([automation.md](docs/automation.md)).
 

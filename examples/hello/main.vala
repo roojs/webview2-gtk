@@ -3,6 +3,7 @@
  *   webview2gtk-hello.exe
  *   webview2gtk-hello.exe --smoke-policy-ignore
  *   webview2gtk-hello.exe --smoke-print [--output PATH]
+ *   webview2gtk-hello.exe --smoke-script-dialog
  */
 
 using Gtk;
@@ -13,6 +14,8 @@ private const string PDF_URI =
 
 private bool smoke_policy_ignore = false;
 private bool smoke_print = false;
+private bool smoke_script_dialog = false;
+private int smoke_script_dialogs = 0;
 private string print_output_path;
 private int smoke_status = 1;
 private bool smoke_done = false;
@@ -299,6 +302,59 @@ private void run_smoke_print(WebView view) {
 	});
 }
 
+private void run_smoke_script_dialog(WebView view) {
+	view.script_dialog.connect((dialog) => {
+		var kind = dialog.get_dialog_type();
+		print("smoke-script-dialog kind=%s message=%s\n", kind.to_string(), dialog.get_message());
+		switch (kind) {
+		case ScriptDialogType.CONFIRM:
+		case ScriptDialogType.BEFORE_UNLOAD_CONFIRM:
+			dialog.confirm_set_confirmed(true);
+			break;
+		case ScriptDialogType.PROMPT:
+			print("smoke-script-dialog prompt default=%s\n", dialog.prompt_get_default_text());
+			dialog.prompt_set_text("from-host");
+			break;
+		default:
+			break;
+		}
+		smoke_script_dialogs++;
+		return true;
+	});
+	view.load_changed.connect((load_event) => {
+		if (load_event != LoadEvent.FINISHED || smoke_done) {
+			return;
+		}
+		var title = view.get_title();
+		print("smoke-script-dialog title=%s count=%d\n", title, smoke_script_dialogs);
+		var ok = smoke_script_dialogs == 3 && title == "dlg:Y:from-host";
+		finish_smoke(ok, "title=%s count=%d".printf(title, smoke_script_dialogs));
+	});
+	view.load_failed.connect((load_event, failing_uri, error) => {
+		print("smoke-script-dialog load_failed %s: %s\n", failing_uri, error.message);
+		finish_smoke(false, "load_failed");
+		return true;
+	});
+	view.load_html("""
+		<!DOCTYPE html><html><head><title>pending</title></head><body>
+		<script>
+		alert("smoke-alert");
+		var c = confirm("smoke-confirm");
+		var p = prompt("smoke-prompt", "seed");
+		document.title = "dlg:" + (c === true ? "Y" : "N") + ":" + String(p);
+		</script>
+		</body></html>
+	""", null);
+	Timeout.add(20000, () => {
+		if (!smoke_done) {
+			print("smoke-script-dialog timeout count=%d title=%s\n",
+				smoke_script_dialogs, view.get_title());
+			finish_smoke(false, "timeout");
+		}
+		return Source.REMOVE;
+	});
+}
+
 public static int main(string[] args) {
 	string[] gtk_args = {};
 	for (var i = 0; i < args.length; i++) {
@@ -312,6 +368,10 @@ public static int main(string[] args) {
 		}
 		if (args[i] == "--smoke-print") {
 			smoke_print = true;
+			continue;
+		}
+		if (args[i] == "--smoke-script-dialog") {
+			smoke_script_dialog = true;
 			continue;
 		}
 		if (args[i] == "--output" && i + 1 < args.length) {
@@ -335,6 +395,8 @@ public static int main(string[] args) {
 			run_smoke_policy_ignore(web);
 		} else if (smoke_print) {
 			run_smoke_print(web);
+		} else if (smoke_script_dialog) {
+			run_smoke_script_dialog(web);
 		} else {
 			run_hello(web);
 		}
@@ -342,5 +404,5 @@ public static int main(string[] args) {
 		window.present();
 	});
 	app.run(gtk_args);
-	return (smoke_policy_ignore || smoke_print) ? smoke_status : 0;
+	return (smoke_policy_ignore || smoke_print || smoke_script_dialog) ? smoke_status : 0;
 }

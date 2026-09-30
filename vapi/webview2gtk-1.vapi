@@ -57,6 +57,13 @@ namespace WebView2Gtk {
 		DISABLED
 	}
 
+	public enum ScriptDialogType {
+		ALERT,
+		CONFIRM,
+		PROMPT,
+		BEFORE_UNLOAD_CONFIRM
+	}
+
 	public enum PolicyDecisionType {
 		NAVIGATION_ACTION,
 		NEW_WINDOW_ACTION,
@@ -242,6 +249,15 @@ namespace WebView2Gtk {
 	}
 
 	[CCode(cheader_filename = "webview2gtk.h")]
+	public class ScriptDialog : GLib.Object {
+		public ScriptDialogType get_dialog_type();
+		public unowned string get_message();
+		public void confirm_set_confirmed(bool confirmed);
+		public unowned string prompt_get_default_text();
+		public void prompt_set_text(string text);
+	}
+
+	[CCode(cheader_filename = "webview2gtk.h")]
 	public class WebView : Gtk.Box {
 		public WebView();
 		public WebContext web_context { owned get; construct; }
@@ -259,6 +275,7 @@ namespace WebView2Gtk {
 			URIRequest request
 		);
 		public signal bool load_failed(LoadEvent load_event, string failing_uri, GLib.Error error);
+		public signal bool script_dialog(ScriptDialog dialog);
 		public signal bool permission_request(PermissionRequest permission_request);
 		public signal bool query_permission_state(PermissionStateQuery query);
 		public bool can_go_back();

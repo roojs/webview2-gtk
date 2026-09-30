@@ -259,6 +259,28 @@ void vala_webview2_host_set_permission_handler (
 	void *user_data
 );
 
+/*
+ * Script dialog callback. kind matches COREWEBVIEW2_SCRIPT_DIALOG_KIND
+ * (same order as WebKit ScriptDialogType).
+ * Return non-zero if the app handled the dialog.
+ * When handled, *accept_out is 1 to Accept (confirm / prompt / beforeunload).
+ * *result_utf8_out is a g_malloc'd prompt answer, or NULL; the host g_frees it.
+ */
+typedef int (*WebView2GtkScriptDialogCb) (
+	int kind,
+	const char *message_utf8,
+	const char *default_text_utf8,
+	int *accept_out,
+	char **result_utf8_out,
+	void *user_data
+);
+void vala_webview2_host_set_script_dialog_handler (
+	WebView2Host *host,
+	WebView2GtkScriptDialogCb cb,
+	void *user_data
+);
+void vala_webview2_host_set_default_script_dialogs_enabled (WebView2Host *host, bool enabled);
+
 #ifdef __cplusplus
 }
 #endif

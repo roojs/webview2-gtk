@@ -85,6 +85,13 @@ struct WebView2Host {
 	WebView2GtkPermissionDecideCb cb_perm_decide;
 	void *perm_ctx;
 
+	/* Script dialogs. default_script_dialogs TRUE = Edge's own modal. */
+	BOOL script_dlg_registered;
+	EventRegistrationToken tok_script_dlg;
+	BOOL default_script_dialogs;
+	WebView2GtkScriptDialogCb cb_script_dlg;
+	void *script_dlg_ctx;
+
 	/* Apply queued cookies before first Navigate (add_cookie-before-attach). */
 	WebView2GtkCookieApplyCb cb_cookie_apply;
 	void *cookie_apply_ctx;

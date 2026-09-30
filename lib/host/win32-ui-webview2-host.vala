@@ -117,6 +117,8 @@ public void finish_setup(
 	 * BasicAuthenticationRequested must be attached before Navigate so a
 	 * 407 from the local host proxy can carry the view id. */
 	host_apply_pending_cookies(host);
+	/* Before the first Navigate, so AreDefaultScriptDialogsEnabled applies to this document. */
+	script_dialogs_register(host);
 	events_register(host);
 	host_flush_pending_navigate(host);
 	document_response_register(host);
@@ -137,6 +139,7 @@ public void destroy(void* host) {
 		downloads_unregister(host);
 		web_resources_unregister(host);
 		permissions_unregister(host);
+		script_dialogs_unregister(host);
 		events_unregister(host);
 	}
 	com_release_host(host);
@@ -163,6 +166,9 @@ extern void web_resources_register(void* host);
 [CCode(cheader_filename = "win32-ui-webview2-permissions.h", cname = "vala_webview2_permissions_register_host")]
 extern void permissions_register(void* host);
 
+[CCode(cheader_filename = "win32-ui-webview2-script-dialogs.h", cname = "vala_webview2_script_dialogs_register_host")]
+extern void script_dialogs_register(void* host);
+
 [CCode(cheader_filename = "win32-ui-webview2-a11y-diag.h", cname = "vala_webview2_a11y_diag_register")]
 extern void a11y_diag_register(ICoreWebView2 webview);
 
@@ -180,5 +186,8 @@ extern void web_resources_unregister(void* host);
 
 [CCode(cheader_filename = "win32-ui-webview2-permissions.h", cname = "vala_webview2_permissions_unregister_host")]
 extern void permissions_unregister(void* host);
+
+[CCode(cheader_filename = "win32-ui-webview2-script-dialogs.h", cname = "vala_webview2_script_dialogs_unregister_host")]
+extern void script_dialogs_unregister(void* host);
 
 }
