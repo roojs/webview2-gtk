@@ -92,10 +92,6 @@ prompt_wndproc (HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	switch (msg) {
 	case WM_CREATE: {
 		CREATESTRUCTW *cs = (CREATESTRUCTW *) lp;
-		HFONT font = (HFONT) GetStockObject (DEFAULT_GUI_FONT);
-		HWND label;
-		HWND ok;
-		HWND cancel;
 		LPCWSTR text;
 		LPCWSTR initial;
 
@@ -103,31 +99,27 @@ prompt_wndproc (HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 		SetWindowLongPtrW (hwnd, GWLP_USERDATA, (LONG_PTR) box);
 		text = (box != NULL && box->message != NULL) ? box->message : L"";
 		initial = (box != NULL && box->initial != NULL) ? box->initial : L"";
-		label = CreateWindowExW (0, L"STATIC", text,
-		                          WS_CHILD | WS_VISIBLE | SS_LEFT,
-		                          12, 12, 400, 52,
-		                          hwnd, NULL, NULL, NULL);
+		CreateWindowExW (0, L"STATIC", text,
+		                 WS_CHILD | WS_VISIBLE | SS_LEFT,
+		                 12, 12, 400, 52,
+		                 hwnd, NULL, NULL, NULL);
 		if (box != NULL) {
 			box->edit = CreateWindowExW (WS_EX_CLIENTEDGE, L"EDIT", initial,
 			                              WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL | ES_LEFT,
 			                              12, 70, 400, 24,
 			                              hwnd, (HMENU) (INT_PTR) PROMPT_EDIT, NULL, NULL);
+			if (box->edit != NULL) {
+				SendMessageW (box->edit, EM_SETSEL, 0, -1);
+			}
 		}
-		ok = CreateWindowExW (0, L"BUTTON", L"OK",
-		                       WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
-		                       228, 108, 88, 26,
-		                       hwnd, (HMENU) (INT_PTR) PROMPT_OK, NULL, NULL);
-		cancel = CreateWindowExW (0, L"BUTTON", L"Cancel",
-		                           WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-		                           324, 108, 88, 26,
-		                           hwnd, (HMENU) (INT_PTR) PROMPT_CANCEL, NULL, NULL);
-		SendMessageW (label, WM_SETFONT, (WPARAM) font, TRUE);
-		if (box != NULL && box->edit != NULL) {
-			SendMessageW (box->edit, WM_SETFONT, (WPARAM) font, TRUE);
-			SendMessageW (box->edit, EM_SETSEL, 0, -1);
-		}
-		SendMessageW (ok, WM_SETFONT, (WPARAM) font, TRUE);
-		SendMessageW (cancel, WM_SETFONT, (WPARAM) font, TRUE);
+		CreateWindowExW (0, L"BUTTON", L"OK",
+		                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
+		                 228, 108, 88, 26,
+		                 hwnd, (HMENU) (INT_PTR) PROMPT_OK, NULL, NULL);
+		CreateWindowExW (0, L"BUTTON", L"Cancel",
+		                 WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+		                 324, 108, 88, 26,
+		                 hwnd, (HMENU) (INT_PTR) PROMPT_CANCEL, NULL, NULL);
 		return 0;
 	}
 	case DM_GETDEFID:
