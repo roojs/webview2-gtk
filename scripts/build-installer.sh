@@ -26,9 +26,9 @@ fi
 WIN_SRC="$(cygpath -aw "${STAGE}")"
 OUT_EXE="$(cygpath -aw "${ROOT}/webview2gtk-setup.exe")"
 
-# NSIS 3.12+ (TARGET_ARCH=amd64) looks in Plugins/amd64-unicode. The MSYS2
-# package still ships nsDialogs.dll under Plugins/unicode, so the default
-# plug-in list is empty and MUI_PAGE_WELCOME fails.
+# MSYS2 ships nsDialogs.dll under Plugins/unicode. NSIS 3.12 looks in
+# Plugins/amd64-unicode unless the script adds the real directory for the
+# active target. Without that, MUI_PAGE_WELCOME cannot call nsDialogs.
 PLUGIN_DIR=""
 if [[ -n "${MINGW_PREFIX:-}" ]]; then
 	for candidate in \
@@ -37,7 +37,9 @@ if [[ -n "${MINGW_PREFIX:-}" ]]; then
 		"${MINGW_PREFIX}/share/nsis/Plugins/unicode"
 	do
 		if [[ -f "${candidate}/nsDialogs.dll" ]]; then
-			PLUGIN_DIR="$(cygpath -aw "${candidate}")"
+			# Forward slashes: a Windows path through _temp contains \t, which
+			# some NSIS string handling treats as a tab.
+			PLUGIN_DIR="$(cygpath -m "${candidate}")"
 			break
 		fi
 	done
