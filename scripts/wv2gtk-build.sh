@@ -104,7 +104,7 @@ CC_QUIET=(
 	-Wno-implicit-function-declaration
 )
 
-WEBVIEW2_LINK=( -lole32 -luuid -lshell32 -ladvapi32 -loleaut32 -luiautomationcore -lwinhttp -lshlwapi )
+WEBVIEW2_LINK=( -lole32 -luuid -lshell32 -ladvapi32 -loleaut32 -luiautomationcore -lwinhttp -lshlwapi -luser32 )
 GTK_CFLAGS="$(pkg-config --cflags gtk4 libsoup-3.0 gee-0.8)"
 GTK_LIBS="$(pkg-config --libs gtk4 libsoup-3.0 gee-0.8)"
 

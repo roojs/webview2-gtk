@@ -56,8 +56,11 @@ public class NetworkSession : Object {
 
 	/**
 	 * WebKitGTK-shaped — ''data_directory'' / ''cache_directory'' are
-	 * accepted for API parity and ignored on Windows (WebView2 user-data
-	 * is per view).
+	 * accepted for API parity. On Windows the host picks the profile: the
+	 * interactive user's LocalAppData (''webview2gtk\shared'', or
+	 * ''webview2gtk\profiles\wv_*'' once the local host proxy is on). An
+	 * elevated process does not use the administrator profile. These two
+	 * arguments are not that path.
 	 */
 	public NetworkSession(string? data_directory = null, string? cache_directory = null) {
 		this.cookie_manager = new CookieManager(this);

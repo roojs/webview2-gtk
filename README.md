@@ -114,7 +114,7 @@ Same “set before first attach” class as proxy (not live mid-session toggles 
 
 ### Process / profile scope
 
-Each GTK `WebView` owns its own WebView2 **controller**. Without the local host proxy they share one **Environment** (cookie profile and CDP stay process-scoped). After `CUSTOM` starts the local host proxy, each view has its own Environment and `%LOCALAPPDATA%\webview2gtk\profiles\wv_<pid>_<tick>_<id>` folder (unique per process so a leftover browser cannot lock the next launch); TEXT cookie jars stay session-level.
+Each GTK `WebView` owns its own WebView2 **controller**. Without the local host proxy they share one **Environment** (cookie profile and CDP stay process-scoped) under the interactive user's `%LOCALAPPDATA%\webview2gtk\shared`. After `CUSTOM` starts the local host proxy, each view has its own Environment and `%LOCALAPPDATA%\webview2gtk\profiles\wv_<pid>_<tick>_<id>` folder (unique per process so a leftover browser cannot lock the next launch); TEXT cookie jars stay session-level. An elevated host uses that interactive profile, not the administrator's.
 
 `CookieManager.set_persistent_storage(SQLITE)` is not supported (`GLib.error`); `TEXT` path jars work. Page-driven Set-Cookie is not mirrored into `CookieManager.changed` the way a full WebKit jar observer might.
 

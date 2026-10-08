@@ -1,7 +1,7 @@
 project(
   'webview2-gtk',
   ['c', 'vala'],
-  version: '0.6.7',
+  version: '0.6.8',
   meson_version: '>= 1.0.0',
   default_options: ['buildtype=debugoptimized', 'c_std=c11'],
 )
