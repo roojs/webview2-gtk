@@ -29,6 +29,13 @@ Unicode true
 !define PRODUCT_WEB_SITE "https://github.com/webview2-gtk/webview2-gtk"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\webview2-gtk"
 
+; MSYS2 NSIS keeps plug-ins in Plugins/unicode. Register that directory
+; before MUI_PAGE_WELCOME, which calls nsDialogs::Create.
+!ifdef PLUGIN_DIR
+  !addplugindir /x86-unicode "${PLUGIN_DIR}"
+  !addplugindir /amd64-unicode "${PLUGIN_DIR}"
+!endif
+
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES

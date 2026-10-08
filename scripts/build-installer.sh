@@ -25,10 +25,33 @@ fi
 
 WIN_SRC="$(cygpath -aw "${STAGE}")"
 OUT_EXE="$(cygpath -aw "${ROOT}/webview2gtk-setup.exe")"
+
+# NSIS 3.12+ (TARGET_ARCH=amd64) looks in Plugins/amd64-unicode. The MSYS2
+# package still ships nsDialogs.dll under Plugins/unicode, so the default
+# plug-in list is empty and MUI_PAGE_WELCOME fails.
+PLUGIN_DIR=""
+if [[ -n "${MINGW_PREFIX:-}" ]]; then
+	for candidate in \
+		"${MINGW_PREFIX}/share/nsis/Plugins/amd64-unicode" \
+		"${MINGW_PREFIX}/share/nsis/Plugins/x86-unicode" \
+		"${MINGW_PREFIX}/share/nsis/Plugins/unicode"
+	do
+		if [[ -f "${candidate}/nsDialogs.dll" ]]; then
+			PLUGIN_DIR="$(cygpath -aw "${candidate}")"
+			break
+		fi
+	done
+fi
+
 cd "${ROOT}"
-makensis \
-	-DINST_SRC="${WIN_SRC}" \
-	-DPRODUCT_VERSION="${VERSION}" \
-	-DOUTFILE="${OUT_EXE}" \
-	packaging/webview2gtk.nsi
+makensis_args=(
+	-DINST_SRC="${WIN_SRC}"
+	-DPRODUCT_VERSION="${VERSION}"
+	-DOUTFILE="${OUT_EXE}"
+)
+if [[ -n "${PLUGIN_DIR}" ]]; then
+	echo "build-installer: NSIS plugins ${PLUGIN_DIR}"
+	makensis_args+=(-DPLUGIN_DIR="${PLUGIN_DIR}")
+fi
+makensis "${makensis_args[@]}" packaging/webview2gtk.nsi
 echo "build-installer: ${ROOT}/webview2gtk-setup.exe"
