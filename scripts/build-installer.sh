@@ -26,34 +26,10 @@ fi
 WIN_SRC="$(cygpath -aw "${STAGE}")"
 OUT_EXE="$(cygpath -aw "${ROOT}/webview2gtk-setup.exe")"
 
-# MSYS2 ships nsDialogs.dll under Plugins/unicode. NSIS 3.12 looks in
-# Plugins/amd64-unicode unless the script adds the real directory for the
-# active target. Without that, MUI_PAGE_WELCOME cannot call nsDialogs.
-PLUGIN_DIR=""
-if [[ -n "${MINGW_PREFIX:-}" ]]; then
-	for candidate in \
-		"${MINGW_PREFIX}/share/nsis/Plugins/amd64-unicode" \
-		"${MINGW_PREFIX}/share/nsis/Plugins/x86-unicode" \
-		"${MINGW_PREFIX}/share/nsis/Plugins/unicode"
-	do
-		if [[ -f "${candidate}/nsDialogs.dll" ]]; then
-			# Forward slashes: a Windows path through _temp contains \t, which
-			# some NSIS string handling treats as a tab.
-			PLUGIN_DIR="$(cygpath -m "${candidate}")"
-			break
-		fi
-	done
-fi
-
 cd "${ROOT}"
-makensis_args=(
-	-DINST_SRC="${WIN_SRC}"
-	-DPRODUCT_VERSION="${VERSION}"
-	-DOUTFILE="${OUT_EXE}"
-)
-if [[ -n "${PLUGIN_DIR}" ]]; then
-	echo "build-installer: NSIS plugins ${PLUGIN_DIR}"
-	makensis_args+=(-DPLUGIN_DIR="${PLUGIN_DIR}")
-fi
-makensis "${makensis_args[@]}" packaging/webview2gtk.nsi
+makensis \
+	-DINST_SRC="${WIN_SRC}" \
+	-DPRODUCT_VERSION="${VERSION}" \
+	-DOUTFILE="${OUT_EXE}" \
+	packaging/webview2gtk.nsi
 echo "build-installer: ${ROOT}/webview2gtk-setup.exe"

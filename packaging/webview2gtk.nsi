@@ -6,6 +6,12 @@
 ;
 ; Or: ./scripts/build-installer.sh dist/webview2gtk
 
+; MSYS2 NSIS 3.13 is a 64-bit makensis whose default installer target is
+; x86-unicode. Plug-ins in Plugins/unicode are 64-bit, so that target ignores
+; them and MUI_PAGE_WELCOME cannot call nsDialogs. amd64-unicode matches the
+; DLLs and the stubs this package ships.
+Target amd64-unicode
+
 !include "MUI2.nsh"
 
 Name "webview2-gtk"
@@ -28,12 +34,6 @@ Unicode true
 !define PRODUCT_PUBLISHER "webview2-gtk"
 !define PRODUCT_WEB_SITE "https://github.com/webview2-gtk/webview2-gtk"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\webview2-gtk"
-
-; MSYS2 NSIS keeps plug-ins in Plugins/unicode, not Plugins/amd64-unicode.
-; Register that directory for the active target before MUI_PAGE_WELCOME.
-!ifdef PLUGIN_DIR
-  !addplugindir "${PLUGIN_DIR}"
-!endif
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
