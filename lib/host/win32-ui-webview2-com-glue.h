@@ -33,7 +33,7 @@ void vala_webview2_host_apply_pending_cookies (WebView2Host *host);
 
 BOOL vala_webview2_com_begin_host (WebView2Host *host, HWND parent, LPCWSTR url, const RECT *bounds);
 
-void vala_webview2_com_present_webview (HWND parent);
+void vala_webview2_com_present_webview (WebView2Host *host);
 
 void vala_webview2_com_release_host (WebView2Host *host);
 

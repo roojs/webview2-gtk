@@ -47,29 +47,43 @@ ensure_parent_clip_styles (HWND parent)
 	}
 }
 
-static BOOL CALLBACK
-raise_webview_child_proc (HWND hwnd, LPARAM lparam)
+static BOOL
+bounds_equal (const RECT *a, const RECT *b)
 {
-	wchar_t cls[64];
+	return a->left == b->left
+		&& a->top == b->top
+		&& a->right == b->right
+		&& a->bottom == b->bottom;
+}
 
-	(void) lparam;
-	if (GetClassNameW (hwnd, cls, 64) <= 0) {
-		return TRUE;
+static BOOL
+controller_is_visible (WebView2Host *host)
+{
+	BOOL visible = FALSE;
+
+	if (host->controller == NULL) {
+		return FALSE;
 	}
-	if (wcsstr (cls, L"Chrome") != NULL || wcsstr (cls, L"WebView") != NULL) {
-		SetWindowPos (hwnd, HWND_TOP, 0, 0, 0, 0,
-		              SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+	if (FAILED (ICoreWebView2Controller_get_IsVisible (host->controller, &visible))) {
+		return FALSE;
 	}
-	return TRUE;
+	return visible ? TRUE : FALSE;
 }
 
 void
-vala_webview2_com_present_webview (HWND parent)
+vala_webview2_com_present_webview (WebView2Host *host)
 {
-	if (parent == NULL) {
+	/* Raise this controller's Chrome child only. Raising every Chrome
+	 * sibling under the shared toplevel covers GTK overlays each frame. */
+	if (host == NULL || host->parent == NULL) {
 		return;
 	}
-	EnumChildWindows (parent, raise_webview_child_proc, 0);
+	vala_webview2_host_note_visible_hwnd (host);
+	if (host->a11y_hwnd == NULL || !IsWindow (host->a11y_hwnd)) {
+		return;
+	}
+	SetWindowPos (host->a11y_hwnd, HWND_TOP, 0, 0, 0, 0,
+	              SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
 typedef struct EnvCompletedHandler {
@@ -191,7 +205,7 @@ static HRESULT STDMETHODCALLTYPE controller_handler_invoke (
 		if (FAILED (hr)) {
 			fprintf (stderr, "WebView2 put_Bounds failed: 0x%08lx\n", (unsigned long) hr);
 		}
-		vala_webview2_com_present_webview (host->parent);
+		vala_webview2_com_present_webview (host);
 	}
 	if (host->url[0] != L'\0') {
 		hr = ICoreWebView2_Navigate (host->webview, host->url);
@@ -432,14 +446,20 @@ vala_webview2_host_set_bounds_xywh (WebView2Host *host, int x, int y, int width,
 	bounds.top = y;
 	bounds.right = x + width;
 	bounds.bottom = y + height;
+	/* Frame tick pushes the same rectangle forever. Skip put_Bounds and
+	 * present once the controller is on screen at that rectangle. */
+	if (bounds_equal (&bounds, &host->bounds) && controller_is_visible (host)) {
+		return;
+	}
 	host->bounds = bounds;
 	host->use_client_bounds = FALSE;
 	if (host->controller != NULL) {
 		ICoreWebView2Controller_put_Bounds (host->controller, bounds);
 		if (host->host_visible) {
-			vala_webview2_com_present_webview (host->parent);
+			vala_webview2_com_present_webview (host);
+		} else {
+			vala_webview2_host_note_visible_hwnd (host);
 		}
-		vala_webview2_host_note_visible_hwnd (host);
 	}
 }
 

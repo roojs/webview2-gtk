@@ -17,7 +17,7 @@ namespace Win32.Ui.WebView {
 extern void com_release_host(void* host);
 
 [CCode(cheader_filename = "win32-ui-webview2-com-glue.h", cname = "vala_webview2_com_present_webview")]
-extern void com_present_webview([CCode(type_id = "HWND")] void* parent);
+extern void com_present_webview(void* host);
 
 [CCode(cheader_filename = "win32-ui-webview2-com-glue.h", cname = "vala_webview2_com_get_webview_for")]
 extern void* com_get_webview_for(void* host);
@@ -111,7 +111,7 @@ public void finish_setup(
 		stderr.printf("WebView2 put_is_visible failed: 0x%08x\n", (uint) vis);
 	}
 	if (parent != null) {
-		com_present_webview(parent);
+		com_present_webview(host);
 	}
 	/* Queued cookies must land in COM before the first Navigate.
 	 * BasicAuthenticationRequested must be attached before Navigate so a
