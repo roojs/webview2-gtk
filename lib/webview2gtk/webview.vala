@@ -650,8 +650,9 @@ public class WebView : Gtk.Box {
 		if (!attached) {
 			try_attach();
 		} else {
-			push_bounds();
-			/* Host ready is async — retry pending HTML / URI once COM is up. */
+			/* Host ready is async — retry pending HTML / URI once COM is up.
+			 * Bounds stay on size_allocate / map / opacity. Pushing them here
+			 * restacks the Chrome child over a GTK overlay. */
 			try_navigate();
 		}
 		return Source.CONTINUE;

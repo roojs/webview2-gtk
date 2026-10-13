@@ -47,27 +47,28 @@ ensure_parent_clip_styles (HWND parent)
 	}
 }
 
-static BOOL
-bounds_equal (const RECT *a, const RECT *b)
+/* Hidden hosts sit at about -30000. A real monitor is nowhere near that. */
+#define WV2_PARKED_COORD (-20000)
+
+static LONG
+rect_delta (LONG a, LONG b)
 {
-	return a->left == b->left
-		&& a->top == b->top
-		&& a->right == b->right
-		&& a->bottom == b->bottom;
+	return a > b ? a - b : b - a;
 }
 
 static BOOL
-controller_is_visible (WebView2Host *host)
+bounds_within (const RECT *a, const RECT *b, LONG slack)
 {
-	BOOL visible = FALSE;
+	return rect_delta (a->left, b->left) <= slack
+		&& rect_delta (a->top, b->top) <= slack
+		&& rect_delta (a->right, b->right) <= slack
+		&& rect_delta (a->bottom, b->bottom) <= slack;
+}
 
-	if (host->controller == NULL) {
-		return FALSE;
-	}
-	if (FAILED (ICoreWebView2Controller_get_IsVisible (host->controller, &visible))) {
-		return FALSE;
-	}
-	return visible ? TRUE : FALSE;
+static BOOL
+bounds_are_parked (const RECT *r)
+{
+	return r->left <= WV2_PARKED_COORD || r->top <= WV2_PARKED_COORD;
 }
 
 void
@@ -438,6 +439,8 @@ void
 vala_webview2_host_set_bounds_xywh (WebView2Host *host, int x, int y, int width, int height)
 {
 	RECT bounds;
+	BOOL was_parked;
+	BOOL now_on_screen;
 
 	if (host == NULL) {
 		return;
@@ -446,16 +449,21 @@ vala_webview2_host_set_bounds_xywh (WebView2Host *host, int x, int y, int width,
 	bounds.top = y;
 	bounds.right = x + width;
 	bounds.bottom = y + height;
-	/* Frame tick pushes the same rectangle forever. Skip put_Bounds and
-	 * present once the controller is on screen at that rectangle. */
-	if (bounds_equal (&bounds, &host->bounds) && controller_is_visible (host)) {
+	/* widget_bounds rounds a .5 fraction onto the neighbour pixel. Once a
+	 * rectangle has been stored, ignore that 1px wobble. Do not query
+	 * IsVisible: a failed get would restack a view that is already shown. */
+	if (bounds_within (&bounds, &host->bounds, 1)) {
 		return;
 	}
+	was_parked = bounds_are_parked (&host->bounds);
+	now_on_screen = !bounds_are_parked (&bounds);
 	host->bounds = bounds;
 	host->use_client_bounds = FALSE;
 	if (host->controller != NULL) {
 		ICoreWebView2Controller_put_Bounds (host->controller, bounds);
-		if (host->host_visible) {
+		/* Raise only when leaving the off-screen park. A resize of a view
+		 * already on screen is put_Bounds alone — HWND_TOP covers GTK. */
+		if (was_parked && now_on_screen && host->host_visible) {
 			vala_webview2_com_present_webview (host);
 		} else {
 			vala_webview2_host_note_visible_hwnd (host);
