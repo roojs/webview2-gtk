@@ -1,4 +1,4 @@
-/* Sync Page.captureScreenshot via DevTools protocol — used by get_snapshot. */
+/* Sync DevTools calls: Page.captureScreenshot (get_snapshot) and Page.reload. */
 
 #define COBJMACROS
 #define WIN32_LEAN_AND_MEAN
@@ -13,6 +13,7 @@
 
 typedef struct {
 	volatile LONG done;
+	HRESULT error;
 	char *json;
 	ICoreWebView2CallDevToolsProtocolMethodCompletedHandler handler;
 	ICoreWebView2CallDevToolsProtocolMethodCompletedHandlerVtbl vtbl;
@@ -47,6 +48,7 @@ static HRESULT STDMETHODCALLTYPE devtools_invoke (
 	LPCWSTR return_object_as_json)
 {
 	DevToolsHandler *dh = CONTAINING_RECORD (This, DevToolsHandler, handler);
+	dh->error = error_code;
 	if (SUCCEEDED (error_code) && return_object_as_json != NULL) {
 		int len = 0;
 		while (return_object_as_json[len] != L'\0') {
@@ -105,6 +107,40 @@ vala_webview2_host_capture_screenshot_sync (WebView2Host *host, bool full_docume
 		*devtools_json_out = dh.json;
 	} else {
 		free (dh.json);
+	}
+	return true;
+}
+
+/* Shift-reload. Page.reload's completion is the CDP ack, not load-finished. */
+bool
+vala_webview2_host_reload_bypass_cache (WebView2Host *host)
+{
+	ICoreWebView2 *webview;
+	DevToolsHandler dh;
+	HRESULT hr;
+
+	webview = vala_webview2_com_get_webview_for (host);
+	if (webview == NULL) {
+		return false;
+	}
+
+	ZeroMemory (&dh, sizeof (dh));
+	dh.handler.lpVtbl = &dh.vtbl;
+	dh.vtbl.QueryInterface = devtools_qi;
+	dh.vtbl.AddRef = devtools_addref;
+	dh.vtbl.Release = devtools_release;
+	dh.vtbl.Invoke = devtools_invoke;
+
+	hr = ICoreWebView2_CallDevToolsProtocolMethod (
+		webview, L"Page.reload", L"{\"ignoreCache\":true}", &dh.handler);
+	if (FAILED (hr)) {
+		return SUCCEEDED (ICoreWebView2_Reload (webview));
+	}
+
+	vala_webview2_com_sync_await (&dh.done);
+	free (dh.json);
+	if (FAILED (dh.error)) {
+		return SUCCEEDED (ICoreWebView2_Reload (webview));
 	}
 	return true;
 }

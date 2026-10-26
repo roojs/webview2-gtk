@@ -24,6 +24,8 @@ bool vala_webview2_host_is_ready (WebView2Host *host);
 bool vala_webview2_host_go_back (WebView2Host *host);
 bool vala_webview2_host_go_forward (WebView2Host *host);
 bool vala_webview2_host_reload (WebView2Host *host);
+/* DevTools Page.reload ignoreCache; falls back to Reload if that call fails. */
+bool vala_webview2_host_reload_bypass_cache (WebView2Host *host);
 bool vala_webview2_host_stop (WebView2Host *host);
 bool vala_webview2_host_get_can_go_back (WebView2Host *host);
 bool vala_webview2_host_get_can_go_forward (WebView2Host *host);

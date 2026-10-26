@@ -38,6 +38,8 @@ extern bool wv2_host_go_back(void* host);
 extern bool wv2_host_go_forward(void* host);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_reload")]
 extern bool wv2_host_reload(void* host);
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_reload_bypass_cache")]
+extern bool wv2_host_reload_bypass_cache(void* host);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_stop")]
 extern bool wv2_host_stop(void* host);
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_get_can_go_back")]
@@ -373,8 +375,7 @@ public class WebView : Gtk.Box {
 	}
 
 	public void reload_bypass_cache() {
-		/* WebView2 has no WebKit-style cache bypass; reload is the closest match. */
-		wv2_host_reload(host_handle);
+		wv2_host_reload_bypass_cache(host_handle);
 	}
 
 	public void stop_loading() {
