@@ -31,6 +31,16 @@ cd /d C:\\msys64\\tmp\\webview2-gtk\\portable-demos
 set G_MESSAGES_DEBUG=all
 set "FONTCONFIG_FILE=%~dp0etc\\fonts\\fonts.conf"
 set "XDG_DATA_DIRS=%~dp0share"
+EOF
+	if [[ "${flag}" == "--smoke-reload-bypass" ]]; then
+		: "${WV2GTK_TEST_URI:?set WV2GTK_TEST_URI}"
+		: "${WV2GTK_TEST_PROXY:?set WV2GTK_TEST_PROXY}"
+		cat >> "${bat}" << EOF
+set "WV2GTK_TEST_URI=${WV2GTK_TEST_URI}"
+set "WV2GTK_TEST_PROXY=${WV2GTK_TEST_PROXY}"
+EOF
+	fi
+	cat >> "${bat}" << EOF
 echo starting > "%LOG%"
 webview2gtk-add-cookie.exe ${flag} >> "%LOG%" 2>&1
 echo exit=%ERRORLEVEL% >> "%LOG%"
@@ -68,6 +78,7 @@ LOG_PERSIST=/c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-persist-smok
 LOG_PROXY=/c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-proxy-smoke.log
 LOG_PROXY_DIRECT=/c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-proxy-direct-smoke.log
 LOG_PROXY_LATE=/c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-proxy-late-smoke.log
+LOG_RELOAD_BYPASS=/c/Users/Alan/AppData/Local/Temp/webview2gtk-add-cookie-reload-bypass-smoke.log
 fail=0
 if [[ "${1:-}" == "--smoke-proxy-direct" ]]; then
 	run_one --smoke-proxy-direct WebView2GtkAddCookieProxyDirectSmoke "${LOG_PROXY_DIRECT}" \
@@ -80,6 +91,9 @@ elif [[ "${1:-}" == "--smoke-proxy" ]]; then
 elif [[ "${1:-}" == "--smoke-proxy-late" ]]; then
 	run_one --smoke-proxy-late WebView2GtkAddCookieProxyLateSmoke "${LOG_PROXY_LATE}" \
 		"${OUT_DIR}/run-add-cookie-proxy-late-smoke.bat" 50 || fail=1
+elif [[ "${1:-}" == "--smoke-reload-bypass" ]]; then
+	run_one --smoke-reload-bypass WebView2GtkAddCookieReloadBypassSmoke "${LOG_RELOAD_BYPASS}" \
+		"${OUT_DIR}/run-add-cookie-reload-bypass-smoke.bat" 75 || fail=1
 else
 	run_one --smoke WebView2GtkAddCookieSmoke "${LOG_ATTACH}" \
 		"${OUT_DIR}/run-add-cookie-smoke.bat" || fail=1

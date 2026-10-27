@@ -1,4 +1,4 @@
-/* Sync DevTools calls: Page.captureScreenshot (get_snapshot) and Page.reload. */
+/* DevTools calls: synchronous Page.captureScreenshot and asynchronous Page.reload. */
 
 #define COBJMACROS
 #define WIN32_LEAN_AND_MEAN
@@ -19,7 +19,17 @@ typedef struct {
 	ICoreWebView2CallDevToolsProtocolMethodCompletedHandlerVtbl vtbl;
 } DevToolsHandler;
 
-static HRESULT STDMETHODCALLTYPE devtools_qi (void *This, REFIID riid, void **ppv)
+typedef struct {
+	ICoreWebView2CallDevToolsProtocolMethodCompletedHandler handler;
+	ICoreWebView2CallDevToolsProtocolMethodCompletedHandlerVtbl vtbl;
+	LONG ref_count;
+	ICoreWebView2 *webview;
+} ReloadHandler;
+
+static HRESULT STDMETHODCALLTYPE devtools_qi (
+	ICoreWebView2CallDevToolsProtocolMethodCompletedHandler *This,
+	REFIID riid,
+	void **ppv)
 {
 	if (IsEqualIID (riid, &IID_IUnknown)
 	    || IsEqualIID (riid, &IID_ICoreWebView2CallDevToolsProtocolMethodCompletedHandler)) {
@@ -30,13 +40,15 @@ static HRESULT STDMETHODCALLTYPE devtools_qi (void *This, REFIID riid, void **pp
 	return E_NOINTERFACE;
 }
 
-static ULONG STDMETHODCALLTYPE devtools_addref (void *This)
+static ULONG STDMETHODCALLTYPE devtools_addref (
+	ICoreWebView2CallDevToolsProtocolMethodCompletedHandler *This)
 {
 	(void) This;
 	return 2;
 }
 
-static ULONG STDMETHODCALLTYPE devtools_release (void *This)
+static ULONG STDMETHODCALLTYPE devtools_release (
+	ICoreWebView2CallDevToolsProtocolMethodCompletedHandler *This)
 {
 	(void) This;
 	return 1;
@@ -58,6 +70,57 @@ static HRESULT STDMETHODCALLTYPE devtools_invoke (
 			(uint16_t *) return_object_as_json, len + 1);
 	}
 	InterlockedExchange (&dh->done, 1);
+	return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE reload_qi (
+	ICoreWebView2CallDevToolsProtocolMethodCompletedHandler *This,
+	REFIID riid,
+	void **ppv)
+{
+	ReloadHandler *rh = CONTAINING_RECORD (This, ReloadHandler, handler);
+
+	if (IsEqualIID (riid, &IID_IUnknown)
+	    || IsEqualIID (riid, &IID_ICoreWebView2CallDevToolsProtocolMethodCompletedHandler)) {
+		*ppv = This;
+		InterlockedIncrement (&rh->ref_count);
+		return S_OK;
+	}
+	*ppv = NULL;
+	return E_NOINTERFACE;
+}
+
+static ULONG STDMETHODCALLTYPE reload_addref (
+	ICoreWebView2CallDevToolsProtocolMethodCompletedHandler *This)
+{
+	ReloadHandler *rh = CONTAINING_RECORD (This, ReloadHandler, handler);
+	return (ULONG) InterlockedIncrement (&rh->ref_count);
+}
+
+static ULONG STDMETHODCALLTYPE reload_release (
+	ICoreWebView2CallDevToolsProtocolMethodCompletedHandler *This)
+{
+	ReloadHandler *rh = CONTAINING_RECORD (This, ReloadHandler, handler);
+	LONG count = InterlockedDecrement (&rh->ref_count);
+
+	if (count == 0) {
+		ICoreWebView2_Release (rh->webview);
+		CoTaskMemFree (rh);
+	}
+	return (ULONG) count;
+}
+
+static HRESULT STDMETHODCALLTYPE reload_invoke (
+	ICoreWebView2CallDevToolsProtocolMethodCompletedHandler *This,
+	HRESULT error_code,
+	LPCWSTR return_object_as_json)
+{
+	ReloadHandler *rh = CONTAINING_RECORD (This, ReloadHandler, handler);
+
+	(void) return_object_as_json;
+	if (FAILED (error_code)) {
+		ICoreWebView2_Reload (rh->webview);
+	}
 	return S_OK;
 }
 
@@ -116,7 +179,7 @@ bool
 vala_webview2_host_reload_bypass_cache (WebView2Host *host)
 {
 	ICoreWebView2 *webview;
-	DevToolsHandler dh;
+	ReloadHandler *rh;
 	HRESULT hr;
 
 	webview = vala_webview2_com_get_webview_for (host);
@@ -124,23 +187,29 @@ vala_webview2_host_reload_bypass_cache (WebView2Host *host)
 		return false;
 	}
 
-	ZeroMemory (&dh, sizeof (dh));
-	dh.handler.lpVtbl = &dh.vtbl;
-	dh.vtbl.QueryInterface = devtools_qi;
-	dh.vtbl.AddRef = devtools_addref;
-	dh.vtbl.Release = devtools_release;
-	dh.vtbl.Invoke = devtools_invoke;
+	rh = (ReloadHandler *) CoTaskMemAlloc (sizeof (*rh));
+	if (rh == NULL) {
+		return SUCCEEDED (ICoreWebView2_Reload (webview));
+	}
+	ZeroMemory (rh, sizeof (*rh));
+	rh->handler.lpVtbl = &rh->vtbl;
+	rh->vtbl.QueryInterface = reload_qi;
+	rh->vtbl.AddRef = reload_addref;
+	rh->vtbl.Release = reload_release;
+	rh->vtbl.Invoke = reload_invoke;
+	rh->ref_count = 1;
+	rh->webview = webview;
+	ICoreWebView2_AddRef (rh->webview);
 
 	hr = ICoreWebView2_CallDevToolsProtocolMethod (
-		webview, L"Page.reload", L"{\"ignoreCache\":true}", &dh.handler);
+		webview, L"Page.reload", L"{\"ignoreCache\":true}", &rh->handler);
 	if (FAILED (hr)) {
-		return SUCCEEDED (ICoreWebView2_Reload (webview));
+		HRESULT reload_hr = ICoreWebView2_Reload (webview);
+		reload_release (&rh->handler);
+		return SUCCEEDED (reload_hr);
 	}
 
-	vala_webview2_com_sync_await (&dh.done);
-	free (dh.json);
-	if (FAILED (dh.error)) {
-		return SUCCEEDED (ICoreWebView2_Reload (webview));
-	}
+	/* WebView2 owns its reference until completion. */
+	reload_release (&rh->handler);
 	return true;
 }
