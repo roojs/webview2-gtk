@@ -1,6 +1,6 @@
 # Bug — `reload_bypass_cache` never returns
 
-**Status:** ✅ fixed, Windows runtime smoke passed
+**Status:** ✅ fixed in **0.6.12**, Windows runtime smoke passed
 **Date:** 2026-10-26
 **Component:** `lib/host/win32-ui-webview2-capture.c`, `examples/add-cookie/main.vala`, `scripts/run-add-cookie-smoke-interactive.sh`
 **Follows:** `docs/bugs/done/2026-10-26-reload-bypass-cache-is-plain-reload.md` (0.6.11 calls DevTools `Page.reload`)
