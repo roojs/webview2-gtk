@@ -1,7 +1,8 @@
 # Bug — `window.open` opens an Edge popup
 
-**Status:** open
+**Status:** ✅ fixed in **0.6.13**, Windows smoke passed
 **Date:** 2026-10-30
+**Smoke:** `examples/hello --smoke-new-window` (`AGENT_WIN_HOST=snappr-win ./scripts/agent-remote-build.sh hello-new-window`)
 **Platform:** Windows (`WebView2Gtk.WebView`)
 **Area:** `lib/host/win32-ui-webview2-events.c`, `lib/webview2gtk/webview.vala`, `lib/webview2gtk/PolicyDecision.vala`
 **Emoji:** 🔷 user req, 💩 LLM suggestion, ⏳ backlog, 🚫 veto.
@@ -46,14 +47,32 @@
 
 ## How
 
-💩 ⏳ Register `NewWindowRequested` beside the other handlers in `vala_webview2_events_register_host`. Remove the token in `vala_webview2_events_unregister_host`. Store the token on `WebView2Host` next to `tok_nav_starting`.
+💩 Register `NewWindowRequested` beside the other handlers in `vala_webview2_events_register_host`. Remove the token in `vala_webview2_events_unregister_host`. Store the token on `WebView2Host` next to `tok_nav_starting`.
 
-💩 ⏳ On the event, read the URI and `IsUserInitiated`. Invoke a host callback into the Vala `WebView`, same crossing as `script_dialog`.
+💩 On the event, read the URI and `IsUserInitiated`. Invoke a host callback into the Vala `WebView`, same crossing as `script_dialog`.
 
-💩 ⏳ Emit `decide_policy` with `NEW_WINDOW_ACTION`. The decision needs the URI (`NavigationPolicyDecision` is enough: a request, `ignore()` already on `PolicyDecision`). Full `NavigationAction` (mouse button, modifiers) is not required.
+💩 Emit `decide_policy` with `NEW_WINDOW_ACTION`. The decision needs the URI (`NavigationPolicyDecision` is enough: a request, `ignore()` already on `PolicyDecision`). Full `NavigationAction` (mouse button, modifiers) is not required.
 
-💩 ⏳ After the signal returns, `put_Handled(TRUE)` unless a later bug supplies a `NewWindow`. Do this when the handler called `ignore()`, and when it did not. Never leave `Handled` false.
+💩 After the signal returns, `put_Handled(TRUE)` unless a later bug supplies a `NewWindow`. Do this when the handler called `ignore()`, and when it did not. Never leave `Handled` false.
 
-💩 ⏳ Update the `PolicyDecision` comment that says only `RESPONSE` is emitted.
+💩 Update the `PolicyDecision` comment that says only `RESPONSE` is emitted.
 
-💩 ⏳ Smoke: one `WebView`, a page that calls `window.open("https://example.test/")` and a link with `target="_blank"`. No new top-level window. The signal's URI is the one that was refused. The original document stays put.
+💩 Smoke: one `WebView`, a page that calls `window.open("https://example.test/")` and a link with `target="_blank"`. No new top-level window. The signal's URI is the one that was refused. The original document stays put.
+
+---
+
+## Result
+
+`NewWindowRequested` is registered with the other host events. The callback emits `decide_policy` (`NEW_WINDOW_ACTION`, `NavigationPolicyDecision`). After the signal returns, `Handled` is set and `NewWindow` is not. The current view is not navigated.
+
+`window.open` in the smoke returned null with no `ignore()` call. The `target="_blank"` click called `ignore()`. Both URIs were the ones refused. The document stayed `about:blank`.
+
+```
+decide_policy NEW_WINDOW_ACTION uri=https://example.test/ user=no
+smoke-new-window title=open:null uri=about:blank
+decide_policy NEW_WINDOW_ACTION uri=https://example.test/blank user=yes
+smoke-new-window title=blank-clicked uri=about:blank
+TEST_PASS
+```
+
+The smoke sets `WEBVIEW2GTK_SMOKE_ALLOW_POPUPS` so Chromium does not swallow a gesture-less `window.open` before this event. Production builds leave popup blocking on.

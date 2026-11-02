@@ -14,6 +14,7 @@
 #   ./scripts/agent-remote-build.sh hidden-stack      # build + smoke-hidden-stack --google
 #   ./scripts/agent-remote-build.sh hello-print       # build + hello --smoke-print
 #   ./scripts/agent-remote-build.sh hello-script-dialog  # build + hello --smoke-script-dialog
+#   ./scripts/agent-remote-build.sh hello-new-window     # build + hello --smoke-new-window
 #   ./scripts/agent-remote-build.sh print             # build + static-font PDF sample
 #
 # Requires: AGENT_WIN_HOST (SSH Host), MSYS2 rsync on Windows (see vala.win32 docs/windows-build.md § Rsync).
@@ -115,6 +116,12 @@ run_remote_hello_script_dialog_smoke() {
 	echo "[agent-remote-build] hello --smoke-script-dialog (interactive RDP session) on ${REMOTE_HOST}"
 	ssh -o BatchMode=yes "${REMOTE_HOST}" \
 		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"bash /c/msys64/tmp/webview2-gtk/scripts/run-hello-script-dialog-smoke-interactive.sh\""
+}
+
+run_remote_hello_new_window_smoke() {
+	echo "[agent-remote-build] hello --smoke-new-window (interactive RDP session) on ${REMOTE_HOST}"
+	ssh -o BatchMode=yes "${REMOTE_HOST}" \
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"bash /c/msys64/tmp/webview2-gtk/scripts/run-hello-new-window-smoke-interactive.sh\""
 }
 
 run_remote_hidden_stack_smoke() {
@@ -242,6 +249,10 @@ print_hint() {
 	if [[ -f "${ROOT}/build-remote/hello-script-dialog-smoke.log" ]]; then
 		echo "--- hello-script-dialog-smoke.log ---"
 		cat "${ROOT}/build-remote/hello-script-dialog-smoke.log"
+	fi
+	if [[ -f "${ROOT}/build-remote/hello-new-window-smoke.log" ]]; then
+		echo "--- hello-new-window-smoke.log ---"
+		cat "${ROOT}/build-remote/hello-new-window-smoke.log"
 	fi
 }
 
@@ -389,6 +400,20 @@ case "${cmd}" in
 		print_hint
 		exit "${build_rc}"
 		;;
+	hello-new-window)
+		sync_to_windows
+		build_rc=0
+		run_remote_hello_print_build || build_rc=$?
+		if [[ "${build_rc}" -eq 0 ]]; then
+			run_remote_hello_new_window_smoke || build_rc=$?
+		fi
+		ssh -o BatchMode=yes "${REMOTE_HOST}" \
+			"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cp -f /c/Users/Alan/AppData/Local/Temp/webview2gtk-hello-new-window-smoke.log /c/msys64/tmp/webview2-gtk/build/hello-new-window-smoke.log 2>/dev/null || true\"" \
+			|| true
+		pull_artifacts || true
+		print_hint
+		exit "${build_rc}"
+		;;
 	hidden-stack)
 		sync_to_windows
 		build_rc=0
@@ -404,7 +429,7 @@ case "${cmd}" in
 		exit "${build_rc}"
 		;;
 	*)
-		echo "usage: $0 [build|sync|remote-build|pull|run|automation|automation-stack|hidden-stack|paned-insert|add-cookie|multi-host-spike|hello-print|hello-script-dialog|print]" >&2
+		echo "usage: $0 [build|sync|remote-build|pull|run|automation|automation-stack|hidden-stack|paned-insert|add-cookie|multi-host-spike|hello-print|hello-script-dialog|hello-new-window|print]" >&2
 		exit 1
 		;;
 esac

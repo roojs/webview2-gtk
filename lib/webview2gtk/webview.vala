@@ -99,6 +99,9 @@ extern void wv2_host_set_event_handlers(
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_document_response_handler")]
 extern void wv2_host_set_document_response_handler(void* host, void* handler, void* user_data);
 
+[CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_new_window_handler")]
+extern void wv2_host_set_new_window_handler(void* host, void* cb, void* user_data);
+
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_set_script_message_handler")]
 extern void wv2_host_set_script_message_handler(void* host, void* handler, void* user_data);
 
@@ -243,9 +246,32 @@ public class WebView : Gtk.Box {
 	public signal void load_changed(LoadEvent load_event);
 
 	/**
-	 * WebKitGTK-shaped — policy decision (main-frame document RESPONSE is wired today).
+	 * WebKitGTK-shaped — policy decision.
 	 *
-	 * Call {@link PolicyDecision.ignore} to refuse the document after MIME is known.
+	 * {@link PolicyDecisionType.RESPONSE} is the main-frame document. Call
+	 * {@link PolicyDecision.ignore} to refuse it after the MIME type is known.
+	 *
+	 * {@link PolicyDecisionType.NEW_WINDOW_ACTION} is ''window.open'' or a link
+	 * with ''target="_blank"''. The decision is a {@link NavigationPolicyDecision}
+	 * whose request URI is the popup. The popup is cancelled when this signal
+	 * returns. That includes no handler, a handler that returns ''false''
+	 * without {@link PolicyDecision.ignore}, and a handler that calls
+	 * {@link PolicyDecision.ignore}. The current view is not navigated to the
+	 * popup URI.
+	 *
+	 * == Usage Examples ==
+	 *
+	 * === Refuse a popup ===
+	 *
+	 * {{{
+	 * web.decide_policy.connect((decision, type) => {
+	 *     if (type == PolicyDecisionType.NEW_WINDOW_ACTION) {
+	 *         decision.ignore();
+	 *         return true;
+	 *     }
+	 *     return false;
+	 * });
+	 * }}}
 	 */
 	public signal bool decide_policy(PolicyDecision decision, PolicyDecisionType type);
 
@@ -309,6 +335,7 @@ public class WebView : Gtk.Box {
 			this.network_session.unbind_download_host(host_handle);
 			wv2_host_set_resource_handlers(host_handle, null, null, null, null);
 			wv2_host_set_document_response_handler(host_handle, null, null);
+			wv2_host_set_new_window_handler(host_handle, null, null);
 			wv2_host_set_event_handlers(host_handle, null, null, null, null);
 			wv2_host_destroy(host_handle);
 			host_handle = null;
@@ -636,6 +663,7 @@ public class WebView : Gtk.Box {
 		wv2_host_set_is_muted(host_handle, this.muted);
 		wv2_host_set_permission_handler(host_handle, (void*) on_permission_decide_cb, this);
 		wv2_host_set_document_response_handler(host_handle, (void*) on_document_response_cb, this);
+		wv2_host_set_new_window_handler(host_handle, (void*) on_new_window_cb, this);
 		wv2_host_set_resource_handlers(host_handle, on_resource_started_cb, on_resource_finished_cb,
 			on_resource_failed_cb, this);
 		wv2_host_set_script_message_handler(host_handle, (void*) on_script_message_cb, user_content_manager);
@@ -869,6 +897,13 @@ public class WebView : Gtk.Box {
 			return 1;
 		}
 		return 0;
+	}
+
+	[CCode(has_target = false)]
+	private static void on_new_window_cb(string uri, int is_user_initiated, void* user_data) {
+		var view = (WebView) user_data;
+		var decision = new NavigationPolicyDecision(uri, is_user_initiated != 0);
+		view.decide_policy(decision, PolicyDecisionType.NEW_WINDOW_ACTION);
 	}
 
 	[CCode(has_target = false)]

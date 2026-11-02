@@ -4,6 +4,7 @@
  *   webview2gtk-hello.exe --smoke-policy-ignore
  *   webview2gtk-hello.exe --smoke-print [--output PATH]
  *   webview2gtk-hello.exe --smoke-script-dialog
+ *   webview2gtk-hello.exe --smoke-new-window
  */
 
 using Gtk;
@@ -15,7 +16,10 @@ private const string PDF_URI =
 private bool smoke_policy_ignore = false;
 private bool smoke_print = false;
 private bool smoke_script_dialog = false;
+private bool smoke_new_window = false;
 private int smoke_script_dialogs = 0;
+private int smoke_new_window_phase = 0;
+private string smoke_new_window_seen;
 private string print_output_path;
 private int smoke_status = 1;
 private bool smoke_done = false;
@@ -355,6 +359,116 @@ private void run_smoke_script_dialog(WebView view) {
 	});
 }
 
+private bool smoke_saw_new_window(string uri) {
+	if (smoke_new_window_seen == null) {
+		return false;
+	}
+	return smoke_new_window_seen.contains("|" + uri + "|");
+}
+
+private void smoke_click_blank(WebView view) {
+	view.evaluate_javascript.begin("""
+		document.getElementById('blank').click();
+		document.title = 'blank-clicked';
+	""", -1, null, null, null, (obj, res) => {
+		try {
+			view.evaluate_javascript.end(res);
+		} catch (Error e) {
+			finish_smoke(false, e.message);
+			return;
+		}
+		smoke_new_window_phase = 2;
+	});
+}
+
+private void run_smoke_new_window(WebView view) {
+	smoke_new_window_seen = "";
+	smoke_new_window_phase = 0;
+	view.decide_policy.connect((decision, type) => {
+		if (type != PolicyDecisionType.NEW_WINDOW_ACTION) {
+			return false;
+		}
+		var nav = decision as NavigationPolicyDecision;
+		if (nav == null) {
+			finish_smoke(false, "NEW_WINDOW_ACTION was not NavigationPolicyDecision");
+			return true;
+		}
+		print("decide_policy NEW_WINDOW_ACTION uri=%s user=%s\n",
+			nav.request.uri, nav.is_user_gesture ? "yes" : "no");
+		smoke_new_window_seen += "|" + nav.request.uri + "|";
+		/* window.open: return false and do not ignore().
+		 * target=_blank: ignore(). Both must cancel the popup. */
+		if (nav.request.uri.has_suffix("/blank")) {
+			decision.ignore();
+			return true;
+		}
+		return false;
+	});
+	view.load_failed.connect((load_event, failing_uri, error) => {
+		if (failing_uri.index_of("example.test") >= 0) {
+			print("smoke-new-window load_failed %s: %s\n", failing_uri, error.message);
+			finish_smoke(false, "view navigated to " + failing_uri);
+			return true;
+		}
+		return false;
+	});
+	view.load_changed.connect((load_event) => {
+		if (load_event != LoadEvent.FINISHED || smoke_done || smoke_new_window_phase != 0) {
+			return;
+		}
+		smoke_new_window_phase = 1;
+		Timeout.add(100, () => {
+			if (smoke_done) {
+				return Source.REMOVE;
+			}
+			var title = view.get_title();
+			var live = view.get_uri();
+			print("smoke-new-window title=%s uri=%s phase=%d seen=%s\n",
+				title, live, smoke_new_window_phase, smoke_new_window_seen);
+			if (live.index_of("example.test") >= 0) {
+				finish_smoke(false, "view uri became " + live);
+				return Source.REMOVE;
+			}
+			if (title.has_prefix("open:") && title != "open:null") {
+				finish_smoke(false, "window.open returned a window");
+				return Source.REMOVE;
+			}
+			if (smoke_new_window_phase == 1
+			    && title == "open:null"
+			    && smoke_saw_new_window("https://example.test/")) {
+				smoke_new_window_phase = 3;
+				smoke_click_blank(view);
+				return Source.CONTINUE;
+			}
+			if (smoke_new_window_phase == 2
+			    && title == "blank-clicked"
+			    && (smoke_saw_new_window("https://example.test/blank")
+			        || smoke_saw_new_window("https://example.test/blank/"))) {
+				finish_smoke(true, "");
+				return Source.REMOVE;
+			}
+			return Source.CONTINUE;
+		});
+	});
+	view.load_html("""
+		<!DOCTYPE html><html><head><title>stay</title></head><body>
+		<a id="blank" href="https://example.test/blank" target="_blank">blank</a>
+		<script>
+		var w = window.open("https://example.test/");
+		document.title = "open:" + (w === null ? "null" : "win");
+		</script>
+		</body></html>
+	""", null);
+	Timeout.add(20000, () => {
+		if (!smoke_done) {
+			print("smoke-new-window timeout title=%s uri=%s seen=%s\n",
+				view.get_title(), view.get_uri(), smoke_new_window_seen);
+			finish_smoke(false, "timeout");
+		}
+		return Source.REMOVE;
+	});
+}
+
 public static int main(string[] args) {
 	string[] gtk_args = {};
 	for (var i = 0; i < args.length; i++) {
@@ -374,12 +488,21 @@ public static int main(string[] args) {
 			smoke_script_dialog = true;
 			continue;
 		}
+		if (args[i] == "--smoke-new-window") {
+			smoke_new_window = true;
+			continue;
+		}
 		if (args[i] == "--output" && i + 1 < args.length) {
 			i++;
 			print_output_path = args[i];
 			continue;
 		}
 		gtk_args += args[i];
+	}
+
+	if (smoke_new_window) {
+		/* Let the smoke page's window.open reach NewWindowRequested. */
+		Environment.set_variable("WEBVIEW2GTK_SMOKE_ALLOW_POPUPS", "1", true);
 	}
 
 	var app = new Gtk.Application("com.webview2gtk.hello", ApplicationFlags.FLAGS_NONE);
@@ -397,6 +520,8 @@ public static int main(string[] args) {
 			run_smoke_print(web);
 		} else if (smoke_script_dialog) {
 			run_smoke_script_dialog(web);
+		} else if (smoke_new_window) {
+			run_smoke_new_window(web);
 		} else {
 			run_hello(web);
 		}
@@ -404,5 +529,5 @@ public static int main(string[] args) {
 		window.present();
 	});
 	app.run(gtk_args);
-	return (smoke_policy_ignore || smoke_print || smoke_script_dialog) ? smoke_status : 0;
+	return (smoke_policy_ignore || smoke_print || smoke_script_dialog || smoke_new_window) ? smoke_status : 0;
 }

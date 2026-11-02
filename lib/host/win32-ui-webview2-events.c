@@ -5,10 +5,12 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 
 #include "win32-ui-webview2-events.h"
 #include "win32-ui-webview2-host-priv.h"
+#include "win32-ui-webview2-com-glue.h"
 #include "win32-ui-webview2-proxy.h"
 #include "win32-ui-webview2-sdk.h"
 #include <wchar.h>
@@ -298,6 +300,83 @@ static HRESULT STDMETHODCALLTYPE proxy_auth_invoke (
 	return S_OK;
 }
 
+typedef struct WebView2NewWindowHandler {
+	ICoreWebView2NewWindowRequestedEventHandler iface;
+	ICoreWebView2NewWindowRequestedEventHandlerVtbl vtbl;
+	LONG ref_count;
+	WebView2Host *host;
+} WebView2NewWindowHandler;
+
+static HRESULT STDMETHODCALLTYPE new_window_qi (
+	ICoreWebView2NewWindowRequestedEventHandler *This,
+	REFIID riid,
+	void **ppv)
+{
+	if (IsEqualIID (riid, &IID_IUnknown)
+	    || IsEqualIID (riid, &IID_ICoreWebView2NewWindowRequestedEventHandler)) {
+		*ppv = This;
+		ICoreWebView2NewWindowRequestedEventHandler_AddRef (This);
+		return S_OK;
+	}
+	*ppv = NULL;
+	return E_NOINTERFACE;
+}
+
+static ULONG STDMETHODCALLTYPE new_window_addref (
+	ICoreWebView2NewWindowRequestedEventHandler *This)
+{
+	WebView2NewWindowHandler *self = (WebView2NewWindowHandler *) This;
+	return (ULONG) InterlockedIncrement (&self->ref_count);
+}
+
+static ULONG STDMETHODCALLTYPE new_window_release (
+	ICoreWebView2NewWindowRequestedEventHandler *This)
+{
+	WebView2NewWindowHandler *self = (WebView2NewWindowHandler *) This;
+	LONG count = InterlockedDecrement (&self->ref_count);
+	if (count == 0) {
+		CoTaskMemFree (self);
+	}
+	return (ULONG) count;
+}
+
+/* Cancel the Edge popup. No deferral, no NewWindow, no navigation of this view. */
+static HRESULT STDMETHODCALLTYPE new_window_invoke (
+	ICoreWebView2NewWindowRequestedEventHandler *This,
+	ICoreWebView2 *sender,
+	ICoreWebView2NewWindowRequestedEventArgs *args)
+{
+	WebView2NewWindowHandler *self = (WebView2NewWindowHandler *) This;
+	WebView2Host *host = self->host;
+	LPWSTR uri_w = NULL;
+	char *uri_utf8 = NULL;
+	BOOL user_init = FALSE;
+	HRESULT hr;
+
+	(void) sender;
+	if (args == NULL) {
+		return S_OK;
+	}
+	if (SUCCEEDED (ICoreWebView2NewWindowRequestedEventArgs_get_Uri (args, &uri_w))
+	    && uri_w != NULL) {
+		uri_utf8 = win32_ui_utf16_to_utf8 ((uint16_t *) uri_w, (int) wcslen (uri_w) + 1);
+		CoTaskMemFree (uri_w);
+	}
+	ICoreWebView2NewWindowRequestedEventArgs_get_IsUserInitiated (args, &user_init);
+	if (host != NULL && host->cb_new_window != NULL) {
+		host->cb_new_window (
+			uri_utf8 != NULL ? uri_utf8 : "",
+			user_init ? 1 : 0,
+			host->new_window_ctx);
+	}
+	free (uri_utf8);
+	hr = ICoreWebView2NewWindowRequestedEventArgs_put_Handled (args, TRUE);
+	if (FAILED (hr)) {
+		fprintf (stderr, "WebView2 put_Handled failed: 0x%08lx\n", (unsigned long) hr);
+	}
+	return S_OK;
+}
+
 void
 vala_webview2_events_register_host (WebView2Host *host)
 {
@@ -408,6 +487,30 @@ vala_webview2_events_register_host (WebView2Host *host)
 		}
 	}
 
+	{
+		WebView2NewWindowHandler *handler = (WebView2NewWindowHandler *) CoTaskMemAlloc (
+			sizeof (WebView2NewWindowHandler));
+		if (handler != NULL) {
+			ZeroMemory (handler, sizeof (*handler));
+			handler->iface.lpVtbl = &handler->vtbl;
+			handler->vtbl.QueryInterface = new_window_qi;
+			handler->vtbl.AddRef = new_window_addref;
+			handler->vtbl.Release = new_window_release;
+			handler->vtbl.Invoke = new_window_invoke;
+			handler->ref_count = 1;
+			handler->host = host;
+			hr = ICoreWebView2_add_NewWindowRequested (
+				webview, &handler->iface, &host->tok_new_window);
+			if (FAILED (hr)) {
+				fprintf (stderr, "WebView2 add_NewWindowRequested failed: 0x%08lx\n",
+				         (unsigned long) hr);
+				ICoreWebView2NewWindowRequestedEventHandler_Release (&handler->iface);
+			} else {
+				ICoreWebView2NewWindowRequestedEventHandler_Release (&handler->iface);
+			}
+		}
+	}
+
 	host->events_registered = TRUE;
 }
 
@@ -422,6 +525,7 @@ vala_webview2_events_unregister_host (WebView2Host *host)
 	webview = host->webview;
 	ICoreWebView2_remove_NavigationCompleted (webview, host->tok_nav_completed);
 	ICoreWebView2_remove_NavigationStarting (webview, host->tok_nav_starting);
+	ICoreWebView2_remove_NewWindowRequested (webview, host->tok_new_window);
 	ICoreWebView2_remove_DocumentTitleChanged (webview, host->tok_title);
 	{
 		ICoreWebView2_10 *wv10 = NULL;
@@ -434,7 +538,22 @@ vala_webview2_events_unregister_host (WebView2Host *host)
 			ICoreWebView2_10_Release (wv10);
 		}
 	}
+	host->cb_new_window = NULL;
+	host->new_window_ctx = NULL;
 	host->events_registered = FALSE;
+}
+
+void
+vala_webview2_host_set_new_window_handler (
+	WebView2Host *host,
+	WebView2GtkNewWindowCb cb,
+	void *user_data)
+{
+	if (host == NULL) {
+		return;
+	}
+	host->cb_new_window = cb;
+	host->new_window_ctx = user_data;
 }
 
 /* Legacy entry points used by Vala finish_setup until callers pass host. */

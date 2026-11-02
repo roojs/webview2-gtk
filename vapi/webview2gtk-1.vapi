@@ -170,6 +170,14 @@ namespace WebView2Gtk {
 		public unowned Soup.MessageHeaders get_http_headers();
 	}
 
+	public sealed class NavigationPolicyDecision : PolicyDecision {
+		public URIRequest request { get; }
+		public bool is_user_gesture { get; }
+		public NavigationPolicyDecision(string uri, bool is_user_gesture);
+		public unowned URIRequest get_request();
+		public bool get_is_user_gesture();
+	}
+
 	public sealed class ResponsePolicyDecision : PolicyDecision {
 		public URIRequest request { get; }
 		public URIResponse response { get; }

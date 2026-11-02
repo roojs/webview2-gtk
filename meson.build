@@ -1,7 +1,7 @@
 project(
   'webview2-gtk',
   ['c', 'vala'],
-  version: '0.6.12',
+  version: '0.6.13',
   meson_version: '>= 1.0.0',
   default_options: ['buildtype=debugoptimized', 'c_std=c11'],
 )
@@ -64,6 +64,7 @@ lib_depend_files = files(
   'lib/webview2gtk/PolicyDecision.vala',
   'lib/webview2gtk/URIResponse.vala',
   'lib/webview2gtk/ResponsePolicyDecision.vala',
+  'lib/webview2gtk/NavigationPolicyDecision.vala',
   'lib/webview2gtk/WebResource.vala',
   'lib/webview2gtk/Download.vala',
   'lib/webview2gtk/EmbeddedProxy.vala',

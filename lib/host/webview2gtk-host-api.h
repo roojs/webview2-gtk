@@ -283,6 +283,22 @@ void vala_webview2_host_set_script_dialog_handler (
 );
 void vala_webview2_host_set_default_script_dialogs_enabled (WebView2Host *host, bool enabled);
 
+/*
+ * NewWindowRequested. uri_utf8 is the popup URI (never NULL).
+ * is_user_initiated is 1 when WebView2 IsUserInitiated is true.
+ * The host sets Handled after this returns. It does not set NewWindow.
+ */
+typedef void (*WebView2GtkNewWindowCb) (
+	const char *uri_utf8,
+	int is_user_initiated,
+	void *user_data
+);
+void vala_webview2_host_set_new_window_handler (
+	WebView2Host *host,
+	WebView2GtkNewWindowCb cb,
+	void *user_data
+);
+
 #ifdef __cplusplus
 }
 #endif

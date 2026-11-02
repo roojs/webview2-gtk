@@ -32,12 +32,15 @@ struct WebView2Host {
 	BOOL events_registered;
 	EventRegistrationToken tok_nav_completed;
 	EventRegistrationToken tok_nav_starting;
+	EventRegistrationToken tok_new_window;
 	EventRegistrationToken tok_title;
 	EventRegistrationToken tok_proxy_auth;
 	WebView2GtkEventCb cb_nav_starting;
 	WebView2GtkNavCompletedCb cb_nav_completed;
 	WebView2GtkEventCb cb_title_changed;
+	WebView2GtkNewWindowCb cb_new_window;
 	void *event_user_data;
+	void *new_window_ctx;
 
 	/* Document response (main-frame HTTP) */
 	BOOL doc_response_registered;

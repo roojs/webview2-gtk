@@ -327,6 +327,7 @@ vala_webview2_host_create_environment_options_for_route (int route_id)
 	BOOL need_hide_webdriver;
 	BOOL need_localhost_proxy;
 	BOOL need_no_proxy;
+	BOOL need_allow_popups;
 	BOOL emit_cdp;
 
 	cap = sizeof (args) / sizeof (args[0]);
@@ -343,12 +344,15 @@ vala_webview2_host_create_environment_options_for_route (int route_id)
 		!vala_webview2_host_embedded_proxy_active ()
 		&& g_proxy_mode == 2
 	);
+	/* Smoke only. Production popup blocking stays on so a gesture-less
+	 * window.open still returns null before NewWindowRequested. */
+	need_allow_popups = (getenv ("WEBVIEW2GTK_SMOKE_ALLOW_POPUPS") != NULL);
 	emit_cdp = (port != 0);
 	if (need_localhost_proxy && g_localhost_proxy_cdp_used) {
 		emit_cdp = FALSE;
 	}
 	if (!emit_cdp && !need_deny && !need_hide_webdriver
-	    && !need_localhost_proxy && !need_no_proxy) {
+	    && !need_localhost_proxy && !need_no_proxy && !need_allow_popups) {
 		return NULL;
 	}
 
@@ -415,6 +419,20 @@ vala_webview2_host_create_environment_options_for_route (int route_id)
 			stderr,
 			"webview2gtk: navigator.webdriver DISABLED (--disable-blink-features=AutomationControlled)\n"
 		);
+	}
+	if (need_allow_popups) {
+		if (used > 0 && used + 1 < cap) {
+			args[used++] = L' ';
+			args[used] = L'\0';
+		}
+		_snwprintf (
+			args + used,
+			cap - used,
+			L"--disable-popup-blocking"
+		);
+		args[cap - 1] = L'\0';
+		used = wcslen (args);
+		fprintf (stderr, "webview2gtk: smoke --disable-popup-blocking\n");
 	}
 	if (need_localhost_proxy) {
 		if (used > 0 && used + 1 < cap) {

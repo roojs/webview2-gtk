@@ -10,9 +10,12 @@ public enum PolicyDecisionType {
 /**
  * WebKitGTK-shaped pending policy decision.
  *
- * On Windows only {@link PolicyDecisionType.RESPONSE} is emitted today.
- * {@link ignore} on that RESPONSE cancels the document. {@link use} and
- * {@link download} remain no-ops.
+ * On Windows {@link PolicyDecisionType.RESPONSE} and
+ * {@link PolicyDecisionType.NEW_WINDOW_ACTION} are emitted.
+ * {@link ignore} on RESPONSE cancels the document. A new-window decision
+ * does not open an OS window and does not navigate this view: that is true
+ * when {@link ignore} runs, when it does not, and when no handler is
+ * connected. {@link use} and {@link download} remain no-ops.
  */
 public abstract class PolicyDecision : Object {
 	private enum Action {
