@@ -487,8 +487,8 @@ public void init() {
  *
  * This walk is best-effort. WebView2 sometimes publishes no UI Automation
  * document for a WebView that is ready, visible, and has its own title and
- * URI. That WebView is then absent from the tree: there is no ''document
- * frame'' for it, and another WebView's document is not substituted.
+ * URI. That WebView is then absent from the tree: there is no ''document frame''
+ * for it, and another WebView's document is not substituted.
  * ''get_child_at_index'' past ''get_child_count'' is not a document. Match a
  * page by name and URI, and treat no match as unavailable.
  *
