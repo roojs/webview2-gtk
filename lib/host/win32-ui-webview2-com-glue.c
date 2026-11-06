@@ -32,6 +32,74 @@ static WebView2Host *g_last_host;
 static LONG g_embedded_proxy_env_count;
 static LONG g_next_route_id;
 
+static const wchar_t webview_host_class[] = L"WebView2GtkHost";
+static ATOM webview_host_class_atom;
+
+static LRESULT CALLBACK
+webview_host_wndproc (HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
+{
+	if (message == WM_NCDESTROY) {
+		SetWindowLongPtrW (hwnd, GWLP_USERDATA, 0);
+	}
+	return DefWindowProcW (hwnd, message, wparam, lparam);
+}
+
+static BOOL
+ensure_webview_host_class (void)
+{
+	WNDCLASSW wc;
+
+	if (webview_host_class_atom != 0) {
+		return TRUE;
+	}
+	ZeroMemory (&wc, sizeof (wc));
+	wc.lpfnWndProc = webview_host_wndproc;
+	wc.hInstance = GetModuleHandleW (NULL);
+	wc.lpszClassName = webview_host_class;
+	webview_host_class_atom = RegisterClassW (&wc);
+	if (webview_host_class_atom == 0
+	    && GetLastError () == ERROR_CLASS_ALREADY_EXISTS) {
+		webview_host_class_atom = 1;
+	}
+	return webview_host_class_atom != 0;
+}
+
+static HWND
+create_webview_host_window (HWND parent, const RECT *bounds, WebView2Host *host)
+{
+	LONG width;
+	LONG height;
+
+	if (parent == NULL || bounds == NULL || !ensure_webview_host_class ()) {
+		return NULL;
+	}
+	width = bounds->right - bounds->left;
+	height = bounds->bottom - bounds->top;
+	if (width < 1) {
+		width = 1;
+	}
+	if (height < 1) {
+		height = 1;
+	}
+	HWND hwnd = CreateWindowExW (
+		0,
+		webview_host_class,
+		L"",
+		WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
+		bounds->left,
+		bounds->top,
+		width,
+		height,
+		parent,
+		NULL,
+		GetModuleHandleW (NULL),
+		NULL);
+	if (hwnd != NULL) {
+		SetWindowLongPtrW (hwnd, GWLP_USERDATA, (LONG_PTR) host);
+	}
+	return hwnd;
+}
+
 static void
 ensure_parent_clip_styles (HWND parent)
 {
@@ -74,16 +142,11 @@ bounds_are_parked (const RECT *r)
 void
 vala_webview2_com_present_webview (WebView2Host *host)
 {
-	/* Raise this controller's Chrome child only. Raising every Chrome
-	 * sibling under the shared toplevel covers GTK overlays each frame. */
-	if (host == NULL || host->parent == NULL) {
+	/* Raise this WebView's isolated native host, including its Chrome subtree. */
+	if (host == NULL || host->host_hwnd == NULL) {
 		return;
 	}
-	vala_webview2_host_note_visible_hwnd (host);
-	if (host->a11y_hwnd == NULL || !IsWindow (host->a11y_hwnd)) {
-		return;
-	}
-	SetWindowPos (host->a11y_hwnd, HWND_TOP, 0, 0, 0, 0,
+	SetWindowPos (host->host_hwnd, HWND_TOP, 0, 0, 0, 0,
 	              SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
@@ -198,9 +261,12 @@ static HRESULT STDMETHODCALLTYPE controller_handler_invoke (
 	{
 		RECT bounds;
 		if (host->use_client_bounds) {
-			GetClientRect (host->parent, &bounds);
+			GetClientRect (host->host_hwnd, &bounds);
 		} else {
-			bounds = host->bounds;
+			bounds.left = 0;
+			bounds.top = 0;
+			bounds.right = host->bounds.right - host->bounds.left;
+			bounds.bottom = host->bounds.bottom - host->bounds.top;
 		}
 		hr = ICoreWebView2Controller_put_Bounds (host->controller, bounds);
 		if (FAILED (hr)) {
@@ -215,7 +281,8 @@ static HRESULT STDMETHODCALLTYPE controller_handler_invoke (
 		}
 	}
 	g_last_host = host;
-	vala_webview2_host_finish_setup (host, host->controller, host->webview, host->parent);
+	vala_webview2_host_finish_setup (
+		host, host->controller, host->webview, host->host_hwnd);
 	return S_OK;
 }
 
@@ -250,7 +317,7 @@ create_controller_for_host (WebView2Host *host)
 
 	hr = ICoreWebView2Environment_CreateCoreWebView2Controller (
 		env,
-		host->parent,
+		host->host_hwnd,
 		&controller_handler->iface);
 	ICoreWebView2CreateCoreWebView2ControllerCompletedHandler_Release (&controller_handler->iface);
 	if (FAILED (hr)) {
@@ -330,6 +397,8 @@ vala_webview2_com_begin_host (WebView2Host *host, HWND parent, LPCWSTR url, cons
 	host->use_client_bounds = (bounds == NULL);
 	if (bounds != NULL) {
 		host->bounds = *bounds;
+	} else {
+		GetClientRect (parent, &host->bounds);
 	}
 	host->host_visible = TRUE;
 	host->url[0] = L'\0';
@@ -341,6 +410,15 @@ vala_webview2_com_begin_host (WebView2Host *host, HWND parent, LPCWSTR url, cons
 	if (!vala_webview2_loader_init ()) {
 		return FALSE;
 	}
+	host->host_hwnd = create_webview_host_window (parent, &host->bounds, host);
+	if (host->host_hwnd == NULL) {
+		fprintf (
+			stderr,
+			"WebView2 native host window failed: 0x%08lx\n",
+			(unsigned long) GetLastError ());
+		return FALSE;
+	}
+	ensure_parent_clip_styles (host->host_hwnd);
 
 	if (vala_webview2_host_embedded_proxy_active ()) {
 		host->route_id = (int) InterlockedIncrement (&g_next_route_id);
@@ -428,6 +506,10 @@ vala_webview2_host_create_with_xywh (void *parent_hwnd, int x, int y, int width,
 	bounds.right = x + width;
 	bounds.bottom = y + height;
 	if (!vala_webview2_com_begin_host (host, (HWND) parent_hwnd, (LPCWSTR) url, &bounds)) {
+		if (host->host_hwnd != NULL) {
+			DestroyWindow (host->host_hwnd);
+			host->host_hwnd = NULL;
+		}
 		CoTaskMemFree (host);
 		return NULL;
 	}
@@ -458,9 +540,24 @@ vala_webview2_host_set_bounds_xywh (WebView2Host *host, int x, int y, int width,
 	was_parked = bounds_are_parked (&host->bounds);
 	now_on_screen = !bounds_are_parked (&bounds);
 	host->bounds = bounds;
+	if (host->host_hwnd != NULL) {
+		MoveWindow (
+			host->host_hwnd,
+			bounds.left,
+			bounds.top,
+			bounds.right - bounds.left,
+			bounds.bottom - bounds.top,
+			TRUE);
+	}
 	host->use_client_bounds = FALSE;
 	if (host->controller != NULL) {
-		ICoreWebView2Controller_put_Bounds (host->controller, bounds);
+		RECT controller_bounds;
+		controller_bounds.left = 0;
+		controller_bounds.top = 0;
+		controller_bounds.right = width;
+		controller_bounds.bottom = height;
+		ICoreWebView2Controller_put_Bounds (
+			host->controller, controller_bounds);
 		/* Raise only when leaving the off-screen park. A resize of a view
 		 * already on screen is put_Bounds alone — HWND_TOP covers GTK. */
 		if (was_parked && now_on_screen && host->host_visible) {
@@ -672,6 +769,10 @@ vala_webview2_com_release_host (WebView2Host *host)
 	if (host->controller != NULL) {
 		ICoreWebView2Controller_Release (host->controller);
 		host->controller = NULL;
+	}
+	if (host->host_hwnd != NULL) {
+		DestroyWindow (host->host_hwnd);
+		host->host_hwnd = NULL;
 	}
 	host->ready = FALSE;
 

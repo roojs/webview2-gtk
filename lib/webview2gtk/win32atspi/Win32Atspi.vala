@@ -482,6 +482,22 @@ public void init() {
 	Bridge.desktop = null;
 }
 
+/**
+ * Rebuild and return this process's accessibility desktop.
+ *
+ * This walk is best-effort. WebView2 sometimes publishes no UI Automation
+ * document for a WebView that is ready, visible, and has its own title and
+ * URI. That WebView is then absent from the tree: there is no ''document
+ * frame'' for it, and another WebView's document is not substituted.
+ * ''get_child_at_index'' past ''get_child_count'' is not a document. Match a
+ * page by name and URI, and treat no match as unavailable.
+ *
+ * When no WebView is registered, the return is still a desktop object with
+ * no page documents.
+ *
+ * @param index desktop index, as in AT-SPI; only 0 is used
+ * @return the desktop for this process
+ */
 public Accessible get_desktop(int index) {
 	try {
 		Bridge.ensure_tree();

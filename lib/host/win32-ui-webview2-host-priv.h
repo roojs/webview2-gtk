@@ -16,7 +16,9 @@ typedef struct {
 } WebView2PendingResource;
 
 struct WebView2Host {
+	/* GTK toplevel owner and per-WebView native controller parent. */
 	HWND parent;
+	HWND host_hwnd;
 	wchar_t url[2048];
 	wchar_t pending_url[2048];
 	BOOL use_client_bounds;

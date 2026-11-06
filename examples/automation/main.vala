@@ -4,6 +4,7 @@
  *
  *   --inspector-port <n>   (default 19222; also WV2GTK_INSPECTOR_PORT)
  *   --smoke               two WebViews side-by-side + Win32Atspi walk; holds ~2.5s then quits
+ *   --smoke-a11y-missing  target UIA document unavailable; sibling must not be duplicated
  *   --smoke-stack         Gtk.Stack (one unmapped) + two-phase Win32Atspi walk
  *   --smoke-webdriver     controlled view + DISABLED policy; navigator.webdriver must not be true
  */
@@ -14,9 +15,12 @@ using Win32Atspi;
 
 const string STACK_PRIMARY_TITLE = "stack primary document";
 const string STACK_SECONDARY_TITLE = "stack secondary document";
+const string MISSING_TARGET_TITLE = "shared app";
+const string MISSING_SIBLING_TITLE = "shared app control";
 
 private int smoke_status = 1;
 private bool smoke = false;
+private bool smoke_a11y_missing = false;
 private bool smoke_stack = false;
 private bool smoke_webdriver = false;
 
@@ -127,6 +131,116 @@ private void finish_quit(Gtk.ApplicationWindow window, Gtk.Application app) {
 		Idle.add(() => {
 			app.quit();
 			return false;
+		});
+		return Source.REMOVE;
+	});
+}
+
+private void run_smoke_a11y_missing(Gtk.ApplicationWindow window, Gtk.Application app) {
+	var context = WebContext.get_default();
+	context.set_automation_allowed(true);
+	var ns = context.get_network_session_for_automation();
+	if (ns == null) {
+		error("get_network_session_for_automation returned null");
+	}
+
+	var target = new WebViewAuto(context, ns);
+	var sibling = new WebViewAuto(context, ns);
+	var box = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
+	box.set_hexpand(true);
+	box.set_vexpand(true);
+	target.set_hexpand(true);
+	target.set_vexpand(true);
+	sibling.set_hexpand(true);
+	sibling.set_vexpand(true);
+	box.append(target);
+	box.append(sibling);
+	window.set_child(box);
+
+	/*
+	 * This test hook makes the target document unavailable to the UIA picker.
+	 * Fuzzy identity is deliberately re-enabled: only per-host HWND isolation
+	 * prevents the shared-prefix sibling from being emitted for the target.
+	 */
+	Environment.set_variable(
+		"WEBVIEW2GTK_A11Y_TEST_HIDE_DOCUMENT_TITLE",
+		MISSING_TARGET_TITLE,
+		true
+	);
+	Environment.set_variable(
+		"WEBVIEW2GTK_A11Y_TEST_FUZZY_IDENTITY",
+		"1",
+		true
+	);
+	target.load_html(
+		"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>""" + MISSING_TARGET_TITLE + """</title>
+</head><body><p>Target WebView</p></body></html>""",
+		null
+	);
+	sibling.load_html(
+		"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>""" + MISSING_SIBLING_TITLE + """</title>
+</head><body><p>Sibling WebView</p></body></html>""",
+		null
+	);
+	window.present();
+
+	var tries = 0;
+	Timeout.add(250, () => {
+		tries++;
+		var target_title = target.get_title() != null ? target.get_title() : "";
+		var sibling_title = sibling.get_title() != null ? sibling.get_title() : "";
+		var ready = target.ready && sibling.ready
+			&& target.get_mapped() && sibling.get_mapped()
+			&& target_title == MISSING_TARGET_TITLE
+			&& sibling_title == MISSING_SIBLING_TITLE;
+		if (!ready && tries < 120) {
+			return Source.CONTINUE;
+		}
+		if (!ready) {
+			print("A11Y_MISSING_FAIL views_not_ready target=%s sibling=%s\n",
+				target_title, sibling_title);
+			smoke_status = 1;
+			finish_quit(window, app);
+			return Source.REMOVE;
+		}
+
+		Timeout.add(500, () => {
+			var target_count = 0;
+			var sibling_count = 0;
+			var document_count = 0;
+			Win32Atspi.init();
+			var desktop = Win32Atspi.get_desktop(0);
+			for (var i = 0; i < desktop.get_child_count(); i++) {
+				var app_acc = desktop.get_child_at_index(i);
+				for (var j = 0; j < app_acc.get_child_count(); j++) {
+					var frame = app_acc.get_child_at_index(j);
+					for (var k = 0; k < frame.get_child_count(); k++) {
+						var doc = frame.get_child_at_index(k);
+						var role = doc.get_role_name();
+						if (role != "document frame" && role != "document text") {
+							continue;
+						}
+						document_count++;
+						var name = doc.get_name() != null ? doc.get_name() : "";
+						print("a11y_missing_doc name=%s\n", name);
+						if (name == MISSING_TARGET_TITLE) {
+							target_count++;
+						}
+						if (name == MISSING_SIBLING_TITLE) {
+							sibling_count++;
+						}
+					}
+				}
+			}
+			var ok = target_count == 0 && sibling_count == 1 && document_count == 1;
+			print("a11y_missing_documents=%d target=%d sibling=%d\n",
+				document_count, target_count, sibling_count);
+			print(ok ? "A11Y_MISSING_PASS\n" : "A11Y_MISSING_FAIL duplicate_or_wrong_host\n");
+			smoke_status = ok ? 0 : 1;
+			finish_quit(window, app);
+			return Source.REMOVE;
 		});
 		return Source.REMOVE;
 	});
@@ -279,6 +393,10 @@ public static int main(string[] args) {
 			smoke = true;
 			continue;
 		}
+		if (args[i] == "--smoke-a11y-missing") {
+			smoke_a11y_missing = true;
+			continue;
+		}
 		if (args[i] == "--smoke-stack") {
 			smoke_stack = true;
 			continue;
@@ -297,6 +415,11 @@ public static int main(string[] args) {
 		var window = new Gtk.ApplicationWindow(app);
 		window.set_title("webview2-gtk automation");
 		window.set_default_size(900, 700);
+
+		if (smoke_a11y_missing) {
+			run_smoke_a11y_missing(window, app);
+			return;
+		}
 
 		if (smoke_stack) {
 			run_smoke_stack(window, app);
@@ -442,11 +565,19 @@ body{font-family:sans-serif;margin:2rem}
 			var tries = 0;
 			Timeout.add(250, () => {
 				tries++;
-				if (view2 == null || !view.ready || !view2.ready) {
+				var first_title = view.get_title() != null ? view.get_title() : "";
+				var second_title = view2 != null && view2.get_title() != null
+					? view2.get_title()
+					: "";
+				var views_ready = view2 != null && view.ready && view2.ready
+					&& first_title == "first document"
+					&& second_title == "second document";
+				if (!views_ready) {
 					if (tries < 32) {
 						return Source.CONTINUE;
 					}
-					print("TEST_FAIL (views not ready tries=%d)\n", tries);
+					print("TEST_FAIL (views not ready tries=%d first=%s second=%s)\n",
+						tries, first_title, second_title);
 					smoke_status = 1;
 					finish();
 					return Source.REMOVE;
@@ -456,6 +587,8 @@ body{font-family:sans-serif;margin:2rem}
 				var desktop = Win32Atspi.get_desktop(0);
 				var n = 0;
 				var win_ok = true;
+				var first_hit = false;
+				var second_hit = false;
 				Win32Atspi.Accessible? first_doc = null;
 				for (var i = 0; i < desktop.get_child_count(); i++) {
 					var app_acc = desktop.get_child_at_index(i);
@@ -468,7 +601,10 @@ body{font-family:sans-serif;margin:2rem}
 								continue;
 							}
 							n++;
-							print("a11y_doc[%d] name=%s\n", n, doc.get_name());
+							var name = doc.get_name() != null ? doc.get_name() : "";
+							print("a11y_doc[%d] name=%s\n", n, name);
+							first_hit = first_hit || name == "first document";
+							second_hit = second_hit || name == "second document";
 							if (first_doc == null) {
 								first_doc = doc;
 							}
@@ -491,7 +627,7 @@ body{font-family:sans-serif;margin:2rem}
 				} else {
 					win_ok = false;
 				}
-				var ok = n >= 2 && win_ok;
+				var ok = n == 2 && first_hit && second_hit && win_ok;
 				print(ok ? "TEST_PASS\n" : "TEST_FAIL\n");
 				smoke_status = ok ? 0 : 1;
 				finish();
@@ -501,7 +637,9 @@ body{font-family:sans-serif;margin:2rem}
 	});
 
 	var code = app.run(gtk_args);
-	return (smoke || smoke_stack || smoke_webdriver) ? smoke_status : code;
+	return (smoke || smoke_a11y_missing || smoke_stack || smoke_webdriver)
+		? smoke_status
+		: code;
 }
 
 class WebViewAuto : WebView

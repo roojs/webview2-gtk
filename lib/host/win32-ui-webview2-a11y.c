@@ -3,6 +3,7 @@
 #define COBJMACROS
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <limits.h>
 #include <oleauto.h>
 #include <objbase.h>
 #include <stdio.h>
@@ -448,16 +449,15 @@ vala_webview2_host_note_visible_hwnd (WebView2Host *host)
 	HWND best = NULL;
 	int i;
 
-	/* Cache Chrome_WidgetWin_1 whose screen rect overlaps controller bounds.
-	 * No overlap (parked / not laid out yet) keeps the last HWND. */
-	if (host == NULL || host->parent == NULL) {
+	/* Each controller now has its own native host subtree. */
+	if (host == NULL || host->host_hwnd == NULL) {
 		return;
 	}
-	parent = host->parent;
-	tl.x = host->bounds.left;
-	tl.y = host->bounds.top;
-	br.x = host->bounds.right;
-	br.y = host->bounds.bottom;
+	parent = host->host_hwnd;
+	tl.x = 0;
+	tl.y = 0;
+	br.x = host->bounds.right - host->bounds.left;
+	br.y = host->bounds.bottom - host->bounds.top;
 	if (!ClientToScreen (parent, &tl) || !ClientToScreen (parent, &br)) {
 		return;
 	}
@@ -473,7 +473,7 @@ vala_webview2_host_note_visible_hwnd (WebView2Host *host)
 
 		cls[0] = L'\0';
 		GetClassNameW (hl.list[i], cls, 128);
-		if (wcscmp (cls, L"Chrome_WidgetWin_1") != 0) {
+		if (!interesting_hwnd (cls)) {
 			continue;
 		}
 		if (!GetWindowRect (hl.list[i], &wr)) {
@@ -510,9 +510,24 @@ score_document (
 
 	name = element_name_utf8 (doc);
 	value = element_value_utf8 (doc);
+	{
+		const char *hidden_title = getenv ("WEBVIEW2GTK_A11Y_TEST_HIDE_DOCUMENT_TITLE");
+		if (hidden_title != NULL && hidden_title[0] != '\0'
+		    && name != NULL && strcmp (name, hidden_title) == 0) {
+			free (name);
+			free (value);
+			if (id != NULL) {
+				*id = false;
+			}
+			return LLONG_MIN;
+		}
+	}
 	ts = str_match_score (name, title);
-	us = str_match_score (value, uri);
-	if (us == 0 && uri != NULL && uri[0] != '\0' && name != NULL) {
+	us = uri != NULL && strcmp (uri, "about:blank") != 0
+		? str_match_score (value, uri)
+		: 0;
+	if (us == 0 && uri != NULL && uri[0] != '\0'
+	    && strcmp (uri, "about:blank") != 0 && name != NULL) {
 		us = str_match_score (name, uri);
 	}
 	if (hwnd_rect != NULL) {
@@ -535,7 +550,13 @@ score_document (
 	free (name);
 	free (value);
 	if (id != NULL) {
-		*id = ts > 0 || us > 0;
+		/*
+		 * Fuzzy matches are useful only for ranking. Treating a shared title or
+		 * URI prefix as host identity can attach a sibling document.
+		 */
+		*id = getenv ("WEBVIEW2GTK_A11Y_TEST_FUZZY_IDENTITY") != NULL
+			? ts > 0 || us > 0
+			: ts == 2 || us == 2;
 	}
 	/* Title / URI outrank geometry so a parked host still beats an on-screen sibling. */
 	return (long long) ts * 1000000000000LL
@@ -598,7 +619,7 @@ search_chrome_hwnds (
 
 		cls[0] = L'\0';
 		GetClassNameW (hl.list[i], cls, 128);
-		if (wcscmp (cls, L"Chrome_WidgetWin_1") != 0) {
+		if (!interesting_hwnd (cls)) {
 			continue;
 		}
 		doc = find_document_under (uia, hl.list[i]);
@@ -701,7 +722,7 @@ find_page_document (IUIAutomation *uia, WebView2Host *host)
 	HwndList hl;
 	int i;
 
-	parent = vala_webview2_com_get_parent_hwnd_for (host);
+	parent = host != NULL ? host->host_hwnd : NULL;
 	if (parent == NULL) {
 		return NULL;
 	}
@@ -717,6 +738,7 @@ find_page_document (IUIAutomation *uia, WebView2Host *host)
 	uri = host_source_utf8 (host);
 	have_id = title[0] != '\0'
 		|| (uri[0] != '\0' && strcmp (uri, "about:blank") != 0);
+	vala_webview2_host_note_visible_hwnd (host);
 
 	if (host->a11y_hwnd != NULL && IsWindow (host->a11y_hwnd)) {
 		IUIAutomationElement *cached = find_document_under (uia, host->a11y_hwnd);
@@ -747,10 +769,10 @@ find_page_document (IUIAutomation *uia, WebView2Host *host)
 		if (ph < 300) {
 			ph = 600;
 		}
-		probe.left = -30000;
-		probe.top = -30000;
-		probe.right = -30000 + pw;
-		probe.bottom = -30000 + ph;
+		probe.left = 0;
+		probe.top = 0;
+		probe.right = pw;
+		probe.bottom = ph;
 		ICoreWebView2Controller_put_Bounds (ctl, probe);
 		ICoreWebView2Controller_put_IsVisible (ctl, TRUE);
 		for (p = 0; p < 20; p++) {

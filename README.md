@@ -71,7 +71,7 @@ acc.set_text_contents ("search text");
 Win32Atspi.generate_keyboard_event (...);
 ```
 
-Tree shape and notes: [docs/a11y.md](docs/a11y.md). Interactive smoke: `examples/browser` (Invoke / Fill / Win32Atspi buttons).
+`get_desktop()` can omit a WebView that is loaded and titled. A missing document is absent; it is not returned as another WebView's page, and a child index past the end is not a document. Match by name and URI. Tree shape and the reliability note: [docs/a11y.md](docs/a11y.md). Interactive smoke: `examples/browser` (Invoke / Fill / Win32Atspi buttons).
 
 ---
 

@@ -1,7 +1,7 @@
 project(
   'webview2-gtk',
   ['c', 'vala'],
-  version: '0.6.13',
+  version: '0.6.14',
   meson_version: '>= 1.0.0',
   default_options: ['buildtype=debugoptimized', 'c_std=c11'],
 )
@@ -85,6 +85,7 @@ lib_depend_files = files(
   'lib/host/win32-ui-webview2-events.c',
   'lib/host/win32-ui-webview2-loader.c',
   'lib/host/win32-ui-webview2-com-glue.c',
+  'lib/host/win32-ui-webview2-host-priv.h',
   'lib/host/win32-ui-webview2-automation.c',
   'lib/host/win32-ui-webview2-proxy.c',
   'lib/host/win32-ui-webview2-proxy.h',
