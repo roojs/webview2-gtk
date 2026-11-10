@@ -17,8 +17,8 @@ using Graphene;
 [CCode(cheader_filename = "webview2gtk-gdk-win32.h", cname = "gdk_win32_surface_get_handle")]
 extern void* gdk_win32_surface_get_handle(Gdk.Surface surface);
 
-[CCode(cheader_filename = "webview2gtk-gdk-win32.h", cname = "webview2gtk_widget_bounds_xywh")]
-extern bool widget_bounds_xywh(Gtk.Widget widget, out int x, out int y, out int width, out int height);
+[CCode(cheader_filename = "webview2gtk-gdk-win32.h", cname = "webview2gtk_widget_bounds")]
+extern bool webview2gtk_widget_bounds(Gtk.Widget widget, out Gdk.Rectangle bounds);
 
 [CCode(cheader_filename = "webview2gtk-host-api.h", cname = "vala_webview2_host_create_with_xywh")]
 extern void* wv2_host_create_with_xywh(void* parent_hwnd, int x, int y, int width, int height, uint16* url);
@@ -135,6 +135,10 @@ public class WebView : Gtk.Box {
 	/* Last on-screen size — parked hosts keep this (never 1×1) so UIA still has a Document. */
 	private int park_width = 800;
 	private int park_height = 600;
+	/* Last rectangle handed to MoveWindow. A move that does not change
+	   our size never enters size_allocate, so the tick compares this.
+	   width 0 means nothing has been pushed yet. */
+	private Gdk.Rectangle pushed_bounds;
 	private string pending_uri = "";
 	private string pending_html = "";
 
@@ -210,6 +214,11 @@ public class WebView : Gtk.Box {
 		host.set_content_width(1);
 		host.set_content_height(1);
 		append(host);
+		/* Gtk.Box installs a layout manager, and that replaces
+		   size_allocate. Drop it so a real resize still reaches
+		   push_bounds. A move that keeps the same size does not:
+		   GTK skips size_allocate then, and the frame tick covers it. */
+		this.layout_manager = null;
 
 		host.map.connect(on_host_map);
 		host.add_tick_callback(on_frame_tick);
@@ -316,8 +325,36 @@ public class WebView : Gtk.Box {
 	/** WebKitGTK-shaped — permission-state query (API parity; host may never emit). */
 	public signal bool query_permission_state(PermissionStateQuery query);
 
+	protected override void measure(
+		Gtk.Orientation orientation,
+		int for_size,
+		out int minimum,
+		out int natural,
+		out int minimum_baseline,
+		out int natural_baseline
+	) {
+		minimum_baseline = -1;
+		natural_baseline = -1;
+		if (!host.should_layout()) {
+			minimum = 0;
+			natural = 0;
+			return;
+		}
+		int min_baseline, nat_baseline;
+		host.measure(
+			orientation,
+			for_size,
+			out minimum,
+			out natural,
+			out min_baseline,
+			out nat_baseline
+		);
+	}
+
 	protected override void size_allocate(int width, int height, int baseline) {
-		base.size_allocate(width, height, baseline);
+		if (host.should_layout()) {
+			host.allocate(width, height, -1, null);
+		}
 		if (!attached) {
 			try_attach();
 			return;
@@ -559,33 +596,37 @@ public class WebView : Gtk.Box {
 		return gdk_win32_surface_get_handle(surface);
 	}
 
-	private void push_bounds() {
+	private void push_bounds()
+	{
+		Gdk.Rectangle bounds;
+
 		if (!attached || parent_hwnd == null) {
 			return;
 		}
-		int x, y, width, height;
-		if (widget_bounds_xywh(host, out x, out y, out width, out height)
-		    && width > 2 && height > 2) {
-			park_width = width;
-			park_height = height;
+		if (webview2gtk_widget_bounds(host, out bounds)
+		    && bounds.width > 2 && bounds.height > 2) {
+			park_width = bounds.width;
+			park_height = bounds.height;
 		} else if (!host_shown_on_screen) {
-			width = park_width;
-			height = park_height;
-			x = -30000;
-			y = -30000;
-			wv2_host_set_bounds_xywh(host_handle, x, y, width, height);
+			bounds.x = -30000;
+			bounds.y = -30000;
+			bounds.width = park_width;
+			bounds.height = park_height;
+			wv2_host_set_bounds_xywh(host_handle, bounds.x, bounds.y, bounds.width, bounds.height);
+			pushed_bounds = bounds;
 			return;
 		} else {
 			return;
 		}
 		if (!host_shown_on_screen) {
 			/* Off-screen while GTK opacity is 0 — DevTools capture still needs IsVisible. */
-			x = -30000;
-			y = -30000;
-			width = park_width;
-			height = park_height;
+			bounds.x = -30000;
+			bounds.y = -30000;
+			bounds.width = park_width;
+			bounds.height = park_height;
 		}
-		wv2_host_set_bounds_xywh(host_handle, x, y, width, height);
+		wv2_host_set_bounds_xywh(host_handle, bounds.x, bounds.y, bounds.width, bounds.height);
+		pushed_bounds = bounds;
 	}
 
 	private void sync_host_visible() {
@@ -631,6 +672,8 @@ public class WebView : Gtk.Box {
 	}
 
 	private void try_attach() {
+		Gdk.Rectangle bounds;
+
 		if (attached) {
 			return;
 		}
@@ -641,15 +684,13 @@ public class WebView : Gtk.Box {
 		if (parent_hwnd == null) {
 			return;
 		}
-
-		int x, y, width, height;
-		if (!widget_bounds_xywh(host, out x, out y, out width, out height)) {
+		if (!webview2gtk_widget_bounds(host, out bounds)) {
 			return;
 		}
 
 		var edge_defaults = !script_dialog_handlers_connected();
 		wv2_host_prepare_default_script_dialogs(edge_defaults);
-		host_handle = wv2_host_create_with_xywh(parent_hwnd, x, y, width, height, null);
+		host_handle = wv2_host_create_with_xywh(parent_hwnd, bounds.x, bounds.y, bounds.width, bounds.height, null);
 		if (host_handle == null) {
 			warning("WebView2Gtk: create_with_xywh failed(runtime/loader missing?)");
 			return;
@@ -675,15 +716,36 @@ public class WebView : Gtk.Box {
 		try_navigate();
 	}
 
-	private bool on_frame_tick(Gtk.Widget widget, Gdk.FrameClock frame_clock) {
+	private bool on_frame_tick(Gtk.Widget widget, Gdk.FrameClock frame_clock)
+	{
+		Gdk.Rectangle bounds;
+		Gdk.Rectangle pushed;
+
 		if (!attached) {
 			try_attach();
-		} else {
-			/* Host ready is async — retry pending HTML / URI once COM is up.
-			 * Bounds stay on size_allocate / map / opacity. Pushing them here
-			 * restacks the Chrome child over a GTK overlay. */
-			try_navigate();
+			return Source.CONTINUE;
 		}
+		/* Host ready is async — retry pending HTML / URI once COM is up.
+		 * size_allocate does not run when the widget only moves.
+		 * Push when the on-screen rectangle has moved by more than
+		 * one pixel. set_bounds raises only when leaving the park. */
+		try_navigate();
+		if (!host_shown_on_screen) {
+			return Source.CONTINUE;
+		}
+		if (!webview2gtk_widget_bounds(host, out bounds)
+		    || bounds.width <= 2 || bounds.height <= 2) {
+			return Source.CONTINUE;
+		}
+		pushed = pushed_bounds;
+		if (pushed.width != 0
+		    && bounds.x >= pushed.x - 1 && bounds.x <= pushed.x + 1
+		    && bounds.y >= pushed.y - 1 && bounds.y <= pushed.y + 1
+		    && bounds.width >= pushed.width - 1 && bounds.width <= pushed.width + 1
+		    && bounds.height >= pushed.height - 1 && bounds.height <= pushed.height + 1) {
+			return Source.CONTINUE;
+		}
+		push_bounds();
 		return Source.CONTINUE;
 	}
 

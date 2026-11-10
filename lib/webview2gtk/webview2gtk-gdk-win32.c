@@ -6,20 +6,20 @@
 #include <math.h>
 
 gboolean
-webview2gtk_widget_bounds_xywh (GtkWidget *widget, int *x, int *y, int *width, int *height)
+webview2gtk_widget_bounds (GtkWidget *widget, GdkRectangle *bounds)
 {
 	GtkWidget *root;
 	GtkNative *native;
 	GdkSurface *surface;
-	graphene_rect_t bounds;
+	graphene_rect_t layout;
 	double surf_x;
 	double surf_y;
 	int scale;
-	int w;
-	int h;
+	int width;
+	int height;
 
 	g_return_val_if_fail (GTK_IS_WIDGET (widget), FALSE);
-	g_return_val_if_fail (x != NULL && y != NULL && width != NULL && height != NULL, FALSE);
+	g_return_val_if_fail (bounds != NULL, FALSE);
 
 	root = gtk_widget_get_root (widget);
 	if (root == NULL || !GTK_IS_NATIVE (root)) {
@@ -28,7 +28,7 @@ webview2gtk_widget_bounds_xywh (GtkWidget *widget, int *x, int *y, int *width, i
 
 	native = GTK_NATIVE (root);
 
-	if (!gtk_widget_compute_bounds (widget, root, &bounds)) {
+	if (!gtk_widget_compute_bounds (widget, root, &layout)) {
 		return FALSE;
 	}
 
@@ -38,16 +38,15 @@ webview2gtk_widget_bounds_xywh (GtkWidget *widget, int *x, int *y, int *width, i
 	surface = gtk_native_get_surface (native);
 	scale = surface != NULL ? gdk_surface_get_scale_factor (surface) : 1;
 
-	*x = (int) round ((bounds.origin.x + surf_x) * (double) scale);
-	*y = (int) round ((bounds.origin.y + surf_y) * (double) scale);
-	w = (int) round (bounds.size.width * (double) scale);
-	h = (int) round (bounds.size.height * (double) scale);
-
-	if (w <= 0 || h <= 0) {
+	width = (int) round (layout.size.width * (double) scale);
+	height = (int) round (layout.size.height * (double) scale);
+	if (width <= 0 || height <= 0) {
 		return FALSE;
 	}
 
-	*width = w;
-	*height = h;
+	bounds->x = (int) round ((layout.origin.x + surf_x) * (double) scale);
+	bounds->y = (int) round ((layout.origin.y + surf_y) * (double) scale);
+	bounds->width = width;
+	bounds->height = height;
 	return TRUE;
 }

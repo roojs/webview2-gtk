@@ -10,6 +10,6 @@
 
 G_BEGIN_DECLS
 
-gboolean webview2gtk_widget_bounds_xywh (GtkWidget *widget, int *x, int *y, int *width, int *height);
+gboolean webview2gtk_widget_bounds (GtkWidget *widget, GdkRectangle *bounds);
 
 G_END_DECLS

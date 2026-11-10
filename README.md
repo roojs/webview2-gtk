@@ -132,6 +132,7 @@ examples/automation/  Automation setup smoke (plan 3.0)
 examples/paned-insert/  Login → first paned insert + load_uri (blank-pane repro)
 examples/add-cookie/    add_cookie / get_all / replace; --smoke-changed; --smoke-replace-startup
 examples/hidden-stack/  Win32Atspi Gtk.Stack hidden-primary document pick
+examples/move-bounds/   Bar opens above two WebViews; --smoke checks a move-only native window
 examples/consumer-meson.build
 docs/               Install / build / use / deploy / a11y / automation / Valadoc
 packaging/          NSIS + MSYS2 PKGBUILD

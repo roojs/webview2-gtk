@@ -7,6 +7,7 @@
 #   ./scripts/agent-remote-build.sh pull     # pull build/ back to Linux
 #   ./scripts/agent-remote-build.sh run      # run hello demo on Windows (3s smoke)
 #   ./scripts/agent-remote-build.sh paned-insert  # build + run first-insert blank-pane test
+#   ./scripts/agent-remote-build.sh move-bounds   # build + move-only native window smoke
 #   ./scripts/agent-remote-build.sh add-cookie    # build + run add_cookie-before-attach test
 #   ./scripts/agent-remote-build.sh multi-host-spike  # 4.5 two-controller HWND spike
 #   ./scripts/agent-remote-build.sh automation        # build + automation --smoke
@@ -142,6 +143,18 @@ run_remote_paned_insert_smoke() {
 		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"bash /c/msys64/tmp/webview2-gtk/scripts/run-paned-insert-smoke-interactive.sh\""
 }
 
+run_remote_move_bounds_build() {
+	echo "[agent-remote-build] move-bounds build on ${REMOTE_HOST}"
+	ssh -o BatchMode=yes "${REMOTE_HOST}" \
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cd /c/msys64/tmp/webview2-gtk && ./scripts/vendor-webview2-sdk.sh && meson setup --reconfigure build && rm -f build/webview2gtk-move-bounds.exe build/libwebview2gtk-1.stamp && set -o pipefail && ninja -C build libwebview2gtk-1.stamp webview2gtk-move-bounds.exe 2>&1 | tee build/last-build.log && OUT_DIR=/c/msys64/tmp/webview2-gtk/portable-demos ./scripts/copy-exe-runtime-dlls.sh build/webview2gtk-move-bounds.exe /c/msys64/tmp/webview2-gtk/portable-demos build/vendor/webview2/x64/WebView2Loader.dll\""
+}
+
+run_remote_move_bounds_smoke() {
+	echo "[agent-remote-build] move-bounds --smoke (interactive RDP session) on ${REMOTE_HOST}"
+	ssh -o BatchMode=yes "${REMOTE_HOST}" \
+		"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"bash /c/msys64/tmp/webview2-gtk/scripts/run-move-bounds-smoke-interactive.sh\""
+}
+
 run_remote_add_cookie_build() {
 	echo "[agent-remote-build] add-cookie build on ${REMOTE_HOST}"
 	ssh -o BatchMode=yes "${REMOTE_HOST}" \
@@ -209,6 +222,10 @@ print_hint() {
 	if [[ -f "${ROOT}/build-remote/paned-insert-smoke.log" ]]; then
 		echo "--- paned-insert-smoke.log ---"
 		cat "${ROOT}/build-remote/paned-insert-smoke.log"
+	fi
+	if [[ -f "${ROOT}/build-remote/move-bounds-smoke.log" ]]; then
+		echo "--- move-bounds-smoke.log ---"
+		cat "${ROOT}/build-remote/move-bounds-smoke.log"
 	fi
 	if [[ -f "${ROOT}/build-remote/add-cookie-smoke.log" ]]; then
 		echo "--- add-cookie-smoke.log ---"
@@ -330,6 +347,20 @@ case "${cmd}" in
 		print_hint
 		exit "${build_rc}"
 		;;
+	move-bounds)
+		sync_to_windows
+		build_rc=0
+		run_remote_move_bounds_build || build_rc=$?
+		if [[ "${build_rc}" -eq 0 ]]; then
+			run_remote_move_bounds_smoke || build_rc=$?
+		fi
+		ssh -o BatchMode=yes "${REMOTE_HOST}" \
+			"C:\\msys64\\msys2_shell.cmd -defterm -no-start -ucrt64 -c \"cp -f /c/Users/Alan/AppData/Local/Temp/webview2gtk-move-bounds-smoke.log /c/msys64/tmp/webview2-gtk/build/move-bounds-smoke.log 2>/dev/null || true\"" \
+			|| true
+		pull_artifacts || true
+		print_hint
+		exit "${build_rc}"
+		;;
 	add-cookie)
 		sync_to_windows
 		build_rc=0
@@ -429,7 +460,7 @@ case "${cmd}" in
 		exit "${build_rc}"
 		;;
 	*)
-		echo "usage: $0 [build|sync|remote-build|pull|run|automation|automation-stack|hidden-stack|paned-insert|add-cookie|multi-host-spike|hello-print|hello-script-dialog|hello-new-window|print]" >&2
+		echo "usage: $0 [build|sync|remote-build|pull|run|automation|automation-stack|hidden-stack|paned-insert|move-bounds|add-cookie|multi-host-spike|hello-print|hello-script-dialog|hello-new-window|print]" >&2
 		exit 1
 		;;
 esac

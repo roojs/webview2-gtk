@@ -1,7 +1,7 @@
 project(
   'webview2-gtk',
   ['c', 'vala'],
-  version: '0.6.14',
+  version: '0.6.16',
   meson_version: '>= 1.0.0',
   default_options: ['buildtype=debugoptimized', 'c_std=c11'],
 )
@@ -210,6 +210,16 @@ hidden_stack_exe = custom_target(
   command: [_build_bash, wv2gtk_build_sh, 'hidden-stack', build_root / 'hidden-stack', '@OUTPUT@', lib_stage],
   depends: lib_target,
   depend_files: files('examples/hidden-stack/main.vala'),
+  build_by_default: get_option('examples'),
+  install: false,
+)
+
+move_bounds_exe = custom_target(
+  'webview2gtk-move-bounds',
+  output: 'webview2gtk-move-bounds.exe',
+  command: [_build_bash, wv2gtk_build_sh, 'move-bounds', build_root / 'move-bounds', '@OUTPUT@', lib_stage],
+  depends: lib_target,
+  depend_files: files('examples/move-bounds/main.vala'),
   build_by_default: get_option('examples'),
   install: false,
 )
