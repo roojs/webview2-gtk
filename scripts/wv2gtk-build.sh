@@ -279,6 +279,9 @@ case "${MODE}" in
 		if [[ "${MODE}" == "add-cookie" ]]; then
 			EXTRA_PKGS=( --pkg webview2gtk-cookie-ext )
 		fi
+		if [[ "${MODE}" == "move-bounds" ]]; then
+			EXTRA_PKGS=( --pkg win32-foundation-stub )
+		fi
 		(
 			cd "${ROOT}"
 			# Example only — link against staged libwebview2gtk-1.a

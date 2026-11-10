@@ -12,6 +12,7 @@
 
 using Gtk;
 using WebView2Gtk;
+using Win32.Foundation;
 
 private const int BAR_HEIGHT = 80;
 private const int STABLE_HEIGHT = 240;
@@ -39,22 +40,14 @@ private bool stable_finished = false;
 [CCode (cheader_filename = "gdk/win32/gdkwin32.h", cname = "gdk_win32_surface_get_handle")]
 extern void* gdk_win32_surface_get_handle (Gdk.Surface surface);
 
-[CCode (cname = "RECT", cheader_filename = "windows.h", has_type_id = false)]
-private struct NativeRect {
-	public int left;
-	public int top;
-	public int right;
-	public int bottom;
-}
-
 [CCode (cname = "FindWindowExA", cheader_filename = "windows.h")]
-extern void* find_window_ex (void* parent, void* child_after, string class_name, void* window_name);
+extern void* FindWindowExA (void* parent, void* child_after, string class_name, void* window_name);
 
 [CCode (cname = "GetWindowRect", cheader_filename = "windows.h")]
-extern bool get_window_rect (void* hwnd, out NativeRect rect);
+extern bool GetWindowRect (void* hwnd, out Rect rect);
 
 [CCode (cname = "MapWindowPoints", cheader_filename = "windows.h")]
-extern int map_window_points (void* from, void* to, ref NativeRect rect, uint points);
+extern int MapWindowPoints (void* from, void* to, ref Rect rect, uint points);
 
 private struct ClientRect {
 	public int x;
@@ -113,16 +106,16 @@ private ClientRect[] host_windows (void* parent) {
 	ClientRect[] found = {};
 	void* after = null;
 	while (true) {
-		var hwnd = find_window_ex (parent, after, "WebView2GtkHost", null);
+		var hwnd = FindWindowExA (parent, after, "WebView2GtkHost", null);
 		if (hwnd == null) {
 			break;
 		}
 		after = hwnd;
-		NativeRect raw;
-		if (!get_window_rect (hwnd, out raw)) {
+		Rect raw;
+		if (!GetWindowRect (hwnd, out raw)) {
 			continue;
 		}
-		map_window_points (null, parent, ref raw, 2);
+		MapWindowPoints (null, parent, ref raw, 2);
 		found += ClientRect () {
 			x = raw.left,
 			y = raw.top,
