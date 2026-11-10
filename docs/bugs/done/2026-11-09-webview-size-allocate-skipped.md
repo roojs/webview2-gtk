@@ -1,7 +1,7 @@
 # Bug: native window stays put when the widget only moves
 
 **Date:** 2026-11-09
-**Status:** layout manager cleared in **0.6.15**. A move that keeps the same size is fixed in **0.6.16**. Windows smoke is `examples/move-bounds --smoke`
+**Status:** ✅ fixed in **0.6.16**. Confirmed 2026-11-10: opening the bar no longer leaves the native window painted over it.
 **Component:** `lib/webview2gtk/webview.vala` (`size_allocate`, `measure`, `layout_manager`, `on_frame_tick`)
 
 ---
